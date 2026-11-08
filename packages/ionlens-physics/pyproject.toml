@@ -1,0 +1,63 @@
+#  ionlens-physics — the forward operator F1 of doc 03.
+#
+#  L0 (analytic) lands first: it is the verification anchor that V-03 checks L1 and L2
+#  against, and it depends on nothing heavier than NumPy and SciPy. The L1 (FEniCSx) and
+#  L2 (PIC) levels arrive behind optional dependency groups so that `pip install
+#  ionlens-physics` does not drag a PDE stack in for a caller who only wants the analytic
+#  limit — doc 08 §3's stated reason for separately-installable packages.
+
+[project]
+name = "ionlens-physics"
+version = "0.1.0"
+description = "IonLens — the forward physics operator F1: analytic, fluid, kinetic and surrogate sheath models."
+readme = "README.md"
+# The L2 PIC benchmark this package feeds must run under the only JAX build proven to work
+# on the reference machine's RTX A4000 — jaxlib 0.4.13+cuda11.cudnn86, ADR-013 — and that
+# wheel exists only for cp38..cp311. The floor is 3.11, not 3.10: this package uses
+# `StrEnum`, `Self` and `datetime.UTC`, all 3.11 additions.
+#
+# Nothing is given up to get here. PEP 695 `type X = ...` was replaced by
+# `X: TypeAlias = ...` and `def f[T]` by an explicit `TypeVar`; both spellings are fully
+# valid on 3.12 and mypy resolves them identically, so this widens the deployable range
+# rather than downgrading it. The other four packages stay at `>=3.12`.
+requires-python = ">=3.11,<3.13"
+authors = [{ name = "Team Astrophage" }]
+dependencies = [
+    "ionlens-core",
+    "numpy>=2.1",
+    # doc 08 §2: SciPy is "buy". The L0 layer reaches it through ionlens.core.constants
+    # (CODATA), and the levels above it will want its special functions and quadrature.
+    "scipy>=1.14",
+]
+
+[project.optional-dependencies]
+#  L1 — doc 03 §3. doc 03 §9 makes the FEM solver a **buy** decision ("FEniCSx: mature,
+#  verified, adjoint-capable") and doc 08 §3 requires it to sit behind an extra, by name:
+#
+#      `pip install ionlens-core ionlens-inverse` must work without dragging in FEniCSx and
+#      Gmsh — a user who only wants to run the inversion on their own data should not
+#      need a PDE stack.
+#
+#  **DOLFINx itself is deliberately not listed, and that is a limitation rather than an
+#  oversight.** Its PyPI distribution is a source build that expects PETSc, Boost,
+#  pugixml, HDF5 and a C++17 toolchain to be present already; adding `fenics-dolfinx` to
+#  this list makes `uv lock` attempt that build on every developer's machine, including
+#  the ones that never import `ionlens.physics.fluid` — measured, not assumed: it does not
+#  terminate in two minutes on the reference machine. The supported route, and the one
+#  the development environment for this package uses, is conda-forge:
+#
+#      mamba create -n ionlens-fenicsx fenics-dolfinx=0.9 petsc4py mpi4py python=3.12
+#
+#  `ionlens.physics.fluid` therefore fails at import with a plain ModuleNotFoundError where
+#  the stack is absent, which is what the `pytest.importorskip("dolfinx")` in every
+#  `test_fluid_*.py` module keys off, and what the `fenicsx` pytest marker records.
+fluid = [
+    "mpi4py>=4.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ionlens"]

@@ -1,0 +1,118 @@
+#  Per-commit gate — doc 07 §7 requires this to stay under 10 minutes.
+#
+#  The heavier tiers (verification suite on PR, nightly benchmarks, weekly full suite)
+#  are separate workflows added as the phases that produce them land. Adding an empty
+#  nightly job now would only produce a green badge for work that does not exist.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_FROZEN: "1"
+
+jobs:
+  lint:
+    name: Lint and format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --all-groups
+      - name: ruff check
+        run: uv run ruff check --output-format=github .
+      - name: ruff format
+        run: uv run ruff format --check .
+
+  types:
+    name: Types (mypy --strict on ionlens-core)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --all-groups
+      # doc 08 §12: --strict is required on ionlens-core specifically. The core is the
+      # contract layer; an untyped contract is not a contract.
+      #
+      # The tests are checked too, and not as a nicety. Half of what proves the doc 08 §4
+      # Protocols actually constrain anything is a `# type: ignore[arg-type]` on a
+      # near-miss implementation: --strict includes warn_unused_ignores, so an ignore
+      # that stopped being necessary would fail the type check. That marker *is* the
+      # assertion, and it is only gated if mypy runs over the tests.
+      - run: uv run mypy packages/ionlens-core/src packages/ionlens-core/tests
+
+  registry:
+    name: Parameter registry discipline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --all-groups
+      # doc 08 §5: fails on a numeric literal in physics code outside the registry or a
+      # named constant. doc 00 C1: reports the ASSUMED count and fails on an increase.
+      - name: Literal rule and ASSUMED metric
+        run: uv run ionlens-lint packages/ionlens-core packages/ionlens-physics
+
+  test:
+    name: Tests and coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync --all-packages --all-groups
+      # doc 08 §8: physics correctness tests are reported separately from software
+      # correctness tests. 100% line coverage of a solver that silently dropped to
+      # first order is a passing suite and a broken program.
+      - name: Software tests
+        run: uv run pytest -m "not physics and not slow" --cov --cov-report=term-missing --cov-report=xml
+      - name: Physics verification tests
+        run: uv run pytest -m "physics and not slow" -v
+      - name: Coverage gate (ionlens-core >= 80%, doc 00 E5)
+        run: uv run coverage report --include="packages/ionlens-core/*" --fail-under=80
+
+  fluid:
+    name: L1 verification gates (FEniCSx)
+    runs-on: ubuntu-latest
+    # doc 08 §3 keeps FEniCSx out of the workspace environment on purpose, so the L1
+    # tests skip in the job above. Without this job the V-01, V-02, V-03 and V-04 gates
+    # are written down and never run — which is worse than not having them, because the
+    # green tick would say otherwise.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-name: ionlens-fenicsx
+          create-args: >-
+            python=3.12
+            fenics-dolfinx=0.9
+            petsc4py
+            mpich
+            numpy
+            scipy
+            pytest
+            pint
+            sympy
+          condarc: |
+            channels:
+              - conda-forge
+      - name: Physics verification gates V-01, V-02, V-03, V-04
+        shell: bash -el {0}
+        run: |
+          PYTHONPATH=packages/ionlens-core/src:packages/ionlens-physics/src:packages/ionlens-validation/src \
+            pytest packages/ionlens-physics/tests/test_fluid_*.py -v

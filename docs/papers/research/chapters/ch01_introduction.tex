@@ -1,0 +1,174 @@
+\chapter{Introduction and Motivation}
+\label{ch:intro}
+
+Every plasma put to technological use eventually meets a solid boundary: the wafer in an etch reactor, the acceleration grid of an ion thruster, the divertor tile of a tokamak, the electrode of a materials-processing discharge. The physics governing the transfer of particles, momentum, and energy across the last few Debye lengths of plasma determines whether the device works, how long it survives, and how efficiently it converts input power into useful output. This chapter frames the central problem of this monograph: the plasma-surface boundary is the narrow region through which essentially all technologically relevant plasma-matter interaction must pass, and the ion energy flux, the scalar that most directly quantifies that interaction's severity, is the variable theory predicts most confidently and the variable experiment struggles hardest to measure without altering it. We introduce the sheath's structure, define the ion energy flux as a master variable, articulate the prediction-measurement gap, review diagnostic limitations, state the reconstruction thesis, and lay out the objectives, scope, and organisation of the monograph.
+
+\section{The Plasma-Surface Boundary as a Universal Bottleneck}
+
+\subsection{Ubiquity of Bounded Plasmas}
+
+Laboratory and technological plasmas are always bounded plasmas. An idealised infinite, homogeneous plasma is a theoretical fiction; every plasma of practical interest is confined by walls, electrodes, grids, or targets, or, in electric propulsion, terminates in a vacuum plume striking a spacecraft surface or collector. Because the plasma is quasi-neutral in bulk while any immersed surface must balance differing electron and ion mobilities, every boundary organises itself into a thin, non-neutral sheath, separated from the bulk by a broader, weakly non-neutral presheath. This two-region structure recurs, with different scalings, across processing plasmas, ion thrusters, tokamak divertors, and dusty or multi-species plasmas \cite{ref0013}. However the bulk plasma is generated, the flow of particles and energy toward any wall is re-organised by the same boundary-layer physics before deposition, which is why the boundary functions as a bottleneck.
+
+\subsection{The Presheath-Sheath Architecture}
+
+The classical description begins with the Bohm requirement, later generalised kinetically, that ions enter the sheath with a directed velocity at least equal to a characteristic velocity set by the electron temperature. In the fluid, cold-ion limit this is the Bohm velocity,
+\begin{equation}
+u_{\mathrm{B}} = \sqrt{\frac{k_{\mathrm{B}} T_{\mathrm{e}}}{m_{\mathrm{i}}}},
+\label{eq:bohm-velocity}
+\end{equation}
+where $T_{\mathrm{e}}$ is the electron temperature, $m_{\mathrm{i}}$ the ion mass, and $k_{\mathrm{B}}$ Boltzmann's constant. The presheath is the extended region in which a small ambipolar field accelerates ions from thermal speed up to $u_{\mathrm{B}}$, on a scale much longer than the Debye length,
+\begin{equation}
+\lambda_{\mathrm{D}} = \sqrt{\frac{\varepsilon_{0} k_{\mathrm{B}} T_{\mathrm{e}}}{n_{\mathrm{e}} e^{2}}},
+\label{ch01-eq:debye}
+\end{equation}
+with $n_{\mathrm{e}}$ the bulk electron density and $e$ the elementary charge. Adjacent to the wall lies the sheath proper, only a few $\lambda_{\mathrm{D}}$ thick, where a strong space-charge field satisfies Poisson's equation,
+\begin{equation}
+\frac{\mathrm{d}^{2}\phi}{\mathrm{d}x^{2}} = -\frac{e}{\varepsilon_{0}}\bigl[n_{\mathrm{i}}(x) - n_{\mathrm{e}}(x)\bigr],
+\label{ch01-eq:poisson}
+\end{equation}
+with $\phi(x)$ the potential and $x$ normal to the surface. The Bohm criterion requires $u_{\mathrm{B}}$ at the sheath edge so that Eq.~\eqref{ch01-eq:poisson} yields a monotonic potential fall rather than an oscillatory or singular one \cite{ref0001}. Its kinetic generalisation, in terms of the ion velocity distribution $f_{\mathrm{i}}(v)$ at the sheath edge, is an integral inequality,
+\begin{equation}
+\int_{0}^{\infty} \frac{f_{\mathrm{i}}(v)}{v^{2}}\,\mathrm{d}v \;\le\; \frac{n_{\mathrm{e}0} m_{\mathrm{i}}}{k_{\mathrm{B}} T_{\mathrm{e}}},
+\label{eq:kinetic-bohm-intro}
+\end{equation}
+with $f_{\mathrm{i}}(v)$ normalised so $\int_0^\infty f_{\mathrm{i}}(v)\,\mathrm{d}v = n_{\mathrm{i}0}$, the sheath-edge ion density. It is thus the velocity distribution, not merely the mean, that governs whether a stable sheath forms; a slow-ion population disproportionately weakens the criterion \cite{ref0001,ref0015}. Subsequent kinetic presheath treatments \cite{ref0001}, magnetised generalisations culminating in the Bohm--Chodura criterion \cite{ref0017}, and two-fluid presheath-sheath coupling \cite{ref0023} confirm that no single, universally agreed formulation yet covers every regime \cite{ref0015}.
+
+\subsection{Consequences for Technology}
+
+Whatever flux the bulk plasma carries, the presheath-sheath system reshapes it before it reaches the wall. Ions with a broad thermal spread are selectively accelerated and, in radio-frequency or pulsed systems, further modulated by a time-varying sheath potential before impact. The wall never simply samples the bulk plasma but a boundary-layer-transformed version, a strong function of $T_{\mathrm{e}}$, $n_{\mathrm{e}}$, field obliquity, and excitation waveform, so the same nominal bulk plasma can produce markedly different surface loading — the last, and often least accessible, stage through which every plasma process routes its output.
+
+\subsection{Collisionality, Magnetisation, and Regime Diversity}
+
+The presheath-sheath architecture varies in detail across applications. In low-pressure, weakly collisional discharges the ion mean free path exceeds the sheath width, so ions cross ballistically and the sheath-edge distribution in Eq.~\eqref{eq:kinetic-bohm-intro} is set almost entirely by presheath acceleration. At higher pressure, ion-neutral collisions within the sheath randomise ion velocity and broaden the delivered energy distribution; collisional-friction formulations show the critical entry velocity, and hence the energy flux, depends measurably on collisionality \cite{ref0024}. A second axis is magnetisation: an oblique field forces ions to satisfy a magnetic presheath condition before the electrostatic sheath, splitting entry velocity into parallel and perpendicular components. A third is species asymmetry: in low-density, low-temperature plasmas an electron-repelling sheath can invert into an electron-attracting ``electron sheath'' \cite{ref0006}. Reconstructing $\Gamma_E$ across regimes requires treating these as explicit model inputs.
+
+\section{Ion Energy Flux as the Master Variable}
+
+\subsection{Definition}
+
+Among the quantities that could characterise ions arriving at a surface, this monograph identifies the ion energy flux as the single most consequential scalar. Given $f_{\mathrm{i}}(v)$ at the sheath edge, normalised so $n_{\mathrm{i}} = \int_0^\infty f_{\mathrm{i}}(v)\,\mathrm{d}v$, the ion energy flux delivered to the surface is
+\begin{equation}
+\Gamma_{E} = \int_{0}^{\infty} \left(\frac{1}{2} m_{\mathrm{i}} v^{2}\right) v\, f_{\mathrm{i}}(v)\,\mathrm{d}v,
+\label{ch01-eq:energy-flux-def}
+\end{equation}
+with units $\si{\watt\per\meter\squared}$. In the cold-fluid limit, where all ions arrive at $u_{\mathrm{B}}$ accelerated through a sheath potential drop $\phi_{\mathrm{s}}$, this reduces to
+\begin{equation}
+\Gamma_{E} \;\approx\; \Gamma_{\mathrm{i}} \left\langle E_{\mathrm{i}} \right\rangle
+\;=\; \left(n_{\mathrm{i}} u_{\mathrm{B}}\right)\left(\tfrac{1}{2} k_{\mathrm{B}} T_{\mathrm{e}} + e\phi_{\mathrm{s}}\right),
+\label{eq:energy-flux-approx}
+\end{equation}
+where $\Gamma_{\mathrm{i}} = n_{\mathrm{i}} u_{\mathrm{B}}$ is the Bohm ion flux and the bracket collects presheath kinetic and sheath potential energy gain. $\Gamma_E$ is thus composite: it multiplies a flux, set by bulk density and temperature, with an energy set by the sheath potential, itself a function of the imposed waveform, electron energy distribution, and collisionality. Reducing $f_{\mathrm{i}}(v)$ to its first moment is convenient, but Eq.~\eqref{ch01-eq:energy-flux-def} must retain the full distribution whenever it is broad, bimodal, or time-dependent, as in radio-frequency-driven and pulsed sheaths \cite{ref0105}.
+
+\subsection{Temporal Structure of the Ion Energy Flux}
+
+Equation~\eqref{ch01-eq:energy-flux-def} presumes $f_{\mathrm{i}}(v)$ stationary, but in almost every relevant boundary it is not. In a radio-frequency discharge, the sheath potential oscillates at the driving frequency, so ions crossing at different phases see different instantaneous potentials: fast-transiting ions produce a bimodal distribution reflecting the waveform extremes, while slow-transiting ions average into a narrower one. In pulsed systems, implantation, and transient fusion events, the potential rises, plateaus, and collapses on a circuit-set timescale, so instantaneous $\Gamma_E$ can differ substantially from the time-average. Departures from a Maxwellian electron distribution likewise shift both the entry velocity and the flux delivered to the sheath edge \cite{ref0090}. Reporting only time-averaged $\Gamma_E$ can mislead whenever damage responds nonlinearly to instantaneous rather than mean ion energy; since Eq.~\eqref{eq:sputter-yield} is convex above threshold, the high-energy tail can dominate cumulative erosion \cite{ref0096}, which is why the thesis requires \emph{time-resolved}, not merely time-averaged, reconstruction.
+
+\subsection{Ion Energy Flux and Surface Heating}
+
+The most direct consequence of non-zero $\Gamma_E$ is thermal loading. Every ion striking the wall deposits its full kinetic energy, plus neutralisation and secondary-electron-emission energy, into the near-surface lattice. Where substrate temperature must be tightly controlled, $\Gamma_E$ sets a hard constraint on throughput \cite{ref0080}. In fusion devices, divertor and first-wall components must absorb ion, electron, and radiative heat fluxes representing a sizeable fraction of the total power balance \cite{ref0093}. Steady-state and transient heat loads are set almost entirely by $\Gamma_E$ and its temporal statistics, not by any single plasma parameter alone.
+
+\subsection{Ion Energy Flux and Surface Erosion}
+
+The second consequence is erosion through sputtering. The sputtering yield $Y$, mean atoms removed per incident ion, is a threshold function of ion energy $E_{\mathrm{i}}$,
+\begin{equation}
+Y(E_{\mathrm{i}}) \;=\; Q \left(\sqrt{E_{\mathrm{i}}} - \sqrt{E_{\mathrm{th}}}\right)^{p}, \qquad E_{\mathrm{i}} \ge E_{\mathrm{th}},
+\label{eq:sputter-yield}
+\end{equation}
+with $E_{\mathrm{th}}$ a threshold energy, $Q$ a yield coefficient, $p$ an empirically fitted exponent typically in the range $p \approx 1.5$--$3$, and $Y=0$ below threshold. The erosion rate per unit area is
+\begin{equation}
+\dot{m}_{\mathrm{er}} \;=\; m_{\mathrm{a}} \int_{0}^{\infty} Y(E)\, \Phi_{\mathrm{i}}(E)\,\mathrm{d}E,
+\label{ch01-eq:erosion-rate}
+\end{equation}
+where $m_{\mathrm{a}}$ is the sputtered atom mass and $\Phi_{\mathrm{i}}(E)\,\mathrm{d}E$ the ion flux in $[E, E+\mathrm{d}E]$, so $\int \Phi_{\mathrm{i}}\,\mathrm{d}E = \Gamma_{\mathrm{i}}$ and $\int E\,\Phi_{\mathrm{i}}\,\mathrm{d}E = \Gamma_{E}$. Since $Y(E)$ is convex above threshold, erosion is driven disproportionately by the high-energy tail rather than the mean, so the full shape of $f_{\mathrm{i}}(v)$, not just $\Gamma_E$'s integral value, controls component lifetime, confirmed by erosion studies of fusion plasma-facing materials \cite{ref0189,ref0190} and Hall-thruster channels \cite{ref0440}.
+
+\subsection{Ion Energy Flux and Process or Propulsive Efficiency}
+
+The third domain is efficiency. In processing, ion energy delivered to a wafer must be tailored, neither too low to activate the desired chemistry nor high enough to cause damage, charging, or mask sputtering; waveform-tailoring techniques exist to sculpt the delivered distribution \cite{ref0105}. In electric propulsion, useful thrust power is carried by the axial component of the ion energy flux in the plume, while energy channelled into divergence, multiply charged states, or wall-directed flux is lost efficiency. In every case, an energy-resolved, direction-resolved ion flux is the figure of merit. Table~\ref{tab:flux-consequences} summarises this cross-cutting role.
+
+\begin{table}[htbp]
+\centering
+\caption{Illustrative cross-domain roles of $\Gamma_E$, the governing variable linking sheath physics to engineering outcomes; entries are qualitative and schematic, not measured values.}
+\label{tab:flux-consequences}
+\begin{tabularx}{\textwidth}{@{}l X X X@{}}
+\toprule
+Domain & Dominant consequence of $\Gamma_E$ & Governing relation & Representative constraint \\
+\midrule
+Plasma etching / deposition & Substrate heating and etch-rate anisotropy & Eq.~\eqref{eq:energy-flux-approx} & Ion energy window bounded above by mask/damage threshold \\
+Fusion divertor / first wall & Steady and transient heat loading, tile erosion & Eqs.~\eqref{ch01-eq:energy-flux-def}, \eqref{ch01-eq:erosion-rate} & Peak heat flux and cumulative erosion bound component lifetime \\
+Electric propulsion (Hall, gridded, RF thrusters) & Discharge-channel erosion, plume divergence loss & Eqs.~\eqref{eq:sputter-yield}, \eqref{ch01-eq:erosion-rate} & Erosion-limited operational life; thrust efficiency \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{The Prediction-Measurement Gap}
+
+\subsection{What Theory and Simulation Can Predict}
+
+The theoretical machinery in Eqs.~\eqref{eq:bohm-velocity}--\eqref{eq:kinetic-bohm-intro} is by now mature. Fluid and kinetic sheath models, particle-in-cell simulations \cite{ref0633}, and hybrid codes can predict the ion velocity distribution at a sheath edge, propagate it through a specified potential waveform, and output a predicted $\Gamma_E$ at the wall \cite{ref0001,ref0017,ref0023}, and coupled plasma-sheath-surface models close the loop from bulk state to surface response \cite{ref0101}. The forward problem is thus comparatively well posed.
+
+\subsection{Why Experimental Validation Lags}
+
+The inverse problem, measuring the flux actually delivered to a real surface with fidelity sufficient to validate the forward prediction, is far less tractable, for three reasons. First, the sheath is thin, typically a few to a few tens of Debye lengths, so diagnostics must resolve scales often sub-millimetre, or sub-micrometre in high-density plasmas. Second, the sheath potential is frequently time-dependent, so inadequate time resolution reports only a cycle- or event-averaged quantity that can misrepresent the peak flux relevant to instantaneous erosion or heating. Third, and most fundamentally, almost every technique that directly samples the ion energy distribution must itself be a material object inserted into the boundary it measures, so the act of measurement perturbs the very quantity sought. The result is a persistent gap between theoretical $\Gamma_E$ and what experiment can confirm, widening in the high-heat-flux, transient, or strongly magnetised regimes where accurate knowledge matters most \cite{ref0093}.
+
+Laser-based measurements of ion velocity distributions approaching a sheath edge, made without material insertion, have tested the Bohm criterion in multi-ion-species plasmas and typically find it satisfied only in a time- and space-averaged sense, with the instantaneous distribution deviating from the idealised single-species, cold-fluid picture \cite{ref0329}. Such results show optical measurement can interrogate sheath-edge kinetics without probe perturbation, yet even the best non-invasive measurements stop short of the energy-flux integral of Eq.~\eqref{ch01-eq:energy-flux-def}: they deliver a velocity distribution along a few optical lines of sight, not a validated, calibrated, wall-normal energy flux. Bridging that gap is what this monograph sets out to do.
+
+\section{Limitations of Existing Diagnostics}
+
+\subsection{Intrusive Electrostatic and Energy-Analysing Probes}
+
+The most direct route to an ion energy distribution is an instrument sampling ions channel by channel. Retarding field energy analysers, gridded devices rejecting ions below a swept discriminator potential, remain the workhorse across processing, fusion-edge, and propulsion plasmas alike. Swept Langmuir probes similarly remain indispensable for $T_{\mathrm{e}}$, $n_{\mathrm{e}}$, and the potentials that set the sheath drop in Eq.~\eqref{eq:energy-flux-approx}. Purpose-built ion energy flux sensors integrate Eq.~\eqref{ch01-eq:energy-flux-def} in situ on a process electrode or wafer surrogate \cite{ref0075}, and biased-substrate ion energy control is itself studied \cite{ref0539}. All such instruments share the same limitation: each is a solid object that develops its own sheath, draws current, and perturbs the plasma locally, a distortion first-order in small or low-density plasmas. Probes are also inherently point or line diagnostics; a resolved map of $\Gamma_E$ requires slow mechanical scanning or an impractically large sensor array.
+
+\subsection{Single-Modality Non-Invasive Optical Diagnostics}
+
+Optical techniques were developed to escape this perturbative burden. Laser-induced fluorescence (LIF) uses a tunable narrow-linewidth laser to excite a transition in a resonant species and detects the resulting fluorescence, its Doppler shift and broadening encoding the ion velocity distribution non-invasively \cite{ref0292}. Optical emission spectroscopy (OES), with a collisional-radiative model, offers a complementary, passive route to bulk electron temperature and density from line-intensity ratios. Both remain single-modality: LIF needs a resonant transition, restricting it to a subset of species, and returns a distribution along only a few lines of sight, with an absolute calibrated flux requiring uncertain assumptions about population fractions, quenching, and saturation. OES reports bulk electron parameters rather than the near-wall ion distribution, requiring an intermediate sheath model to bridge the two. Neither technique alone delivers a directly validated, time-resolved, absolute ion energy flux at the wall.
+
+\subsection{The Gap Between Techniques}
+
+Recommended-practice reviews of plasma and electric-propulsion diagnostics converge on one observation: no single instrument, intrusive or optical, is non-perturbing, species-general, absolutely calibrated, spatially resolved, and time-resolved on the sheath timescale \cite{ref0490,ref0511,ref0506}, a tension sharpened in the constrained setting of spacecraft propulsion \cite{ref0496}. Table~\ref{ch01-tab:diagnostics} summarises the complementary strengths and weaknesses of the two families above; no single row dominates every column, which motivates the reconstruction approach developed here.
+
+\begin{table}[htbp]
+\centering
+\caption{Qualitative, schematic comparison of representative diagnostic families for near-wall ion energy characterisation; ratings are illustrative, not measured, summaries of well-documented trade-offs.}
+\label{ch01-tab:diagnostics}
+\begin{tabularx}{\textwidth}{@{}l X X X X@{}}
+\toprule
+Technique & Invasiveness & Species / charge-state generality & Time resolution & Absolute energy-flux calibration \\
+\midrule
+Retarding field energy analyser & High (material probe, local sheath) & High & Moderate (grid RC / sweep limited) & Direct, but perturbed \\
+Swept Langmuir probe & High (material probe) & Species-agnostic (bulk parameters) & Moderate & Indirect (via sheath model) \\
+Laser-induced fluorescence & None (optical) & Restricted (resonant transitions only) & High & Indirect (needs calibration assumptions) \\
+Optical emission spectroscopy & None (optical) & Restricted (emitting species only) & Moderate--high & Indirect (bulk, not near-wall) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Thesis Statement}
+
+The central argument of this monograph is that the prediction-measurement gap is not primarily a hardware problem solved by another instrument, but an inference problem solved by combining what non-invasive measurements observe with what sheath theory constrains them to be consistent with. We state the thesis as follows: \emph{a physically consistent, time-resolved estimate of the ion energy flux at a plasma-bounding surface can be reconstructed without inserting any material object into the sheath, by fusing sparse, non-invasive optical observations with the constraints imposed by kinetic and fluid sheath theory, in place of relying on any single diagnostic technique to deliver the quantity directly.} Two ideas combine. The first is non-invasiveness: every observable is drawn from optical or non-contact measurement, so the diagnostic act does not itself modify the sheath potential, density, or ion velocity distribution, unlike the electrostatic probes above \cite{ref0539}. The second is physics-constraint: rather than treating the optical observable as alone determining $\Gamma_E$, the reconstruction enforces the kinetic Bohm criterion (Eq.~\eqref{eq:kinetic-bohm-intro}), quasi-neutrality, and the presheath-sheath energy balance (Eq.~\eqref{eq:energy-flux-approx}) as constraints on an under-determined problem. A single observable cannot alone pin down the full distribution, especially its high-energy tail, which Eq.~\eqref{eq:sputter-yield} shows disproportionately important for erosion; the physics constraint elevates a sparse measurement into a complete, time-resolved estimate of $\Gamma_E$, distinguishing this approach from both intrusive point-probe measurement and purely empirical optical calibration.
+
+\section{Objectives, Scope, and Boundaries of the Study}
+
+\subsection{Research Objectives}
+
+Four objectives follow from the thesis. First, formalise the ion energy flux, Eq.~\eqref{ch01-eq:energy-flux-def}, and its sheath-transport relations as an inference constraint rather than only a forward-simulation output. Second, identify which non-invasive, optically accessible observables, combined with sheath constraints, make reconstruction of $\Gamma_E$ well posed, distinguishing informative from merely convenient observables. Third, construct and validate a reconstruction procedure fusing these observables with physics constraints to produce a time-resolved estimate of $\Gamma_E$ and, where possible, the underlying distribution, with quantified uncertainty. Fourth, demonstrate the methodology across collisionless, weakly collisional, and radio-frequency-modulated regimes, so applicability is not confined to a single idealised limit.
+
+These objectives are deliberately ordered, each depending on the one preceding, so multi-regime demonstration is a meaningful test rather than a curve-fit confined to one regime: a reconstruction is adequate not because it reproduces a tuned forward simulation, but because it degrades predictably outside it, with the physics constraints revealing which assumptions were violated.
+
+\subsection{Scope}
+
+This monograph restricts detailed treatment to electropositive or weakly electronegative plasmas bounded by planar or weakly curved surfaces, where sheath thickness remains small compared with the local radius of curvature, so the one-dimensional formalism of Section~\ref{ch:intro} applies without geometric correction. Multiply charged, multi-species, and magnetised sheaths are addressed where the kinetic Bohm criterion admits a tractable generalisation; strongly magnetised, oblique-field configurations requiring the full Bohm--Chodura treatment appear only as a boundary case. The methodology is developed primarily for low-temperature, laboratory-accessible plasmas relevant to materials processing and electric propulsion ground testing, with fusion plasma-facing components treated as a motivating application for the erosion and heat-flux relations, Eqs.~\eqref{eq:sputter-yield}--\eqref{ch01-eq:erosion-rate}, not a setting where the full pipeline is deployed on an operating reactor.
+
+\subsection{Boundaries: What This Work Does Not Attempt}
+
+Equally important is what falls outside scope. This work does not propose new optical hardware; it develops the inference framework combining existing non-invasive observables with sheath theory to yield $\Gamma_E$. It does not attempt to resolve long-standing disputes over the precise form of the kinetic Bohm criterion \cite{ref0015}; rather, it adopts the most broadly validated forms, treating residual uncertainty as part of the error budget. Nor does it claim non-invasive reconstruction can replace intrusive probes; in strongly collisional or optically inaccessible plasmas the framework is expected to degrade gracefully toward available cross-validation.
+
+\section{Structure of the Monograph}
+
+The remainder of this monograph is organised into three parts. Part~I, comprising this chapter and those immediately following, establishes the theoretical foundation: presheath-sheath theory across collisionless, collisional, and radio-frequency-modulated regimes, building on the Bohm-criterion formalism of Eqs.~\eqref{eq:bohm-velocity}--\eqref{eq:kinetic-bohm-intro} \cite{ref0001,ref0017,ref0023}, followed by the flux's propagation into heating and erosion via Eqs.~\eqref{eq:sputter-yield}--\eqref{ch01-eq:erosion-rate}. Part~II surveys the diagnostic and modelling landscape of Table~\ref{ch01-tab:diagnostics} in dedicated chapters on intrusive and optical techniques and on fluid and kinetic models, formalises the prediction-measurement gap as an inference problem drawing on recommended-practice reviews from the processing and propulsion communities \cite{ref0490,ref0511,ref0506,ref0496}, and presents the reconstruction framework that is this monograph's principal contribution: the forward and inverse formulations of the constrained inference problem and the fusion of sparse optical observables with sheath-theory constraints. Part~III draws the threads together in a comprehensive review of the supporting literature, a discussion of open problems, and concluding remarks on extending the framework to magnetised and strongly electronegative sheaths.
+
+\section{Summary of Intended Contributions}
+
+This monograph makes four contributions. First, it consolidates the theoretical basis for treating the ion energy flux, rather than any single more easily measured parameter, as the master variable linking sheath physics to heating, erosion, and efficiency across processing, fusion, and propulsion, unifying relations usually developed separately per community. Second, it accounts for why the prediction-measurement gap for $\Gamma_E$ persists despite mature forward theory, tracing it to generalisable diagnostic limitations rather than a single missing instrument. Third, it develops a reconstruction methodology combining non-invasive optical observability with explicit sheath-theoretic constraints to recover time-resolved $\Gamma_E$ without material insertion. Fourth, it demonstrates and honestly bounds the methodology's applicability across representative regimes.
+
+\subsection*{Summary}
+
+The plasma-surface boundary is the point through which every technologically relevant plasma process must route its particle and energy output, and the ion energy flux, Eq.~\eqref{ch01-eq:energy-flux-def}, is the scalar that most directly governs the resulting heating, erosion, and efficiency of the bounding surface. Sheath theory predicts this quantity with considerable maturity, yet intrusive probes perturb the sheath they measure and single-modality optical diagnostics capture only a partial, indirect view, leaving a persistent gap. The remainder of this monograph develops and validates a non-intrusive, physics-constrained, time-resolved reconstruction of the ion energy flux, intended to close this gap within a clearly stated, honestly bounded scope.

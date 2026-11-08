@@ -1,0 +1,48 @@
+#  ionlens-validation — doc 07.
+#
+#  Verification and validation are kept structurally separate (doc 07 §1): different
+#  suites, different reports, different gates. This package holds the machinery both
+#  need — convergence studies, error norms, the sealed-truth barrier, benchmark
+#  definitions — and depends on no solver, so that a solver cannot influence the thing
+#  that judges it.
+
+[project]
+name = "ionlens-validation"
+version = "0.1.0"
+description = "IonLens — verification, validation and benchmarking machinery."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+authors = [{ name = "Team Astrophage" }]
+dependencies = [
+    "ionlens-core",
+    "numpy>=2.1",
+    "scipy>=1.14",
+    # doc 07 §2.3's manufactured solutions need the source term derived *through* the
+    # operator. A hand-derived source that is subtly wrong makes a correct solver
+    # converge at the wrong order, and the bug hunt then goes looking in the solver.
+    # Symbolic differentiation removes that failure mode entirely; doc 08 §2's rule is
+    # to buy mature libraries rather than rebuild them, and this is one.
+    "sympy>=1.13",
+    # The published swarm benchmarks are transcribed tables, held as data so a reviewer
+    # can diff them against the cited paper without reading Python. Declared explicitly
+    # rather than leaned on through ionlens-core: a package that imports yaml depends on
+    # yaml, and a transitive dependency is one refactor away from disappearing.
+    "pyyaml>=6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ionlens"]
+
+[tool.hatch.build.targets.wheel.force-include]
+# PEP 561. ionlens-validation was the only package of the four without this marker, so
+# anything importing it silently lost type checking — including the physics tests that
+# are judged against the benchmarks below.
+"src/ionlens/validation/py.typed" = "ionlens/validation/py.typed"
+# The published benchmark tables must travel with the package. Without this an
+# installed wheel imports cleanly and then fails at the first benchmark, which is
+# the worst time to discover a packaging error.
+"src/ionlens/validation/data" = "ionlens/validation/data"

@@ -1,0 +1,175 @@
+\chapter{Discussion, Open Problems and Future Work}
+\label{ch:discussion}
+
+The preceding chapters assembled a diagnostic and inferential framework for quantifying the ion energy flux $\Gamma_{E}$ across a plasma sheath, from the kinetic ion velocity distribution $f_{\mathrm{i}}(v)$ at the sheath edge, through forward models coupling sheath electrostatics to measurable observables, to regularized inverse solvers recovering $\Gamma_{E}$ and its uncertainty from noisy, partial data. This chapter asks what has been established, where the framework's assumptions are load-bearing, and what remains before the approach is a mature, transferable measurement technology: we interpret its strengths and boundaries (\cref{sec:disc-interp}), catalogue open problems (\cref{sec:disc-open}), consider extensions to magnetized sheaths, multi-species plasmas and machine-learning surrogates (\cref{sec:disc-extensions}), outline a pathway toward standardization (\cref{sec:disc-standard}), and propose future experimental campaigns (\cref{sec:disc-campaigns}).
+
+\section{Interpretation: Strengths and Boundaries of the Framework}
+\label{sec:disc-interp}
+
+\subsection{What the framework establishes}
+
+The central deliverable of this monograph is a reformulation of ion-energy-flux estimation as a constrained inverse problem rather than a single-instrument reading. For a one-dimensional collisionless sheath with ion distribution $f_{\mathrm{i}}(v)$ normalized to $n_{\mathrm{i}}$, the flux is
+\begin{equation}
+\Gamma_{E} = \int_{0}^{\infty} \tfrac{1}{2} m_{\mathrm{i}} v^{2} \, v \, f_{\mathrm{i}}(v) \, \mathrm{d}v ,
+\label{eq:disc-gammaE}
+\end{equation}
+with $m_{\mathrm{i}}$ the ion mass. \Cref{eq:disc-gammaE} is exact but not directly observable: every diagnostic returns a functional of $f_{\mathrm{i}}(v)$ convolved with an instrument response, yield curve, or line-of-sight emissivity, never $f_{\mathrm{i}}(v)$ itself. The framework treats this convolution as a forward operator $\mathcal{F}$, writes $d = \mathcal{F}[f_{\mathrm{i}}] + \varepsilon$, and recovers $f_{\mathrm{i}}$ — hence $\Gamma_{E}$ — by regularized inversion rather than back-substitution of a single probe reading into the Bohm relation.
+
+This has three strengths. It is diagnostic-agnostic: RFA traces, surface-sensor currents, and etch or erosion outcomes all reduce to the same inverse problem, differing only in the kernel of $\mathcal{F}$ \cite{ref0074,ref0075}, making the regularization machinery reusable across instrument classes. It makes assumptions explicit: every use of the Bohm criterion, every truncation of $f_{\mathrm{i}}$ to a drifting Maxwellian, every regularization choice is a traceable decision. And propagating covariance through the inversion returns $\Gamma_{E}$ with a defensible uncertainty band rather than an asserted error bar.
+
+\subsection{Where the boundaries lie}
+
+First, $\mathcal{F}$ is only as good as its sheath-edge closure: departures from a Maxwellian source — depleted, beam-like, or non-thermal upstream populations — modify both the sheath-edge speed and the shape of $f_{\mathrm{i}}(v)$ \cite{ref0090}, and regularization suppresses noise amplification without correcting model bias. Second, the framework is one-dimensional, electrostatic and, in baseline form, unmagnetized; extending to magnetized or multi-species sheaths (\cref{subsec:disc-magnetized,subsec:disc-species}) requires re-deriving $\mathcal{F}$, not re-fitting parameters. Third, the inversion is only as informative as the data are independent: fusing strongly correlated projections adds little conditioning despite nominally increasing the data count (\cref{subsec:disc-crosscal}). Finally, a meaningful sheath edge must exist; in strongly collisional, rf-modulated, or transient sheaths this requires justification, making presheath-sheath patching part of the inverse problem itself.
+
+\subsection{The role of surrogate observables}
+
+A recurring theme in the literature is using surrogate, non-invasive observables in place of direct in-sheath kinetic measurement — e.g.\ sheath-accelerated secondary electrons tracking incident ion flux during plasma immersion ion implantation \cite{ref0078}. Each such observable is a projection of $\Gamma_{E}$ through a device-specific transfer function, and inferred-flux quality is bounded by how well that function is characterized rather than by raw signal-to-noise — explaining why different sensors can report comparable accuracy despite different raw signals.
+
+\section{Open Problems}
+\label{sec:disc-open}
+
+Three classes of open problem limit the framework's present maturity: mathematical well-posedness under realistic noise, physical constraints on access to the sheath, and the metrological problem of cross-calibrating heterogeneous diagnostics.
+
+\subsection{Well-posedness under noise}
+\label{subsec:disc-wellposed}
+
+Recovering $f_{\mathrm{i}}(v)$ — and functionals such as $\Gamma_{E}$ — from a finite, noisy data vector $d \in \mathbb{R}^{M}$ is, in the Hadamard sense, typically ill-posed: small perturbations in $d$ can produce large, non-physical oscillations in $f_{\mathrm{i}}$ unless a regularization functional $\mathcal{R}[f_{\mathrm{i}}]$ is added:
+\begin{equation}
+\hat{f}_{\mathrm{i}} = \arg\min_{f_{\mathrm{i}} \geq 0} \; \left\{ \left\| \mathcal{F}[f_{\mathrm{i}}] - d \right\|_{\Sigma^{-1}}^{2} + \alpha \, \mathcal{R}[f_{\mathrm{i}}] \right\},
+\label{eq:disc-tikhonov}
+\end{equation}
+where $\Sigma$ is the data covariance and $\alpha>0$ the regularization parameter. Tikhonov-type regularization of this form has been applied successfully to tomographic laser-absorption reconstruction, with the same resolution/noise trade-off governed by $\alpha$ \cite{ref0677}; here $\mathcal{F}$ is frequently mildly nonlinear, through the self-consistent dependence of the potential profile on $f_{\mathrm{i}}$, so linear stability guarantees do not transfer automatically.
+
+A second issue is selecting $\alpha$: no general theorem guarantees a single rule is bias- and variance-minimizing across all sheath regimes, and empirical, problem-specific rules remain the norm.
+
+A third is non-uniqueness proper, distinct from noise amplification: even noise-free, a finite-dimensional $d$ constrains only finitely many moments of $f_{\mathrm{i}}(v)$, and the null space of $\mathcal{F}$ contains shapes the instrument suite cannot distinguish. The inverse Vlasov--Maxwell equilibrium problem exhibits the same non-uniqueness, and its resolution via a finite-dimensional, physically motivated basis expansion offers a template for regularizing this null space — an analogous truncation of $f_{\mathrm{i}}(v)$, e.g.\ shifted Hermite or half-range polynomial bases, is a promising, unexplored route to sharpening \cref{eq:disc-tikhonov}. A related concern is the high-velocity tail of $f_{\mathrm{i}}(v)$, which dominates $\Gamma_{E}$ through the $v^{3}$ weighting yet is where data are sparsest; dedicated tail-statistics work \cite{ref0096} indicates tail-aware regularization is necessary for controlled error.
+
+Finally, the noise model itself deserves scrutiny: \Cref{eq:disc-tikhonov} assumes additive, Gaussian noise with known $\Sigma$, yet collector currents carry Poissonian shot noise at low flux, spectroscopic inputs carry non-Gaussian counting statistics, and calibration drift introduces correlated error a diagonal $\Sigma$ cannot represent. This can bias the point estimate, not merely under-report uncertainty, since the misfit term implicitly weights coupled data points equally. A sensitivity study under Poissonian versus Gaussian noise, and diagonal versus fully populated $\Sigma$, is a tractable open problem addressable with existing synthetic-data techniques.
+
+\subsection{Optical and electrical access}
+\label{subsec:disc-access}
+
+A second class of open problem is physical: many information-rich diagnostics require optical or electrical access difficult to provide in industrially or reactor-relevant geometries. Direct kinetic diagnostics give the richest constraint on $f_{\mathrm{i}}(v)$ but typically require viewports positioned with sub-millimetre accuracy and a sightline often unavailable in production chambers, tokamak divertors, or thruster discharge channels.
+
+Electrically invasive alternatives needing no optical access remain the practical default: purpose-built ion-energy-flux sensors \cite{ref0075} and RFA-type collectors occupy this role, but each is an intrusive probe that perturbs the sheath it characterizes and carries a transmission response requiring independent calibration — reintroducing the cross-calibration problem discussed next. Validating that an RFA-type procedure recovers the true sheath-edge distribution requires an independent, fully kinetic ground truth; self-consistent PIC simulation \cite{ref0631} confirms that recovered collector-current distributions are quantitatively consistent with the simulated sheath-edge distribution. The open problem is diagnostic complementarity under access constraints: identifying, for a given access combination, the minimal diagnostic suite for which $\mathcal{F}$ stays well conditioned enough that \cref{eq:disc-tikhonov} yields acceptable-uncertainty $\Gamma_{E}$.
+
+\subsection{Cross-calibration of heterogeneous diagnostics}
+\label{subsec:disc-crosscal}
+
+The third open problem is metrological: when fusing structurally different diagnostics — an RFA-type trace, a surface-erosion outcome, a bulk plasma parameter set — the relative weighting of each stream in the misfit term is meaningful only if they are cross-calibrated on a common scale, and each carries its own systematic budget: transmission-function uncertainty for a collector, yield-model uncertainty for erosion, calibration drift for spectroscopy.
+
+Bayesian integrated data analysis (IDA), mature within magnetic-confinement fusion diagnostics, offers the best answer: rather than pre-calibrating each diagnostic in isolation, IDA treats all forward models and their systematic (nuisance) parameters jointly within a single posterior, so relative calibration is itself inferred \cite{ref0706}, as demonstrated for ITER kinetic-profile/equilibrium inference \cite{ref0706} and profile-diagnostic fusion at Wendelstein 7-X \cite{ref0713}. Extending \cref{eq:disc-tikhonov} into a full IDA framework — jointly inferring transmission functions, yield-model coefficients, and calibration parameters alongside $f_{\mathrm{i}}(v)$ and $\Gamma_{E}$ — is the highest-value extension available here, taken up as a machine-learning-accelerated variant in \cref{subsec:disc-ml}.
+
+\Cref{tab:disc-crosscal} summarizes the principal systematic-error sources for three diagnostic families and the corresponding cross-calibration strategy IDA-style joint inference makes available.
+
+\begin{table}[htbp]
+\centering
+\caption{Systematic-error sources for three diagnostic families used in ion-energy-flux inference, and the corresponding joint-inference cross-calibration strategy (schematic, not measured values).}
+\label{tab:disc-crosscal}
+\begin{tabularx}{\linewidth}{@{}l X X@{}}
+\toprule
+Diagnostic family & Principal systematic & Joint-inference treatment \\
+\midrule
+Collector / RFA-type sensor & Transmission function, sheath perturbation & Transmission function as inferred nuisance parameter \\
+Surface-erosion or etch outcome & Yield-model uncertainty, redeposition & Yield-model coefficients inferred jointly with $\Gamma_{E}$ \\
+Spectroscopic / bulk-plasma input & Calibration drift, non-Maxwellian sensitivity & Calibration parameters as shared latent variables \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Extensions}
+\label{sec:disc-extensions}
+
+\subsection{Magnetized sheaths}
+\label{subsec:disc-magnetized}
+
+The framework as developed treats the unmagnetized, or weakly magnetized, electrostatic sheath. Tokamak divertor targets, magnetized plasma-processing sources, and Hall-effect thrusters instead present a magnetized presheath-sheath system where the ion Larmor radius, Debye length $\lambda_{\mathrm{D}}$, and magnetic presheath scale length are all dynamically relevant. Ion kinetic energy and sheath thickness there depend sensitively on field-incidence angle, absent from the unmagnetized problem \cite{ref0088}; fully kinetic PIC simulation of the magnetized sheath \cite{ref0633} provides a validated forward model $\mathcal{F}_{B}$ that could replace the unmagnetized kernel used here and serve as benchmark for any reduced closure \cite{ref0631,ref0633}.
+
+The principal complication is that the sheath-edge flux becomes anisotropic: normal flux $\Gamma_{E,\perp}$ and the flux from ions striking obliquely along the field are no longer related by a simple cosine projection once gyromotion redistributes energy between field-parallel and field-perpendicular degrees of freedom. A generalized definition retaining full velocity-space structure is
+\begin{equation}
+\Gamma_{E}(\hat{n}) = \int_{\mathbb{R}^{3}} \tfrac{1}{2} m_{\mathrm{i}} |\mathbf{v}|^{2} \, (\mathbf{v}\cdot\hat{n}) \, f_{\mathrm{i}}(\mathbf{v}) \, \mathrm{d}^{3}v ,
+\label{eq:disc-gammaE-mag}
+\end{equation}
+where $\hat{n}$ is the surface normal and integration is restricted to $\mathbf{v}\cdot\hat{n} > 0$. Recovering $f_{\mathrm{i}}(\mathbf{v})$ — three velocity components rather than one — from a comparable or smaller data vector makes \cref{subsec:disc-wellposed} substantially harder, and is judged the single largest open extension of the framework. A tractable intermediate step, consistent with existing practice \cite{ref0088}, retains reduced \cref{eq:disc-gammaE} but replaces the isotropic Bohm speed with its magnetized generalization, treating field angle as a separately measured rather than jointly inferred input; this is achievable within the existing regularization architecture and is proposed as a near-term deliverable in \cref{sec:disc-campaigns}.
+
+\subsection{Additional ion species and mixed-species sheaths}
+\label{subsec:disc-species}
+
+The single-species assumption underlying \cref{eq:disc-gammaE} is violated beyond a pure noble-gas discharge: process plasmas contain multiple ion fragments, and thruster plumes contain singly and multiply charged heavy-species ions. The natural generalization sums the species-resolved flux,
+\begin{equation}
+\Gamma_{E} = \sum_{s} \int_{0}^{\infty} \tfrac{1}{2} m_{s} v^{2} \, v \, f_{s}(v) \, \mathrm{d}v ,
+\label{eq:disc-gammaE-multi}
+\end{equation}
+where the sum runs over species $s$ with mass $m_{s}$; $\mathcal{F}$ must map $\{f_{s}\}$ onto the data. PIC simulation of an ion-ion sheath and presheath \cite{ref0655} provides a fully kinetic reference, showing species-resolved sheath-edge speeds generally differ, so a single scalar Bohm speed cannot characterize a multi-species sheath edge. Non-Maxwellian sheath-formation criteria \cite{ref0090} extend naturally to this species-summed case, each contribution governed by its own closure. This extension is more favourable for well-posedness than the magnetized case: additional species can increase effective data dimensionality rather than only unknown dimensionality, provided the diagnostic resolves species by mass, charge, or arrival time.
+
+\subsection{Machine-learning surrogates}
+\label{subsec:disc-ml}
+
+The regularized inversion of \cref{eq:disc-tikhonov} is cheap for the reduced, single-species forward model used here, but each extension above raises the cost of evaluating $\mathcal{F}$: a magnetized, kinetic model \cite{ref0633}, or a joint IDA posterior (\cref{subsec:disc-crosscal}), can take seconds to minutes per evaluation — prohibitive for iterative optimization or full posterior sampling. The fusion-diagnostics community has addressed this by training neural-network surrogates of the expensive Bayesian forward model: surrogates at Wendelstein~7-X reduce inference latency by orders of magnitude while reproducing the sampler's posterior to acceptable fidelity \cite{ref0728}. Training a comparable surrogate $\hat{\mathcal{F}}_{\theta} \approx \mathcal{F}$ offline against a library of expensive kinetic simulations, then inverting online against it, directly transfers this strategy. A complementary approach learns a reduced closure rather than surrogating the full operator: a data-driven heat-flux closure \cite{ref0101} shows such reductions can be trained directly against kinetic reference data, a template for linking $T_{\mathrm{e}}$, $T_{\mathrm{i}}$, $n_{\mathrm{e}}$ to $\Gamma_{E}$ at some cost in interpretability.
+
+Two caveats apply. A surrogate trained on a finite simulation library can silently amplify the extrapolation risk in the underlying model: outside the training distribution its failure mode is typically a smooth, plausible-looking wrong extrapolation — more dangerous for a jury-facing measurement than an overtly ill-conditioned inversion. Propagating calibrated uncertainty through a neural-network surrogate is also less straightforward than through \cref{eq:disc-tikhonov}; its tail-calibration quality is not yet established for sheath problems, though dedicated tail-prediction techniques \cite{ref0096} suggest tail-aware training is achievable. Surrogates are recommended as an acceleration layer around the validated physical model, cross-checked at reduced frequency, not a wholesale replacement.
+
+\section{Pathways to Standardization of the Measurement}
+\label{sec:disc-standard}
+
+A measurement technique becomes an accepted standard only when independent laboratories can reproduce a common quantity within a stated, agreed uncertainty. The framework here is, at present, research-grade; this section outlines steps toward the consensus practice already established for other plasma diagnostics.
+
+\subsection{A reference forward model}
+
+Standardization requires fixing a reference forward operator $\mathcal{F}_{0}$ — a specific, versioned, publicly documented sheath model against which any laboratory's implementation of \cref{eq:disc-tikhonov} can be benchmarked. Since closures for non-Maxwellian sources \cite{ref0090} can differ appreciably in predicted sheath-edge speed from the classical closure, a defensible short-term strategy is not to declare one closure correct, but to require any reported $\Gamma_{E}$ carry an explicit statement of which closure was used and a sensitivity bound for leading alternatives — converting an unresolved theoretical choice into a disclosed, bounded uncertainty.
+
+\subsection{Round-robin validation against particle-in-cell benchmarks}
+
+PIC simulation, fully kinetic and self-consistent by construction, is the natural common reference for validating competing forward models and pipelines without prior agreement on sheath theory. The original fully kinetic simulation of the collisionless sheath \cite{ref0631} established this template, and subsequent PIC studies of magnetized \cite{ref0633} and multi-species ion-ion sheaths \cite{ref0655} constitute a reusable benchmark suite. A round-robin in which multiple laboratories apply their pipelines to a common synthetic dataset from an agreed PIC benchmark, with known hidden ground-truth $\Gamma_{E}$, would establish an empirical accuracy floor.
+
+\subsection{Uncertainty reporting conventions}
+
+A standardized measurement also requires a standardized uncertainty-reporting convention. The Bayesian IDA literature has converged on reporting full posterior credible intervals rather than point estimates with an ad hoc error bar \cite{ref0706,ref0713}; adopting the same for $\Gamma_{E}$ — median or mode with a credible interval, statistical uncertainty separated from systematic (closure) uncertainty — is the minimum requirement. \Cref{tab:disc-standard-tiers} sketches a three-tier maturity model for classifying a reported $\Gamma_{E}$.
+
+\begin{table}[htbp]
+\centering
+\caption{Three-tier maturity classification for a reported ion-energy-flux measurement during the transition toward standardization (proposed criteria, not observed outcomes).}
+\label{tab:disc-standard-tiers}
+\begin{tabularx}{\linewidth}{@{}l X@{}}
+\toprule
+Tier & Reporting requirement \\
+\midrule
+1 (exploratory) & Point estimate of $\Gamma_{E}$; forward-model closure stated but not sensitivity-tested \\
+2 (validated) & Posterior credible interval; closure sensitivity bound reported; single-diagnostic \\
+3 (reference) & Posterior credible interval; closure sensitivity bound; multi-diagnostic joint inference (\cref{subsec:disc-crosscal}); validated against a common particle-in-cell benchmark \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Traceability to primary standards}
+
+A fully mature standardization would trace $\Gamma_{E}$ back to primary electrical, optical, and dimensional standards through each diagnostic's calibration chain — collector current through primary current-source calibration, erosion depth through the length standard used, spectroscopic intensity through an absolutely calibrated radiometric source. This is standard metrological practice, but has not, to our knowledge, been carried through end-to-end for any published pipeline — a necessary, if unglamorous, precondition for regulatory acceptance. It is less new physics than disciplined bookkeeping: each nuisance parameter from \cref{subsec:disc-crosscal} must carry documented calibration provenance, so the reported credible interval can be decomposed into each primary-standard contribution.
+
+\section{Future Experimental Campaigns}
+\label{sec:disc-campaigns}
+
+This section proposes a sequenced set of campaigns judged to offer the highest ratio of scientific return to implementation cost.
+
+\subsection{Campaign 1: controlled single-species benchmark}
+
+The first campaign validates the baseline (unmagnetized, single-species) framework in a well-diagnosed test plasma with simultaneous collector-type and independent surface-outcome measurement \cite{ref0074,ref0075}. It applies the joint inversion of \cref{eq:disc-tikhonov} and compares recovered $\Gamma_{E}$ against each diagnostic's single-instrument estimate, quantifying the conditioning gain from data fusion (\cref{subsec:disc-crosscal}); as the lowest-risk campaign it is recommended first, establishing the baseline against which later campaigns are compared.
+
+\subsection{Campaign 2: magnetized sheath in an oblique field}
+
+The second campaign extends Campaign 1 to a magnetized presheath-sheath configuration with a controllable field-incidence angle, testing the near-term extension of \cref{subsec:disc-magnetized}: reduced one-dimensional inversion with a magnetically generalized Bohm speed, field angle treated as an independently measured input. Comparison against existing magnetized-sheath characterization \cite{ref0088} and PIC simulation of the same configuration \cite{ref0633} would establish whether this approximation is adequate across the angular range relevant to divertor-target and magnetized-source geometries, or whether the full anisotropic treatment of \cref{eq:disc-gammaE-mag} is required.
+
+\subsection{Campaign 3: multi-species discharge}
+
+The third campaign targets the multi-species extension of \cref{subsec:disc-species}, using a discharge with a measurably multi-component positive-ion population, and would validate the species-summed flux definition of \cref{eq:disc-gammaE-multi} \cite{ref0655,ref0090} against a species-resolved collector-type measurement, testing whether species-resolved data genuinely improve conditioning relative to Campaign 1's baseline.
+
+\subsection{Campaign 4: industrially relevant access-constrained validation}
+
+The fourth campaign addresses the optical-access problem of \cref{subsec:disc-access} by deploying the framework in a production-representative reactive-ion-etch or plasma-immersion-implantation chamber with only electrical access, no optical viewport, and an independent process-level cross-check on inferred $\Gamma_{E}$ through established etch models \cite{ref0074} and secondary-electron monitoring \cite{ref0078}. As the most industrially relevant campaign, it is recommended to run alongside Campaigns 2 and 3, exercising the framework's most demanding practical regime.
+
+\subsection{Campaign 5: cross-laboratory round robin}
+
+The fifth and final campaign is the standardization round robin of \cref{sec:disc-standard}: distributing a common synthetic PIC-generated dataset \cite{ref0631,ref0633,ref0655}, with hidden ground-truth $\Gamma_{E}$, to multiple laboratories for independent inversion, followed by a blinded comparison against the known truth. It requires no new hardware and could begin alongside Campaigns 1 through 4; it is listed last only because its interpretive value is greatest once Campaign 1 confirms the baseline pipeline performs correctly against real data.
+
+\section{Summary}
+
+This chapter recast ion-energy-flux inversion as an explicit, regularized inverse problem that makes modelling assumptions transparent, unifies disparate diagnostics under a common forward-operator formalism, and returns propagated uncertainty on $\Gamma_{E}$ rather than a bare point estimate. Three open-problem classes limit its maturity: well-posedness under realistic, non-Gaussian noise and forward-operator nonlinearity, including recovery of the high-energy tail of $f_{\mathrm{i}}(v)$ that dominates $\Gamma_{E}$; physical access constraints, since information-rich diagnostics often need viewports or sightlines unavailable in industrial or reactor-relevant geometries; and cross-calibrating heterogeneous diagnostics, for which Bayesian IDA offers the most promising answer. Three extensions were examined: magnetized sheaths, requiring a field-angle-dependent Bohm speed and, generally, an anisotropic flux definition that worsens well-posedness; mixed ion species, favourable since species-resolved signatures can increase data dimensionality; and machine-learning surrogates, recommended as an acceleration layer rather than a physics replacement given open questions about tail-calibration and extrapolation risk. A standardization pathway was outlined around four pillars — a versioned reference forward model with disclosed closure-sensitivity bounds, PIC-based round-robin validation, a tiered uncertainty-reporting convention, and end-to-end metrological traceability — with five future campaigns proposed, progressing from a single-species benchmark through magnetized and multi-species extensions to an access-constrained industrial validation and a cross-laboratory round robin.

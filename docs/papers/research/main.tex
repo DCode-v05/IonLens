@@ -1,0 +1,152 @@
+\documentclass[11pt,a4paper,oneside]{report}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\tolerance=2000
+\setlength{\emergencystretch}{3em}
+\hbadness=3000
+\clubpenalty=10000
+\widowpenalty=10000
+\raggedbottom
+
+\usepackage[a4paper,inner=32mm,outer=28mm,top=30mm,bottom=30mm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\setlength{\parskip}{0.54em}
+\setlength{\parindent}{1.4em}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage[binary-units=true]{siunitx}
+\DeclareSIUnit\torr{Torr}
+\DeclareSIUnit\sccm{sccm}
+\DeclareSIUnit\amu{u}
+\DeclareSIUnit\eV{\electronvolt}
+\usepackage{mhchem}
+
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{tabularx}
+\usepackage{caption}
+\usepackage{subcaption}
+\captionsetup{font=small,labelfont=bf}
+
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,calc,shapes.geometric,fit,backgrounds}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\tikzset{every picture/.style={/utils/exec={\color{black}}}}
+
+\usepackage{enumitem}
+\setlist{itemsep=2pt,topsep=3pt}
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{16pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{10pt}{28pt}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0.4pt}
+\fancyhead[L]{\small\itshape Quantifying Ion Energy Flux Across Plasma Sheaths}
+\fancyhead[R]{\small\thepage}
+\fancyfoot[C]{\small Team Astrophage \textbullet\ Techathon 2.0}
+
+\usepackage[hidelinks]{hyperref}
+\hypersetup{
+  pdftitle={Quantifying Ion Energy Flux Across Plasma Sheaths},
+  pdfauthor={Team Astrophage},
+  pdfsubject={Plasma diagnostics, sheath physics, ion energy flux},
+  bookmarksnumbered=true
+}
+\usepackage[capitalise,nameinlink]{cleveref}
+\usepackage{xurl}
+
+\usepackage[backend=biber,
+            style=numeric-comp,
+            sorting=none,
+            giveninits=true,
+            maxbibnames=12,
+            minbibnames=8,
+            maxcitenames=2,
+            doi=true,
+            url=true,
+            isbn=false,
+            eprint=true]{biblatex}
+\addbibresource{refs/references_top130.bib}
+\setcounter{biburllcpenalty}{7000}
+\setcounter{biburlucpenalty}{8000}
+
+\newcommand{\Te}{T_{\mathrm{e}}}
+\newcommand{\Ti}{T_{\mathrm{i}}}
+\renewcommand{\ne}{n_{\mathrm{e}}}
+\renewcommand{\ni}{n_{\mathrm{i}}}
+\newcommand{\lD}{\lambda_{\mathrm{D}}}
+\newcommand{\uB}{u_{\mathrm{B}}}
+\newcommand{\GammaE}{\Gamma_{E}}
+
+\begin{document}
+
+\pagenumbering{roman}
+\pagestyle{empty}
+\singlespacing
+\input{frontmatter/titlepage}
+\cleardoublepage
+\input{frontmatter/abstract}
+\input{frontmatter/acknowledgements}
+
+\pagestyle{fancy}
+\tableofcontents
+\listoffigures
+\listoftables
+\input{frontmatter/nomenclature}
+
+\cleardoublepage
+\pagenumbering{arabic}
+\onehalfspacing
+
+\part{Foundations}
+\input{chapters/ch01_introduction}
+\input{chapters/ch02_plasma_fundamentals}
+\input{chapters/ch03_sheath_theory}
+\input{chapters/ch04_ion_energy_flux}
+\input{chapters/ch05_plasma_surface}
+
+\part{Measurement and Modelling}
+\input{chapters/ch06_intrusive_diagnostics}
+\input{chapters/ch07_oes}
+\input{chapters/ch08_lif}
+\input{chapters/ch09_thomson}
+\input{chapters/ch10_interferometry}
+\input{chapters/ch11_diagnostic_fusion}
+\input{chapters/ch12_fluid_models}
+\input{chapters/ch13_kinetic_pic}
+\input{chapters/ch14_inverse_problems}
+\input{chapters/ch15_pci_framework}
+
+\part{Synthesis}
+\input{chapters/ch23_literature_review}
+\input{chapters/ch24_discussion_future}
+\input{chapters/ch25_conclusions}
+
+\appendix
+\part{Appendices}
+\input{appendices/appB_notation}
+\input{appendices/appC_diagnostic_specs}
+\input{appendices/appD_data_tables}
+\input{appendices/appE_annotated_biblio}
+
+\cleardoublepage
+\phantomsection
+\addcontentsline{toc}{part}{References}
+\nocite{*}
+\printbibliography[title={References},heading=bibintoc]
+
+\end{document}

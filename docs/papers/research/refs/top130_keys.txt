@@ -1,0 +1,131 @@
+# Allowed citation keys (top 130 by in-text reference count). Cite ONLY these.
+ref0013 | sheath-theory | Plasma-wall transition and sheath formation
+ref0090 | ion-energy-flux | Sheath Formation Criterion and Ion Flux for Non-Maxwellian Plasma
+ref0017 | sheath-theory | The Bohm–Chodura plasma sheath criterion
+ref0001 | sheath-theory | Kinetic theory of the presheath and the Bohm criterion
+ref0023 | sheath-theory | Two-Fluid Theory of Presheath and Space Charge Sheath in Low Pressure Plasmas
+ref0075 | ion-energy-flux | Development of an ion energy flux sensor for plasma processing
+ref0024 | sheath-theory | Sheath formation in low-pressure discharges, the Bohm criterion and the consequences of collisi
+ref0093 | ion-energy-flux | Power balance in a fusion reactor
+ref0490 | ep-diagnostics | Introduction: Recommended Practices for Performance and Diagnostic Measurement in Electric Prop
+ref0074 | ion-energy-flux | Model of etching profiles for ion energy flux dependent etch rates in a collisionless plasma sh
+ref0105 | ion-energy-flux | Tailored ion energy distributions on plasma electrodes (Review Article)
+ref0384 | thomson | A New Method for the Determination of Plasma Electron Temperature and Density from Thomson Scat
+ref0015 | sheath-theory | Why is there no generally accepted theory of the plasma-sheath transition and the Bohm criterio
+ref0706 | data-fusion | Simultaneous kinetic profile and magnetic equilibrium inference with Bayesian integrated data a
+ref0080 | ion-energy-flux | Plasma Ion Bombardment Induced Heat Flux on the Wafer Surface in Inductively Coupled Plasma Rea
+ref0355 | thomson | Laser Thomson scattering measurements of electron temperature and density in a Hall-effect plas
+ref0357 | thomson | Portable Thomson scattering system for temporally resolved plasma measurements under low densit
+ref0665 | kinetic | Plasma-sheath transition in the kinetic Tonks-Langmuir model
+ref0677 | inverse-problems | Tomographic laser absorption spectroscopy using Tikhonov regularization
+ref0292 | lif | Laser induced fluorescence diagnostic for velocity distribution functions: applications, physic
+ref0707 | data-fusion | Integrated data analysis of fusion diagnostics by means of the Bayesian probability theory
+ref0009 | sheath-theory | The exact form of the Bohm criterion for a collisional plasma
+ref0633 | pic | Particle-in-Cell Simulation of Magnetized Plasma Sheath
+ref0666 | kinetic | Kinetic Bohm criterion in the Tonks-Langmuir model: Assumption or theorem?
+ref0683 | inverse-problems | Bayesian modelling of Thomson scattering and multichannel interferometer diagnostics using Gaus
+ref0692 | inverse-problems | A note on convergence of solutions of total variation regularized linear inverse problems
+ref0712 | data-fusion | Integrated Data Analysis and Validation
+ref0018 | sheath-theory | Bohm Criterion in a Magnetized Plasma Sheath
+ref0304 | lif | The Application of Planar Laser-Induced Fluorescence as a Diagnostic in Plasma Processing
+ref0511 | ep-diagnostics | Measurement challenges: electric and hybrid propulsion
+ref0004 | sheath-theory | Extensions and Applications of the Bohm Criterion
+ref0096 | ion-energy-flux | Predicting PDF tails of flux in plasma sheath region
+ref0237 | oes | Optical Emission Spectroscopic (OES) analysis for diagnostics of electron density and temperatu
+ref0256 | oes | Fast Optical Emission Spectroscopy Measurements of Time-Resolved Electron Temperature in a Hall
+ref0360 | thomson | Ponderomotive perturbations of low density low-temperature plasma under laser Thomson scatterin
+ref0362 | thomson | Thomson microwave scattering for electron number density diagnostics of miniature plasmas at lo
+ref0383 | thomson | Thomson scattering diagnostic for a low-density, high-temperature, steady-state plasma
+ref0400 | interferometry | Measurement of electron density in atmospheric pressure small-scale plasmas using CO2-laser het
+ref0539 | semi-diagnostics | Control of ion energy distribution at substrates during plasma processing
+ref0553 | semi-diagnostics | Plasma diagnostics for monitoring and control
+ref0685 | inverse-problems | Two-dimensional inference of divertor plasma characteristics: advancements to a multi-instrumen
+ref0687 | inverse-problems | Inverse Problems in Magnetohydrodynamics: Theoretical and Experimental Aspects
+ref0710 | data-fusion | A Review of the Bayesian Method in Nuclear Fusion Diagnostic Research
+ref0711 | data-fusion | 2022 Review of Data-Driven Plasma Science
+ref0727 | data-fusion | Thinking Bayesian for plasma physicists
+ref0012 | sheath-theory | How to Patch Active Plasma and Collisionless Sheath: Practical Guide
+ref0077 | ion-energy-flux | The effect of ion–neutral collisions on the weakly collisional plasma-sheath and the reduction 
+ref0078 | ion-energy-flux | Direct measurements of sheath-accelerated secondary electrons for monitoring the incident ion f
+ref0101 | ion-energy-flux | Data-driven discovery of a heat flux closure for electrostatic plasma phenomena
+ref0106 | ion-energy-flux | Ion energy distributions driven by the ultra-low frequency electrical asymmetry effect in biase
+ref0143 | sputtering | Sputtering by ion bombardment: theoretical concepts
+ref0231 | oes | Optical emission spectroscopy for simultaneous measurement of plasma electron density and tempe
+ref0245 | oes | Study of argon ions density and electron temperature and density in magnetron plasma by optical
+ref0300 | lif | Laser Induced Fluorescence
+ref0354 | thomson | Advances in Thomson scattering diagnostics of plasmas used for chemical analysis
+ref0417 | interferometry | A fiber-coupled dispersion interferometer for density measurements of pulsed power transmission
+ref0496 | ep-diagnostics | An in-flight plasma diagnostic package for spacecraft with electric propulsion
+ref0541 | semi-diagnostics | Novel Method of Ion Energy and Ion Energy Distribution Function Control at the Substrate during
+ref0586 | fusion-pwi | SIRHEX - A new experimental facility for high heat flux testing of plasma facing components
+ref0631 | pic | A fully kinetic, self-consistent particle simulation model of the collisionless plasma-sheath r
+ref0659 | kinetic | Continuum kinetic and multi-fluid simulations of classical sheaths
+ref0670 | kinetic | Boltzmann and Vlasov equations in plasma physics
+ref0695 | inverse-problems | Efficient Determination of Optimal Regularization Parameter for Inverse Problem in EXAFS Spectr
+ref0713 | data-fusion | Bayesian modelling of multiple plasma diagnostics at Wendelstein 7-X
+ref0728 | data-fusion | Neural network approximation of Bayesian models for the inference of ion and electron temperatu
+ref0006 | sheath-theory | Theory of the Electron Sheath and Presheath
+ref0083 | ion-energy-flux | Fluid Model of Plasma Sheath Involving Ion Energy Spectrum
+ref0088 | ion-energy-flux | The Study of Kinetic Energy of Ion and Sheath Thickness in Magnetized Plasma Sheath
+ref0158 | sputtering | Gross and net erosion balance of plasma-facing materials in full-W tokamaks
+ref0257 | oes | Tomographic characterization of electron properties in xenon Hall thruster plasmas using collis
+ref0347 | lif-ivdf | Understanding Plasmas through Ion Velocity Distribution Function measurements
+ref0356 | thomson | Spatially resolved Thomson scattering measurements of electron properties across the accelerati
+ref0399 | interferometry | Research on measurement and processing of plasma electron density in Tokamak device
+ref0433 | hall-erosion | Simulating Plasma-Induced Hall Thruster Wall Erosion With a Two-Dimensional Hybrid Model
+ref0506 | ep-diagnostics | Diagnostics Of Plasma Propulsion Devices
+ref0540 | semi-diagnostics | Ion energy distribution measurements in rf and pulsed dc plasma discharges
+ref0548 | semi-diagnostics | Plasma diagnostics for semiconductor processing
+ref0556 | semi-diagnostics | In-Situ Diagnostics For Plasma Processing
+ref0588 | fusion-pwi | High heat flux testing of divertor plasma facing materials and components using the HHF test fa
+ref0593 | fusion-pwi | Recent DIII-D progress toward validating models of tungsten erosion, re-deposition, and migrati
+ref0637 | pic | Particle simulation of the magnetized rf plasma sheath
+ref0655 | pic | Sheath and presheath in ion-ion plasmas via particle-in-cell simulation
+ref0672 | kinetic | Ion energy distribution functions behind the sheaths of magnetized and non-magnetized radio fre
+ref0684 | inverse-problems | Bayesian inference of plasma parameters from collective Thomson scattering technique on a gas-p
+ref0709 | data-fusion | Bayesian inference applied to electron temperature data: computational performances and diagnos
+ref0719 | data-fusion | Uncertainty quantification of a multi-component Hall thruster model at varying facility pressur
+ref0731 | data-fusion | Neural network surrogates of Bayesian diagnostic models for fast inference of plasma parameters
+ref0043 | rf-sheath | High frequency sheath modulation and higher harmonic generation in a low pressure very high fre
+ref0144 | sputtering | Physical Sputtering of Solids at Ion Bombardment
+ref0189 | pmi | Comprehensive Screening of Plasma-Facing Materials for Nuclear Fusion
+ref0194 | langmuir | Analysis of the temperature influence on Langmuir probe measurements on the basis of gyrofluid 
+ref0213 | langmuir | Electron energy distribution function, plasma potential and electron density measured by Langmu
+ref0217 | langmuir | New Method for the Determination of the Electron Temperature from Langmuir Probe Characteristic
+ref0322 | lif | Laser-induced fluorescence study of a xenon Hall thruster
+ref0328 | lif-ivdf | 3D ion velocity distribution function measurement in an electric thruster using laser induced f
+ref0329 | lif-ivdf | Laser-induced-fluorescence observation of ion velocity distribution functions in a plasma sheat
+ref0338 | lif-ivdf | Laser-Induced Fluorescence Measurements of Ion Distribution Functions
+ref0454 | hall-erosion | In-Situ Diagnostic of Channel Erosion in Hall Thrusters
+ref0463 | ion-thruster | Modeling grid erosion in the NEXT ion thruster using the CEX2D and CEX3D codes
+ref0581 | fusion-pwi | High heat flux issues for plasma-facing components in fusion reactors
+ref0040 | rf-sheath | Kinetic simulation of the sheath dynamics in the intermediate radio-frequency regime
+ref0055 | rf-sheath | Ion energy distributions in rf sheaths; review, analysis and simulation
+ref0226 | langmuir | Recommended Practice for Use of Langmuir Probes in Electric Propulsion Testing
+ref0260 | crmodel | Spectroscopic measurement of electron temperature and density in argon plasmas based on collisi
+ref0266 | crmodel | Comparison of He I line intensity ratio method and electrostatic probe for electron density and
+ref0275 | crmodel | Bayesian Based Inference of Electron Temperature and Density by Using a Collisional-Radiative M
+ref0391 | interferometry | Optical diagnostics of laser-produced plasmas
+ref0425 | hall-erosion | Plasma flow and plasma–wall transition in Hall thruster channel
+ref0440 | hall-erosion | Predicting Hall Thruster Operational Lifetime
+ref0461 | ion-thruster | A review of the impact of ground test-related facility effects on gridded ion thruster operatio
+ref0480 | ion-thruster | Internal erosion rates of a 10-kW xenon ion thruster
+ref0481 | ion-thruster | Effect of facility background gases on internal erosion of the 30-cm Hg ion thruster
+ref0038 | rf-sheath | On the role of secondary electron emission in capacitively coupled radio frequency plasma sheat
+ref0123 | iedf | Plasma sheath model and ion energy distribution for all radio frequencies
+ref0152 | sputtering | Sputtering yields for low-energy Ar+- and Ne+-ion bombardment
+ref0175 | pmi | A Heat Flux Microsensor for Direct Measurements in Plasma Surface Interactions
+ref0176 | pmi | Physical modeling of plasma material interaction and first numerical results of vapor shield an
+ref0190 | pmi | Challenges for plasma-facing components in nuclear fusion
+ref0290 | crmodel | Electron energy distribution function in the collisional-radiative model of an argon plasma
+ref0610 | tokamak-edge | Scrape-off layer ion temperature measurements at the divertor target in MAST by retarding field
+ref0114 | iedf | Ion-Energy Diagnostics in the Plasma Exhaust Plume of a Hall Thruster
+ref0115 | iedf | Ion thrusters for electric propulsion: Scientific issues developing a niche technology into a g
+ref0119 | iedf | The Ion Velocity Distribution Function at the Plasma-Sheath Interface: New Boundary Conditions 
+ref0530 | etching | Plasma Characterization in Chlorine-Based Reactive Ion Beam Etching and Chemically Assisted Ion
+ref0531 | etching | RF Matching of a Reactive Ion Etching (RIE) Plasma Reactor
+ref0532 | etching | Kinetics of Reactive Ion Etching of Polymers in an Oxygen Plasma: The Importance of Direct Reac
+ref0536 | etching | Plasma and Reactive Ion Etching
+ref0600 | tokamak-edge | L-mode filament characteristics on MAST as a function of plasma current measured using visible 
+ref0605 | tokamak-edge | Magnetic Fluctuations in Gyrokinetic Simulations of Tokamak Scrape-Off Layer Turbulence
+ref0611 | tokamak-edge | Fluctuation statistics in the scrape-off layer of Alcator C-Mod

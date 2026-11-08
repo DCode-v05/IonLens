@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Commercialization Assessment, Explained — Team Astrophage</title>
+<style>
+  :root{
+    --paper:#ffffff; --tint:#f6f8fa; --ink:#1b1f24; --muted:#5a636d; --line:#e2e7ec;
+    --accent:#0f5f86; --accent-soft:#e7f1f6; --accent-2:#7a4bbd;
+    --amber:#8a6d1f; --amber-soft:#fbf4de; --green:#1f6b4a; --green-soft:#e4f3ec;
+    --red:#9a2b2b; --red-soft:#fbeaea; --code:#f2f4f7; --maxread:840px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:Georgia,"Cambria","Times New Roman",serif;font-size:18px;line-height:1.7}
+  .wrap{display:flex;max-width:1250px;margin:0 auto;align-items:flex-start}
+
+  nav.toc{position:sticky;top:0;height:100vh;overflow-y:auto;width:280px;flex:0 0 280px;
+    padding:30px 18px 60px 26px;border-right:1px solid var(--line);
+    font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif;font-size:13.5px;line-height:1.45;background:var(--tint)}
+  nav.toc .brand{font-weight:700;font-size:15px}
+  nav.toc .brandsub{color:var(--muted);font-size:11.5px;margin-bottom:16px;text-transform:uppercase;letter-spacing:.04em}
+  nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:4px 10px;border-radius:6px;border-left:2px solid transparent}
+  nav.toc a:hover{color:var(--accent);background:#eef3f6}
+  nav.toc a.active{color:var(--accent);background:#eaf2f6;border-left:2px solid var(--accent);font-weight:600}
+  nav.toc a .n{display:inline-block;width:22px;color:#9aa4ad}
+
+  main{flex:1 1 auto;min-width:0;padding:0 5vw 120px;max-width:calc(var(--maxread) + 12vw)}
+  .inner{max-width:var(--maxread);margin:0 auto}
+
+  header.hero{padding:58px 0 32px;border-bottom:1px solid var(--line)}
+  header.hero .kicker{font-family:-apple-system,"Segoe UI",Arial,sans-serif;font-size:12.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:800}
+  header.hero h1{font-family:-apple-system,"Segoe UI",Arial,sans-serif;font-weight:800;font-size:33px;line-height:1.15;margin:12px 0 14px}
+  header.hero p.lede{font-size:18.5px;color:var(--muted);margin:0}
+
+  section{padding:38px 0 6px;border-top:1px solid var(--line)}
+  section:first-of-type{border-top:none}
+  h2{font-family:-apple-system,"Segoe UI",Arial,sans-serif;font-weight:800;font-size:25px;margin:6px 0 6px;scroll-margin-top:14px}
+  h2 .sn{color:var(--accent);margin-right:10px}
+  h3{font-family:-apple-system,"Segoe UI",Arial,sans-serif;font-weight:700;font-size:18.5px;margin:26px 0 4px}
+  p{margin:12px 0}
+  strong{color:#12161b}
+  ul,ol{margin:12px 0;padding-left:24px}
+  li{margin:6px 0}
+  .lead{font-size:18.5px;color:var(--muted)}
+  code{background:var(--code);border-radius:4px;padding:1px 6px;font-size:.85em;font-family:"SFMono-Regular",Consolas,Menlo,monospace}
+
+  .box{border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--tint);border-radius:8px;padding:15px 19px;margin:20px 0;font-size:16.5px;line-height:1.6}
+  .box .lbl{font-family:-apple-system,"Segoe UI",Arial,sans-serif;font-weight:700;font-size:12px;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:6px}
+  .box.key{border-left-color:var(--accent);background:var(--accent-soft)} .box.key .lbl{color:var(--accent)}
+  .box.good{border-left-color:var(--green);background:var(--green-soft)} .box.good .lbl{color:var(--green)}
+  .box.warn{border-left-color:var(--red);background:var(--red-soft)} .box.warn .lbl{color:var(--red)}
+  .box.note{border-left-color:var(--amber);background:var(--amber-soft)} .box.note .lbl{color:var(--amber)}
+  .box.def{border-left-color:var(--accent-2);background:#f2ecfa} .box.def .lbl{color:var(--accent-2)}
+
+  .tablewrap{overflow-x:auto;margin:18px 0}
+  table{border-collapse:collapse;width:100%;font-size:14.5px;font-family:-apple-system,"Segoe UI",Arial,sans-serif}
+  th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+  th{background:var(--tint);font-weight:700}
+  tbody tr:nth-child(even){background:#fbfcfd}
+  .r-hi{color:var(--red);font-weight:800} .r-md{color:var(--amber);font-weight:800} .r-lo{color:var(--green);font-weight:800}
+
+  .stat{display:flex;flex-wrap:wrap;gap:12px;margin:20px 0}
+  .stat .s{flex:1 1 150px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--tint)}
+  .stat .s .v{font-family:-apple-system,"Segoe UI",Arial,sans-serif;font-weight:800;font-size:22px;color:var(--accent)}
+  .stat .s .k{font-family:-apple-system,"Segoe UI",Arial,sans-serif;font-size:12.5px;color:var(--muted);margin-top:2px;line-height:1.35}
+
+  .tags{font-family:-apple-system,"Segoe UI",Arial,sans-serif;font-size:14px}
+  .tag{display:inline-block;font-weight:700;border-radius:4px;padding:1px 6px;font-size:12px;margin-right:2px}
+  .tag.c{background:#fdecef;color:#9a2b2b} .tag.calc{background:#eef6fb;color:#0f5f86}
+  .tag.a{background:#eaf6ef;color:#1f6b4a} .tag.s{background:#f0edf8;color:#7a4bbd}
+
+  footer.end{border-top:1px solid var(--line);margin-top:50px;padding-top:22px;color:var(--muted);font-size:14px;font-family:-apple-system,"Segoe UI",Arial,sans-serif}
+
+  @media(max-width:960px){ nav.toc{display:none} main{padding:0 22px 90px;max-width:100%} header.hero h1{font-size:26px} body{font-size:17px} }
+  @media print{ nav.toc{display:none} .box,table,.stat{page-break-inside:avoid} }
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="toc" id="toc">
+  <div class="brand">Commercialization Assessment</div>
+  <div class="brandsub">Explained &middot; Team Astrophage</div>
+  <a href="#s0"><span class="n">00</span>What this document is</a>
+  <a href="#s1"><span class="n">01</span>The bottom line</a>
+  <a href="#s2"><span class="n">02</span>The problem being solved</a>
+  <a href="#s3"><span class="n">03</span>The value proposition</a>
+  <a href="#s4"><span class="n">04</span>The technology</a>
+  <a href="#s5"><span class="n">05</span>The evidence (the numbers)</a>
+  <a href="#s6"><span class="n">06</span>Readiness (TRL 2)</a>
+  <a href="#s7"><span class="n">07</span>The market</a>
+  <a href="#s8"><span class="n">08</span>Competition</a>
+  <a href="#s9"><span class="n">09</span>Business model &amp; exit</a>
+  <a href="#s10"><span class="n">10</span>IP &amp; moat</a>
+  <a href="#s11"><span class="n">11</span>The risks</a>
+  <a href="#s12"><span class="n">12</span>India &amp; partnerships</a>
+  <a href="#s13"><span class="n">13</span>Funding routes</a>
+  <a href="#s14"><span class="n">14</span>What is genuinely strong</a>
+  <a href="#s15"><span class="n">15</span>What to do next</a>
+</nav>
+
+<main>
+<div class="inner">
+
+<header class="hero" id="top">
+  <div class="kicker">Independent review &middot; prepared for an incubation &amp; investment committee</div>
+  <h1>The Commercialization Assessment, in plain terms</h1>
+  <p class="lede">An outside analyst assessed your technology &mdash; the physics-constrained Bayesian framework for ion energy flux &mdash; the way an investor or incubator would. This page explains what the 63-page report actually says: the verdict, the numbers, the risks, and the recommended path, without the density.</p>
+</header>
+
+<!-- ===== 0 ===== -->
+<section id="s0">
+  <h2><span class="sn">00</span>What this document is (and how it is written)</h2>
+  <p>It is an <strong>Executive Commercialization Assessment Report</strong> &mdash; a third party judging whether your work is worth incubating and investing in. It is not marketing and it is not from your team; it deliberately separates what you claim from what the analyst could verify.</p>
+  <p>The whole report runs on one rule: <strong>every number carries a tag saying where it came from.</strong> Worth knowing, because it explains the report's cautious tone.</p>
+  <div class="box def"><span class="lbl">The four tags</span>
+    <p class="tags"><span class="tag c">[C]</span> a <strong>claim by your team</strong>, not independently checked. &nbsp; <span class="tag calc">[CALC]</span> the analyst's own <strong>arithmetic</strong> (inputs shown). &nbsp; <span class="tag a">[A]</span> the analyst's own <strong>count or search result</strong>. &nbsp; <span class="tag s">[S1]</span> an <strong>external source</strong> with a live URL.</p>
+    <p style="margin-bottom:0">Sentences that begin <em>"Assessment:"</em> are the analyst's opinion; <em>"Projection (scenario):"</em> are forward-looking guesses. Almost every hard number about your results is tagged <span class="tag c">[C]</span> &mdash; meaning it is real to you, but the analyst has not seen the code run.</p>
+  </div>
+  <div class="box note"><span class="lbl">The central caution the report repeats</span>
+    <p>Every one of your benchmark figures is <strong>synthetic, self-reported, and not independently verified.</strong> Nothing has yet been tested against real laboratory data. Reading a synthetic result as a lab result, or a projected number as an achieved one, is a misreading. Keep this in mind for every "3.99%" that follows.</p>
+  </div>
+</section>
+
+<!-- ===== 1 ===== -->
+<section id="s1">
+  <h2><span class="sn">01</span>The bottom line</h2>
+  <p class="lead">If you read nothing else, read this. The verdict is <strong>cautiously positive, but firmly modest.</strong></p>
+  <div class="stat">
+    <div class="s"><div class="v">TRL 2</div><div class="k">Readiness reached &mdash; the gate the report said mattered has been cleared</div></div>
+    <div class="s"><div class="v">Pre-revenue</div><div class="k">No company, no patent, no hardware, no real data yet</div></div>
+    <div class="s"><div class="v">84</div><div class="k">Real, named customer organisations counted by hand</div></div>
+    <div class="s"><div class="v">~$8M</div><div class="k">The realistic exit comparable, not venture-scale</div></div>
+  </div>
+  <p>The five things the committee is meant to take away:</p>
+  <ol>
+    <li><strong>The problem is real and unsolved.</strong> Ion energy flux governs erosion and lifetime in thrusters, etch tools and fusion walls, and it cannot be measured without disturbing it.</li>
+    <li><strong>The differentiator survives &mdash; but it is narrower than your framing.</strong> Bayesian fusion of diagnostics is <em>not</em> new, and "four channels" is <em>not</em> the edge. The one defensible, unoccupied position is: <strong>inferring ion energy flux at a surface, through a sheath forward model, from non-intrusive optical channels only.</strong></li>
+    <li><strong>The commercial case is small and honest.</strong> No "plasma diagnostics market" figure exists, so the market was counted by hand (84 organisations). Licence income at that scale is <em>grant-scale</em>, not company-scale.</li>
+    <li><strong>The real risks are novelty and access, not technical failure.</strong> The method might work and still be hard to patent; and access to a validation lab is a live problem.</li>
+    <li><strong>Fund it as research infrastructure with a plausible modest exit &mdash; not as a venture bet.</strong></li>
+  </ol>
+  <div class="box good"><span class="lbl">The single most creditworthy thing in the file</span>
+    <p>The report says your team's <strong>honesty posture</strong> is the strongest asset it found: you pre-committed to reporting only the pessimistic result, you deliberately built in model mismatch to avoid fooling yourselves, and you published the configuration that made your own headline claim fail. "A team that publishes the configuration that made its own headline claim fail is displaying the behaviour this class of investment most needs and least often gets."</p>
+  </div>
+</section>
+
+<!-- ===== 2 ===== -->
+<section id="s2">
+  <h2><span class="sn">02</span>The problem being solved</h2>
+  <p>Ion energy flux at a plasma&ndash;surface boundary sets how fast a surface heats and erodes &mdash; and in all three target industries it is <strong>causal</strong> for lifetime, yet cannot be measured directly without perturbing it. The report shows two measurement routes, both of which fail in a documented way:</p>
+  <ul>
+    <li><strong>Intrusive probes perturb what they measure.</strong> A Langmuir probe in low-pressure argon is expected to <strong>underestimate density by ~50%</strong> <span class="tag s">S1</span>. The field found it necessary to publish three formal "Recommended Practice" papers for probe use in one 2017 journal issue &mdash; "fields do not codify practice that is working reliably."</li>
+    <li><strong>Single optical diagnostics see only part of the state.</strong> They do not perturb, but each returns a partial observable, leaving the problem underdetermined.</li>
+  </ul>
+  <p>That structure &mdash; partial non-perturbing observables plus a known physical model &mdash; is <strong>the textbook setup for an inverse problem</strong>, which is why the approach is appropriate in principle. What the gap costs today:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Industry</th><th>What the gap costs (from the report)</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Electric propulsion</strong></td><td>NASA's NEXT thruster life test ran <strong>June 2005 to Sept 2013</strong> (~8 yrs 3 mo), 50,170 hours, 902 kg of xenon &mdash; qualification measured in calendar years. HERMeS ran multiple multi-thousand-hour wear tests just as a pathfinder <span class="tag s">S3, S13, S14</span>.</td></tr>
+      <tr><td><strong>Fusion</strong></td><td>ITER divertor targets must survive <strong>10&ndash;20 MW/m&sup2;</strong> (~10&times; a re-entering spacecraft); 54 ten-tonne cassettes, replaced at least once in machine life <span class="tag s">S15</span>.</td></tr>
+      <tr><td><strong>Semiconductor</strong></td><td>Honest gap: every "$2M&ndash;$8M/hour downtime" figure traced to content-farm blogs with no primary source, so the report <strong>refuses to quote a cost</strong>. This is flagged as the most commercially significant open gap.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ===== 3 ===== -->
+<section id="s3">
+  <h2><span class="sn">03</span>The value proposition &mdash; and what it is NOT</h2>
+  <p>Measured against the real baseline (a retarding-field analyser inserted into the plasma), the report accepts four selling points. The one it rates highest is the third:</p>
+  <ol>
+    <li>Designed to leave the plasma undisturbed (all four channels non-intrusive).</li>
+    <li>Returns a <strong>calibrated posterior</strong> (an answer with honest error bars), not a single number.</li>
+    <li><strong>It states what it cannot resolve.</strong> "A framework that declares its own blind spots is more useful to a qualification engineer than one that returns a confident number everywhere &mdash; and it is the hardest claim for a competitor to retrofit."</li>
+    <li>Reaches where hardware cannot go (optical access where probes do not survive).</li>
+  </ol>
+  <div class="box warn"><span class="lbl">Three claims the report says you must NOT make</span>
+    <ul style="margin-bottom:0">
+      <li><strong>Not "the first Bayesian fusion of plasma diagnostics."</strong> Integrated Data Analysis has run at ASDEX Upgrade since ~2004; the method is well published.</li>
+      <li><strong>Not "more channels than anyone."</strong> Minerva at W7-X fuses the same four; Minerva at JET models ~ten. And your own benchmark showed a fourth channel added <em>naively</em> made things worse &mdash; so channel count was never the edge.</li>
+      <li><strong>Not "faster."</strong> Neural-network surrogates for this exact problem already exist.</li>
+    </ul>
+  </div>
+  <div class="box key"><span class="lbl">The claim that survives &mdash; memorise this sentence</span>
+    <p>"Inference of ion energy flux <strong>at a surface</strong>, <strong>through a sheath forward model</strong>, from <strong>non-intrusive optical channels only</strong>." The report verified that no competing framework it read occupies this exact position. That precise sentence &mdash; not "Bayesian" and not "four channels" &mdash; is your defensible ground.</p>
+  </div>
+</section>
+
+<!-- ===== 4 ===== -->
+<section id="s4">
+  <h2><span class="sn">04</span>The technology, as the analyst understood it</h2>
+  <p>The report files you under a category that does not yet exist on any analyst's list: <strong>model-based inferential instrumentation</strong> &mdash; software that turns an incomplete set of measurements into an estimate of an unmeasurable quantity, with a stated uncertainty, by inverting a first-principles model.</p>
+  <p>Architecture (your description, <span class="tag c">[C]</span>, not independently run):</p>
+  <ul>
+    <li>Observation model <code>y = F(x) + &epsilon;</code>, with <code>F</code> a strict four-layer chain: plasma physics &rarr; emission/scattering &rarr; optical transport &rarr; detector.</li>
+    <li>Inversion via Bayes, with <strong>sheath theory as a structural prior</strong> &mdash; the sampler can only propose states that satisfy Poisson's equation. The report calls this "the technically distinctive decision": impossible states become <em>unreachable</em>, not merely improbable.</li>
+    <li>Six inference engines behind one interface, for cross-validation; four fused optical channels (OES, LIF, Thomson, interferometry).</li>
+  </ul>
+  <div class="box warn"><span class="lbl">The one number the report says must not be misread</span>
+    <p>Your "<strong>~33 hours on one RTX A4000</strong>" for the full simulation programme is a <strong>projection, not a runtime.</strong> It rests on an <em>assumed</em> GPU throughput that has not been measured. The L1 fluid solver was since measured (86 ms vs a 1 s estimate &mdash; good), but the L2 particle-push speed the 33 h actually depends on was not, and you carried it forward rather than closing it. The report says flagging this yourselves is "among the strongest credibility signals in the submission."</p>
+  </div>
+</section>
+
+<!-- ===== 5 ===== -->
+<section id="s5">
+  <h2><span class="sn">05</span>The evidence &mdash; the numbers, and how to quote them</h2>
+  <p>Your benchmark reports in four tiers. Only the hardest one (T2) is meant to be quoted publicly:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Tier</th><th>Mean rel. error</th><th>What it tests</th></tr></thead>
+    <tbody>
+      <tr><td>T0 analytic</td><td>0.012%</td><td>self-consistency, closed form</td></tr>
+      <tr><td>T0 fluid inverted</td><td>0.035%</td><td>self-consistency, numerical</td></tr>
+      <tr><td>T1 noise added</td><td>0.050%</td><td>optimistic / "inverse-crime" tier</td></tr>
+      <tr><td><strong>T2 honest, mismatched</strong></td><td><strong>3.99% &plusmn; 2.76%</strong></td><td><strong>the only tier to quote publicly</strong></td></tr>
+    </tbody>
+  </table></div>
+  <p>The T2 figure is a mean over 10 noise realisations against the true flux at a sealed point (an analytic 9.40 kW/m&sup2;). By your own rule you must quote the two supporting numbers beside it: <strong>density &minus;3.54%</strong> and <strong>temperature +8.20%</strong>.</p>
+  <div class="box key"><span class="lbl">The commercial claim is calibration, not accuracy</span>
+    <p>The number that decides whether anyone buys this is <strong>coverage: 8 of 10 credible intervals cover the truth at the 90% level</strong> (against 0 of 10 for naive fusion). In plain terms: your error bars are roughly honest. Two caveats the report insists go with it: at only 10 runs, 8/10 and 9/10 are statistically indistinguishable; and 80% against a 90% target is mild <em>under</em>-coverage.</p>
+  </div>
+  <div class="box good"><span class="lbl">The finding worth more than the headline number</span>
+    <p>Fusing four channels <em>naively</em> gave <strong>25.7% error at 0/10 coverage</strong> &mdash; confidently wrong, with error bars four times too narrow. A per-channel audit traced it to one channel (<strong>OES</strong>) understating its own uncertainty by <strong>29&ndash;138&times;</strong>. <strong>Down-weighting</strong> that channel (rather than dropping it) recovered <strong>3.99% at 8/10 coverage with all four channels kept.</strong> This is the story the report says to lead with: catching an inverse problem lying to itself, which is exactly what the technology is for.</p>
+  </div>
+  <div class="box note"><span class="lbl">The +8.2% temperature bias, and the biggest open gap</span>
+    <p>The temperature error was traced to a fixable modelling detail (a LIF sampling node that is not quite the sheath edge) &mdash; "a located, fixable defect rather than a diffuse one." <strong>But the highest-value missing item in the whole report is the identifiability map</strong>: the analysis of which regions of operating space can actually be resolved. Your machinery for it exists but it was <em>not computed</em>. This is the joint-highest risk and the one with the least evidence &mdash; and it needs only compute and time, not money or hardware.</p>
+  </div>
+</section>
+
+<!-- ===== 6 ===== -->
+<section id="s6">
+  <h2><span class="sn">06</span>Readiness: TRL 2, and what that does and doesn't mean</h2>
+  <p>The report maps you against NASA's official <em>software</em> readiness scale and assigns <strong>TRL 2</strong>: all four clauses met, including the two that require working code and experiments on synthetic data. "The gate this assessment named has been cleared."</p>
+  <div class="box note"><span class="lbl">Read TRL 2 precisely</span>
+    <p>TRL 2 is a statement about <strong>work performed, not work succeeding</strong> &mdash; the clause is met simply because the experiments were <em>run</em>. It also rests on your report of execution, not independent verification. <strong>TRL 3 needs validation against real laboratory data</strong>, which is the next real gate and is still open. An assessor's fair ask is to watch the benchmark actually run.</p>
+  </div>
+  <p>The maturity dashboard's most telling feature is its <strong>asymmetry</strong>: <strong>Documentation scores 4</strong> while everything else scores 1&ndash;3. You have specified far more than you have built, and built far more than you have validated &mdash; "the correct shape to start from" for a rigorous researcher without lab access. It becomes a warning only if it persists after funding.</p>
+</section>
+
+<!-- ===== 7 ===== -->
+<section id="s7">
+  <h2><span class="sn">07</span>The market: the category doesn't exist, so it was counted by hand</h2>
+  <p class="lead">The single most important market finding: <strong>there is no credible published "plasma diagnostics market size."</strong> All eight major research houses were checked; none publishes one. The only sources that do are report mills whose figures for the same category differ ~7&times;.</p>
+  <p>This cuts both ways: no analyst tailwind and no budget line a customer already owns &mdash; but also no incumbent sized and funded against the category. So the market was built <strong>bottom-up from named organisations</strong>:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Counted, addressable organisations</th><th>#</th></tr></thead>
+    <tbody>
+      <tr><td>Private fusion companies (from a dated archive of the FIA roster)</td><td>46</td></tr>
+      <tr><td>Fusion education &amp; research partners</td><td>21</td></tr>
+      <tr><td>Plasma etch tool makers (named)</td><td>10</td></tr>
+      <tr><td>Electric-propulsion test facilities (a floor, least-evidenced)</td><td>7</td></tr>
+      <tr><td><strong>Total serviceable market</strong></td><td><strong>84</strong></td></tr>
+    </tbody>
+  </table></div>
+  <p>At the one published comparable price (a Cambridge COMSOL seat, &pound;3,025/seat/yr), 84 organisations yield:</p>
+  <div class="stat">
+    <div class="s"><div class="v">&pound;254,100</div><div class="k">1 seat each / year</div></div>
+    <div class="s"><div class="v">&pound;508,200</div><div class="k">2 seats each / year</div></div>
+    <div class="s"><div class="v">&pound;762,300</div><div class="k">3 seats each / year</div></div>
+  </div>
+  <div class="box warn"><span class="lbl">The consequence, stated plainly</span>
+    <p>That whole band is <strong>the same size as a single research grant</strong> (on-topic awards run $300k&ndash;$400k each), and it assumes <em>universal</em> adoption. So: <strong>licence revenue alone does not build this company.</strong> This is a real limit, not a presentation problem.</p>
+  </div>
+  <p>The big money figures on your own slide are <strong>adjacent context, not your market</strong>: wafer-fab equipment $115.7B (2025), total semi equipment $133B&rarr;$156B, fusion funding $4.48B raised in a year ($14.24B to date = $13.26B private + $0.98B public), space propulsion $10.21B&rarr;$20.02B. The report commends you for labelling them as context rather than passing them off as addressable.</p>
+</section>
+
+<!-- ===== 8 ===== -->
+<section id="s8">
+  <h2><span class="sn">08</span>Competition</h2>
+  <p>Bayesian fusion of plasma diagnostics is an <strong>established research discipline</strong>, not empty space. The frameworks the analyst actually read:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Framework</th><th>Targets sheath ion energy flux?</th></tr></thead>
+    <tbody>
+      <tr><td>Minerva (W7-X), IDA (ASDEX Upgrade)</td><td><strong>No</strong> &mdash; core/edge profiles, no sheath, no surface flux.</td></tr>
+      <tr><td><strong>D-MIBAS (MAST-U)</strong> &mdash; the closest competitor</td><td><strong>Partial.</strong> Multi-diagnostic Bayesian inference in the plasma&ndash;surface region; derives heat &amp; ion fluxes with uncertainty. But <em>no sheath forward model</em> and <em>not non-intrusive</em> (uses Langmuir probes).</td></tr>
+      <tr><td>Hall-thruster Bayesian calibration; Bayesian LIF</td><td>Partial / no &mdash; plume current density, or a single diagnostic. A method you would subsume, not a rival.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box warn"><span class="lbl">The principal competitive threat, named</span>
+    <p><strong>D-MIBAS should be treated as the benchmark.</strong> Its two structural gaps are exactly the two things you fix &mdash; which is a strong story, but also means the same group "is plausibly one publication away from closing them." It already publishes hard accuracy numbers (6%/5%/30%), the "triple" your 3.99% sits inside.</p>
+  </div>
+  <p><strong>The commercially strongest finding:</strong> every entity with a <em>published error bar</em> is academic; no vendor page checked shows an accuracy figure or uncertainty budget for the ion-energy quantity. Two cautions: it is a finding about the pages checked, not a census; and your 3.99% is synthetic and self-reported while every other point is peer-reviewed, so it must be plotted and quoted distinctly.</p>
+  <div class="box note"><span class="lbl">The highest-consequence commercial fact</span>
+    <p><strong>Applied Materials has acquired Impedans</strong> (maker of the incumbent intrusive analyser). This cuts two ways: it removes the most obvious independent hardware partner, and it proves the largest equipment vendor thinks this measurement is worth owning.</p>
+  </div>
+</section>
+
+<!-- ===== 9 ===== -->
+<section id="s9">
+  <h2><span class="sn">09</span>Business model and realistic exit</h2>
+  <p>Each pathway is anchored to a real company:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Pathway</th><th>Comparable</th><th>What it tells you</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Federal R&amp;D funding, modest exit</strong></td><td><strong>Tech-X</strong> (plasma-sim software): $111M federal funding over <strong>31 years</strong>, sold to Silvaco for <strong>$8.0M</strong>.</td><td>The single most directly comparable data point. Viable and durable &mdash; not venture-scale.</td></tr>
+      <tr><td>Perpetual licence, no VC</td><td>MathWorks: $1.5B revenue, profitable since 1984.</td><td>The licence model compounds &mdash; over decades, not quarters.</td></tr>
+      <tr><td>Employee ownership</td><td>Kitware: 200+ staff, $39M revenue, employee-owned.</td><td>Services-on-open-source scales further than licensing at this size.</td></tr>
+      <tr><td>Public-market physics software</td><td>Schr&ouml;dinger: $199.5M software revenue, <strong>net loss $103.3M</strong>.</td><td>Even at scale, physics software can be loss-making.</td></tr>
+      <tr><td><em>Ceiling case (discounted)</em></td><td>Synopsys/Ansys ~$35B.</td><td>A multi-decade platform &mdash; <strong>not a comparable for a TRL-2 project.</strong></td></tr>
+    </tbody>
+  </table></div>
+  <p><strong>Recommended sequencing:</strong> (1) fund the next gate with <strong>non-dilutive research money, not equity</strong> &mdash; the licence market is too small to justify dilution; (2) pair with instrumentation only if you want the larger (&pound;158M / $90M / $60M) instrument-plus-software exit; (3) treat licence revenue as a signal of adoption, not the business.</p>
+  <div class="box key"><span class="lbl">How the committee is told to size its expectations</span>
+    <p>Against <strong>Tech-X's $8M</strong>, not the Ansys headline. "The pathway is viable and durable; it is not venture-scale." Fund it as research infrastructure with a plausible modest exit.</p>
+  </div>
+</section>
+
+<!-- ===== 10 ===== -->
+<section id="s10">
+  <h2><span class="sn">10</span>IP and the moat</h2>
+  <p>The patent search (18 patents reviewed, 23 queries) found <strong>no patent claiming exactly your combination</strong>: Bayesian inversion of multiple fused non-intrusive optical diagnostics against a physics-based sheath model to produce a calibrated posterior over ion energy flux. The closest live art is a Lam Research patent coupling an optical signal to a sheath quantity inside a control loop.</p>
+  <div class="box warn"><span class="lbl">The finding that inverts the usual reading</span>
+    <p>A thin patent record here is <strong>a novelty risk, not open whitespace.</strong> The <em>non-patent</em> literature is dense with exactly this method &mdash; and dense non-patent prior art is a <strong>validity problem</strong> (it is the likeliest reason the patent record looks empty). Practical consequence: a <strong>literature-based prior-art search</strong> is worth more than more patent keyword searching. If you file, the defensible combination is the method <em>plus a control action conditioned on a posterior credible interval</em> &mdash; the piece the academic literature does not contain.</p>
+  </div>
+  <p>Filing cost is small (~$4,352 in government PCT fees before attorney costs), with possible fee reductions &mdash; so cost is not the barrier; defensibility is.</p>
+</section>
+
+<!-- ===== 11 ===== -->
+<section id="s11">
+  <h2><span class="sn">11</span>The risks, ranked</h2>
+  <p>Ten risks scored probability &times; impact (1&ndash;5). The two highest are not "the tech breaks":</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Risk</th><th>What it means</th><th>Score</th></tr></thead>
+    <tbody>
+      <tr><td><strong>R1 Identifiability</strong></td><td>Flux may be unresolvable across much of the operating space &mdash; and the map proving otherwise was not computed.</td><td class="r-hi">16</td></tr>
+      <tr><td><strong>R4 Novelty</strong></td><td>The method works but can't be defended, because dense non-patent prior art threatens validity.</td><td class="r-hi">16</td></tr>
+      <tr><td><strong>R8 Market</strong></td><td>Licence revenue alone (grant-scale) cannot sustain a company.</td><td class="r-hi">15</td></tr>
+      <tr><td><strong>R2 Validation</strong></td><td>T2 accuracy could land too wide to be decision-useful. Lowered to 10 on the 3.99% result.</td><td class="r-md">10</td></tr>
+      <tr><td>R5 Competition</td><td>D-MIBAS closes its two gaps first.</td><td class="r-md">12</td></tr>
+      <tr><td>R9 Execution</td><td>No secured access to a validation facility (a specific route <em>does</em> exist &mdash; see next section).</td><td class="r-md">12</td></tr>
+      <tr><td>R6 / R7</td><td>An incumbent absorbs the capability / buyers have no habit of paying for calibrated uncertainty.</td><td class="r-md">9</td></tr>
+      <tr><td>R3 Compute</td><td>The 33 h budget rests on an unmeasured GPU throughput &mdash; but you gate it, so low consequence.</td><td class="r-lo">8</td></tr>
+      <tr><td>R10 Regulatory</td><td>Possible export-control / dual-use concern &mdash; unverified, weakest-evidenced risk.</td><td class="r-lo">6</td></tr>
+    </tbody>
+  </table></div>
+  <p>The report's read: <strong>R1</strong> is "the method might not deliver its output"; <strong>R4</strong> is "it works and can't be defended"; <strong>R9</strong> (facility access) is the most tractable because a route is already identified. This argues for spending early money on <strong>partnership and prior-art clearance, not engineering.</strong></p>
+</section>
+
+<!-- ===== 12 ===== -->
+<section id="s12">
+  <h2><span class="sn">12</span>India, strategic fit, and partnerships</h2>
+  <p>The strongest strategic hooks the report found &mdash; all tied to named, funded programmes:</p>
+  <ul>
+    <li><strong>India Semiconductor Mission (Semicon 2.0)</strong> &mdash; &#8377;127,500 crore; its "Machines and Materials" pillar covers process-control instrumentation. The strongest hook available.</li>
+    <li><strong>ISRO electric propulsion</strong> &mdash; completed a 1,000-hour thruster life test (300 mN, 5.4 kW) in March 2025, explicitly monitoring <em>electrode-liner erosion</em>. "That is precisely the quantity this technology infers &mdash; the most direct national application in the file."</li>
+    <li><strong>ITER-India</strong> (India delivers "Selected Diagnostics"); <strong>National Quantum Mission</strong> (precedent for funding measurement science).</li>
+  </ul>
+  <div class="box good"><span class="lbl">The single most actionable item in the whole dossier</span>
+    <p><strong>AIC-Plasmatech at the Institute for Plasma Research (IPR), Gandhinagar.</strong> It is the <em>only</em> Indian organisation with a named plasma-diagnostics group <em>and</em> electric-propulsion work &mdash; and it hosts a deep-tech incubator wholly owned by the Department of Atomic Energy, inside the one institution with the lab you need. It directly addresses the facility-access risk (R9). International targets named: Georgia Tech HPEPL, DIFFER (Netherlands), Max Planck IPP.</p>
+  </div>
+  <p>Note the discipline: "Nothing below is a relationship. All are verified <em>targets</em>." No partnership is claimed that does not exist.</p>
+</section>
+
+<!-- ===== 13 ===== -->
+<section id="s13">
+  <h2><span class="sn">13</span>Funding routes actually available to you</h2>
+  <p>Because the applicant is India-based, the most-cited instrument is <strong>ruled out</strong>, and the report is emphatic about it:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Instrument</th><th>Fit</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Startup India Seed Fund</strong></td><td><strong>Best fit.</strong> Up to &#8377;20 lakh grant (+ &#8377;50 lakh for market entry); space &amp; defence are preference sectors.</td></tr>
+      <tr><td>NIDHI-PRAYAS</td><td>Up to &#8377;10 lakh, via a partner incubator &mdash; AIC-Plasmatech is the natural host.</td></tr>
+      <tr><td>Technology Development Board</td><td>Not yet &mdash; needs TRL above 6; you are at 2.</td></tr>
+      <tr><td><strong>US SBIR</strong></td><td><strong>Not available.</strong> The decisive bar is <em>place of performance</em>: all funded work must be done in the US. Incorporating a US entity would not help, because the science couldn't then be done in India.</td></tr>
+      <tr><td>BIRAC</td><td>Not applicable (biotechnology remit).</td></tr>
+    </tbody>
+  </table></div>
+  <div class="box key"><span class="lbl">What the next stage costs, and why sequencing matters</span>
+    <p>The defensible envelope for a funded validation programme is <strong>$300,000&ndash;$399,999.56</strong> (bracketed by three real on-topic Thomson-scattering awards). But the immediate next gate needs <strong>no hardware &mdash; only compute and time.</strong> And industrial lab rates run ~6&times; academic rates, so the report argues strongly for <strong>completing lab validation before incorporating</strong>: "the cheapest possible action is also the one that resolves the most uncertainty."</p>
+  </div>
+</section>
+
+<!-- ===== 14 ===== -->
+<section id="s14">
+  <h2><span class="sn">14</span>What is genuinely strong (say this to the jury)</h2>
+  <div class="box good"><span class="lbl">The report's own list</span>
+    <ul style="margin-bottom:0">
+      <li>You <strong>pre-committed to reporting only the pessimistic tier</strong> (T2) &mdash; and honoured it.</li>
+      <li>You <strong>designed deliberate model mismatch</strong> into the benchmark to avoid "inverse crime" (fooling yourself with a too-easy test).</li>
+      <li>You <strong>reported the negative four-channel result against your own stated differentiator</strong>.</li>
+      <li>You <strong>gated your own weakest assumption</strong> (the compute projection) instead of hiding it.</li>
+      <li>Your pre-benchmark self-rating of "TRL 1&ndash;2" was <strong>honest, not inflated</strong>.</li>
+      <li><strong>Documentation maturity far exceeds every other axis</strong> &mdash; unusual, and in the right direction.</li>
+    </ul>
+  </div>
+  <p>The bibliometrics carry one honest tension worth knowing before a judge raises it: the niche itself ("plasma sheath" + "ion energy") is <strong>thin and flat</strong> &mdash; which reads either as untouched whitespace <em>or</em> as a field the community found intractable. The defensible framing is the adjacent one: <strong>the method (uncertainty quantification in plasma) is the fastest-growing series measured</strong>, while the specific intersection is unoccupied. That is a real tailwind without over-claiming.</p>
+</section>
+
+<!-- ===== 15 ===== -->
+<section id="s15">
+  <h2><span class="sn">15</span>What to do next (the report's priority order)</h2>
+  <p>Ranked by how much each would change a committee's decision:</p>
+  <ol>
+    <li><strong>Produce any T2 accuracy figure at all.</strong> This is the one gap that turns the dossier from a proposal into evidence &mdash; and it needs compute and time, not money. <em>(You have since done this: 3.99% at 8/10 coverage.)</em></li>
+    <li><strong>Do a literature-based prior-art clearance.</strong> The novelty risk (score 16) rests on non-patent art; keyword patent searches do not address it.</li>
+    <li><strong>Get a written lab-access agreement</strong> &mdash; AIC-Plasmatech at IPR is the specific, identified route.</li>
+    <li><strong>Find a primary source for semiconductor process-excursion cost</strong> &mdash; the semiconductor value argument currently rests on no quotable number.</li>
+    <li><strong>Compute and publish the identifiability map</strong> &mdash; the highest-value technical item still open.</li>
+  </ol>
+  <div class="box key"><span class="lbl">The one-line recommendation to the committee</span>
+    <p>Fund this as <strong>research infrastructure with a plausible modest exit, not as a venture bet.</strong> The problem is real, the differentiator is precise and defensible, the honesty is exceptional &mdash; and the market, exit comparables, and absence of a category all point to a durable, grant-funded outcome rather than a large one. The cheapest next action (compute + prior-art clearance + a lab agreement) resolves the most uncertainty.</p>
+  </div>
+</section>
+
+<footer class="end">
+  <p><strong>Team Astrophage</strong> &mdash; plain-language summary of the <em>Executive Commercialization Assessment Report</em> (63 pp). Every figure here traces to that report; where it tags a number <span class="tag c">[C]</span> (your claim, unverified), <span class="tag calc">[CALC]</span> (analyst arithmetic), <span class="tag a">[A]</span> (analyst count) or <span class="tag s">[S]</span> (external source), the same caution carries into this summary. Nothing in the report has yet been tested against real laboratory data.</p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('nav.toc a'));
+  var map={}; links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a;});
+  var secs=links.map(function(a){return document.getElementById(a.getAttribute('href').slice(1));}).filter(Boolean);
+  function on(){var p=scrollY+120,c=secs[0];for(var i=0;i<secs.length;i++){if(secs[i].offsetTop<=p)c=secs[i];}
+    links.forEach(function(a){a.classList.remove('active');}); if(c&&map[c.id])map[c.id].classList.add('active');}
+  addEventListener('scroll',on,{passive:true}); addEventListener('load',on); on();
+})();
+</script>
+</body>
+</html>

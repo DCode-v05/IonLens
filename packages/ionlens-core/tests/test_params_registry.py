@@ -1,0 +1,366 @@
+"""The parameter registry — doc 02 §12, doc 08 §5, doc 09 §1.
+
+    The registry is the single source of truth. No number appears in code as a literal.
+    The count of ASSUMED-class entries is a tracked project metric (doc 00 C1) and is
+    reported in CI.
+
+Everything here exists to make that enforceable rather than aspirational.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from ionlens.core.params import (
+    Parameter,
+    ParameterRegistry,
+    ProvenanceClass,
+    Uncertainty,
+    default_registry,
+)
+from ionlens.core.units import DimensionalityError, magnitude_in
+
+#: The doc 02 §12 example entry, verbatim, plus ``category``.
+#:
+#: ``category`` is an extension of the published schema and it is not gratuitous: doc 09
+#: §1 states its target as "zero ASSUMED entries in the physics-constants and atomic-data
+#: categories", which cannot be expressed — let alone enforced in CI — unless entries say
+#: which category they are in.
+VALID_ENTRY = """
+- id: TS-L1.energy
+  description: Nd:YAG pulse energy at the measurement volume
+  value: 0.5
+  units: J
+  class: SPEC
+  source: "Continuum Powerlite DLS 8010 datasheet, rev 2019"
+  uncertainty: {type: relative, value: 0.05}
+  sweep_range: [0.1, 2.0]
+  affects: [thomson.photon_budget, thomson.snr]
+  category: instrument
+"""
+
+
+def _write(tmp_path: Path, text: str, name: str = "entries.yaml") -> Path:
+    path = tmp_path / name
+    path.write_text(text)
+    return path
+
+
+class TestParameterSchema:
+    def test_loads_every_field_of_the_doc_02_12_schema(self, tmp_path: Path) -> None:
+        registry = ParameterRegistry.load([_write(tmp_path, VALID_ENTRY)])
+
+        entry = registry["TS-L1.energy"]
+
+        assert entry.description.startswith("Nd:YAG")
+        assert entry.units == "J"
+        assert entry.provenance_class is ProvenanceClass.SPEC
+        assert "Continuum" in entry.source
+        assert entry.uncertainty == Uncertainty(kind="relative", value=0.05)
+        assert entry.sweep_range == (0.1, 2.0)
+        assert entry.affects == ("thomson.photon_budget", "thomson.snr")
+        assert entry.category == "instrument"
+
+    def test_exposes_the_value_as_a_dimensional_quantity(self, tmp_path: Path) -> None:
+        registry = ParameterRegistry.load([_write(tmp_path, VALID_ENTRY)])
+
+        assert magnitude_in(registry["TS-L1.energy"].quantity, "mJ") == pytest.approx(500.0)
+
+    def test_value_in_converts_and_strips(self, tmp_path: Path) -> None:
+        # This is the accessor physics code actually calls, so it does the doc 08 §5
+        # boundary assertion for the caller rather than trusting them to.
+        registry = ParameterRegistry.load([_write(tmp_path, VALID_ENTRY)])
+
+        assert registry.value_in("TS-L1.energy", "J") == pytest.approx(0.5)
+
+    def test_value_in_refuses_the_wrong_dimensionality(self, tmp_path: Path) -> None:
+        registry = ParameterRegistry.load([_write(tmp_path, VALID_ENTRY)])
+
+        with pytest.raises(DimensionalityError):
+            registry.value_in("TS-L1.energy", "m")
+
+    def test_rejects_units_pint_cannot_parse(self, tmp_path: Path) -> None:
+        text = VALID_ENTRY.replace("units: J", "units: wombats")
+
+        with pytest.raises(DimensionalityError, match="wombats"):
+            ParameterRegistry.load([_write(tmp_path, text)])
+
+    def test_rejects_an_unknown_provenance_class(self, tmp_path: Path) -> None:
+        text = VALID_ENTRY.replace("class: SPEC", "class: PROBABLY_FINE")
+
+        with pytest.raises(ValueError, match="PROBABLY_FINE"):
+            ParameterRegistry.load([_write(tmp_path, text)])
+
+    def test_rejects_a_missing_required_key(self, tmp_path: Path) -> None:
+        text = VALID_ENTRY.replace("  units: J\n", "")
+
+        with pytest.raises(ValueError, match="units"):
+            ParameterRegistry.load([_write(tmp_path, text)])
+
+    def test_rejects_an_unrecognised_key(self, tmp_path: Path) -> None:
+        # A typo'd key that is silently ignored is a parameter that silently does not
+        # apply — which is the parameter-fog trap of doc 00 §6 wearing a YAML costume.
+        text = VALID_ENTRY + "  uncertianty: {type: relative, value: 0.1}\n"
+
+        with pytest.raises(ValueError, match="uncertianty"):
+            ParameterRegistry.load([_write(tmp_path, text)])
+
+
+class TestProvenanceDiscipline:
+    def test_a_sourced_class_must_actually_carry_a_source(self, tmp_path: Path) -> None:
+        # doc 09 §1: MEASURED, PUBLISHED and SPEC each mean "traceable to something".
+        # An entry claiming SPEC with no datasheet is an ASSUMED wearing a better label.
+        text = VALID_ENTRY.replace(
+            '  source: "Continuum Powerlite DLS 8010 datasheet, rev 2019"\n', ""
+        )
+
+        with pytest.raises(ValueError, match="source"):
+            ParameterRegistry.load([_write(tmp_path, text)])
+
+    def test_a_design_choice_must_be_swept(self, tmp_path: Path) -> None:
+        # doc 09 §1, verbatim: "an unswept design choice is a hidden assumption wearing
+        # a different label". DESIGN entries are unlimited but must all appear in the
+        # sensitivity study, and the only way to guarantee that is to require the range.
+        text = VALID_ENTRY.replace("class: SPEC", "class: DESIGN").replace(
+            "  sweep_range: [0.1, 2.0]\n", ""
+        )
+
+        with pytest.raises(ValueError, match="sweep"):
+            ParameterRegistry.load([_write(tmp_path, text)])
+
+    def test_an_assumed_entry_is_permitted_and_counted(self, tmp_path: Path) -> None:
+        # doc 00 C1 calls every ASSUMED value a defect, but refusing to load one would
+        # push it back into an unlabelled literal — which is strictly worse. It loads,
+        # it is labelled, and it is counted.
+        text = VALID_ENTRY.replace("class: SPEC", "class: ASSUMED").replace(
+            '  source: "Continuum Powerlite DLS 8010 datasheet, rev 2019"\n', ""
+        )
+
+        registry = ParameterRegistry.load([_write(tmp_path, text)])
+
+        assert registry.assumed_count == 1
+        assert registry["TS-L1.energy"].is_defect is True
+
+    def test_counts_by_class_for_the_ci_metric(self, tmp_path: Path) -> None:
+        registry = ParameterRegistry.load([_write(tmp_path, VALID_ENTRY)])
+
+        assert registry.count_by_class()[ProvenanceClass.SPEC] == 1
+        assert registry.count_by_class()[ProvenanceClass.ASSUMED] == 0
+
+    def test_a_sweep_range_must_bracket_the_nominal_value(self, tmp_path: Path) -> None:
+        # A range that excludes its own nominal value means one of the two is wrong, and
+        # the sensitivity study would silently explore somewhere the model never runs.
+        text = VALID_ENTRY.replace("sweep_range: [0.1, 2.0]", "sweep_range: [0.6, 2.0]")
+
+        with pytest.raises(ValueError, match="bracket"):
+            ParameterRegistry.load([_write(tmp_path, text)])
+
+    def test_a_sweep_range_must_be_ordered(self, tmp_path: Path) -> None:
+        text = VALID_ENTRY.replace("sweep_range: [0.1, 2.0]", "sweep_range: [2.0, 0.1]")
+
+        with pytest.raises(ValueError, match="ascending"):
+            ParameterRegistry.load([_write(tmp_path, text)])
+
+    def test_a_negative_uncertainty_is_rejected(self, tmp_path: Path) -> None:
+        text = VALID_ENTRY.replace("value: 0.05}", "value: -0.05}")
+
+        with pytest.raises(ValueError, match="uncertainty"):
+            ParameterRegistry.load([_write(tmp_path, text)])
+
+    def test_an_unknown_uncertainty_kind_is_rejected(self, tmp_path: Path) -> None:
+        text = VALID_ENTRY.replace("type: relative", "type: vibes")
+
+        with pytest.raises(ValueError, match="vibes"):
+            ParameterRegistry.load([_write(tmp_path, text)])
+
+
+class TestRegistryComposition:
+    def test_loads_several_files_into_one_registry(self, tmp_path: Path) -> None:
+        second = (
+            VALID_ENTRY.replace("TS-L1.energy", "TS-L1.wavelength")
+            .replace("units: J", "units: nm")
+            .replace("value: 0.5", "value: 532.0")
+            .replace("sweep_range: [0.1, 2.0]", "sweep_range: [500.0, 550.0]")
+        )
+        registry = ParameterRegistry.load(
+            [_write(tmp_path, VALID_ENTRY, "a.yaml"), _write(tmp_path, second, "b.yaml")]
+        )
+
+        assert len(registry) == 2
+
+    def test_a_duplicate_id_is_an_error_naming_both_files(self, tmp_path: Path) -> None:
+        # Last-one-wins would mean the answer depends on file iteration order, which
+        # doc 00 E3 forbids outright — and the losing entry would never announce itself.
+        a = _write(tmp_path, VALID_ENTRY, "a.yaml")
+        b = _write(tmp_path, VALID_ENTRY, "b.yaml")
+
+        with pytest.raises(ValueError, match="duplicate parameter id") as excinfo:
+            ParameterRegistry.load([a, b])
+
+        assert "a.yaml" in str(excinfo.value)
+        assert "b.yaml" in str(excinfo.value)
+
+    def test_an_unknown_id_error_suggests_near_matches(self, tmp_path: Path) -> None:
+        registry = ParameterRegistry.load([_write(tmp_path, VALID_ENTRY)])
+
+        with pytest.raises(KeyError, match=r"TS-L1\.energy"):
+            registry["TS-L1.enrgy"]
+
+    def test_iterates_in_a_deterministic_order(self, tmp_path: Path) -> None:
+        # doc 00 E3: anything that hashes or writes the registry must see one order.
+        second = VALID_ENTRY.replace("TS-L1.energy", "AAA.first")
+        registry = ParameterRegistry.load(
+            [_write(tmp_path, VALID_ENTRY, "a.yaml"), _write(tmp_path, second, "b.yaml")]
+        )
+
+        assert registry.ids() == ("AAA.first", "TS-L1.energy")
+
+    def test_records_which_file_each_entry_came_from(self, tmp_path: Path) -> None:
+        # Provenance of the provenance. When a value looks wrong the first question is
+        # always "where is this defined", and grepping a shipped wheel is not an answer.
+        path = _write(tmp_path, VALID_ENTRY)
+        registry = ParameterRegistry.load([path])
+
+        assert registry["TS-L1.energy"].defined_in == path
+
+    def test_is_immutable(self, tmp_path: Path) -> None:
+        registry = ParameterRegistry.load([_write(tmp_path, VALID_ENTRY)])
+
+        with pytest.raises(TypeError):
+            registry.entries["TS-L1.energy"] = registry["TS-L1.energy"]  # type: ignore[index]
+
+    def test_rejects_a_file_that_is_not_a_list(self, tmp_path: Path) -> None:
+        with pytest.raises(ValueError, match="list"):
+            ParameterRegistry.load([_write(tmp_path, "id: lonely\n")])
+
+    def test_an_empty_file_contributes_nothing_rather_than_failing(self, tmp_path: Path) -> None:
+        registry = ParameterRegistry.load(
+            [_write(tmp_path, VALID_ENTRY, "a.yaml"), _write(tmp_path, "", "b.yaml")]
+        )
+
+        assert len(registry) == 1
+
+
+class TestShippedRegistry:
+    def test_the_default_registry_loads(self) -> None:
+        assert len(default_registry()) > 0
+
+    def test_the_default_registry_is_memoised(self) -> None:
+        assert default_registry() is default_registry()
+
+    def test_every_shipped_entry_satisfies_the_provenance_rules(self) -> None:
+        # Loading enforces the rules, so this passing means the shipped data is clean.
+        # It is here so the failure says "the registry data is wrong" rather than
+        # surfacing inside whichever unrelated test happened to import first.
+        for entry in default_registry():
+            assert isinstance(entry, Parameter)
+
+    def test_the_reference_operating_point_is_registered(self) -> None:
+        # doc 01 §2.1 defines RP-1 and every other document derives from it. It must be
+        # in the registry, not retyped into whichever module needs it next.
+        registry = default_registry()
+
+        assert registry.value_in("RP1.pressure", "mTorr") == pytest.approx(5.0)
+        assert registry.value_in("RP1.n_0", "m**-3") == pytest.approx(1e17)
+        assert registry.value_in("RP1.T_e", "eV") == pytest.approx(3.0)
+        assert registry.value_in("RP1.bias", "V") == pytest.approx(-250.0)
+
+    def test_the_assumed_count_is_zero_in_physics_categories(self) -> None:
+        # doc 09 §1: "Target: zero ASSUMED entries in the physics-constants and
+        # atomic-data categories before Phase 2 exit". Asserting it from the start means
+        # the count can only be driven up deliberately, never drift up by accident.
+        offenders = [
+            entry.id
+            for entry in default_registry()
+            if entry.is_defect and entry.category in {"physics", "atomic"}
+        ]
+
+        assert offenders == []
+
+
+class TestRobustnessOfDiscovery:
+    """Found on the reference machine, not on the laptop.
+
+    doc 10 §1 makes the A4000 box the reference machine, and the first full run there
+    failed at import with ``UnicodeDecodeError: 'utf-8' codec can't decode byte 0xa3``.
+    The cause was a pair of macOS AppleDouble sidecars — ``._physics.yaml`` and friends,
+    binary files that a ``*.yaml`` glob happily matches — riding along in the transfer.
+
+    Two separate defects, both worth fixing rather than blaming on the transfer:
+    the loader treated any name-matching file as a registry file, and the failure
+    surfaced as a decoding error from ``pathlib`` with no mention of the registry at all.
+    """
+
+    def test_dotfiles_are_not_registry_files(self, tmp_path: Path) -> None:
+        # AppleDouble sidecars, editor swap files and partial downloads all take this
+        # shape. A registry file is something a person wrote and committed.
+        (tmp_path / "._physics.yaml").write_bytes(b"\x00\x02\x00\x00\x00\xa3\x00\x00")
+        good = _write(tmp_path, VALID_ENTRY, "physics.yaml")
+
+        registry = ParameterRegistry.load(sorted(tmp_path.glob("*.yaml")))
+
+        assert len(registry) == 1
+        assert registry["TS-L1.energy"].defined_in == good
+
+    def test_a_file_that_is_not_utf8_names_the_file_and_the_registry(self, tmp_path: Path) -> None:
+        # A bare UnicodeDecodeError from pathlib says nothing about what was being
+        # loaded or why. The registry is the single source of truth (doc 08 §5); when it
+        # fails to load, the message has to start there.
+        bad = tmp_path / "physics.yaml"
+        bad.write_bytes(b"- id: x\n  value: \xa3\n")
+
+        with pytest.raises(ValueError, match=r"physics\.yaml"):
+            ParameterRegistry.load([bad])
+
+    def test_files_are_read_as_utf8_regardless_of_locale(self, tmp_path: Path) -> None:
+        # Python's text mode defaults to the *locale* encoding, so a machine with
+        # LANG=C reads these files as ASCII and the em dashes and section signs
+        # throughout the registry become a crash. doc 00 E3 promises reproducibility;
+        # a load that depends on an environment variable does not deliver it.
+        text = VALID_ENTRY.replace("Nd:YAG pulse energy", "Nd:YAG pulse energy — doc 02 §12")
+        path = tmp_path / "physics.yaml"
+        path.write_text(text, encoding="utf-8")
+
+        registry = ParameterRegistry.load([path])
+
+        assert "§12" in registry["TS-L1.energy"].description
+
+
+class TestTheYamlExponentTrap:
+    """PyYAML implements YAML 1.1, whose float resolver requires a *signed* exponent.
+
+    ``1.0e17`` therefore loads as the **string** ``"1.0e17"``, while ``1.0e+17`` and
+    ``5.0e-19`` load as floats. Found while building the manifest engine, where it is
+    fatal — doc 08 §6's own example manifest writes ``n0: {value: 1.0e17}``, so a
+    PyYAML-based manifest reader could not parse the example in its own specification.
+
+    The registry survives it only because every value goes through ``float()``, which
+    coerces the string back. That is load-bearing rather than incidental, so it is pinned
+    here: a future refactor that passes the parsed value through unconverted would turn
+    the reference density of doc 01 §2.1 into a string, and ``Q_("1.0e17", "m**-3")``
+    fails somewhere far from the cause.
+    """
+
+    def test_pyyaml_really_does_misparse_an_unsigned_exponent(self) -> None:
+        import yaml
+
+        assert yaml.safe_load("a: 1.0e17\n")["a"] == "1.0e17"
+        assert yaml.safe_load("a: 1.0e+17\n")["a"] == 1.0e17
+
+    def test_an_unsigned_exponent_still_loads_as_a_number(self, tmp_path: Path) -> None:
+        text = (
+            VALID_ENTRY.replace("value: 0.5", "value: 1.0e17")
+            .replace("sweep_range: [0.1, 2.0]", "sweep_range: [1.0e15, 1.0e19]")
+            .replace("units: J", "units: m**-3")
+        )
+
+        registry = ParameterRegistry.load([_write(tmp_path, text)])
+
+        assert isinstance(registry["TS-L1.energy"].value, float)
+        assert registry.value_in("TS-L1.energy", "m**-3") == pytest.approx(1e17)
+
+    def test_the_shipped_reference_density_is_a_float_not_a_string(self) -> None:
+        # The one that would actually bite: operating-point.yaml writes `1.0e17`.
+        assert isinstance(default_registry()["RP1.n_0"].value, float)

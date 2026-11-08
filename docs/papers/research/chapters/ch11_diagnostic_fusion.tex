@@ -1,0 +1,220 @@
+\chapter{Comparative Analysis and the Case for Sensor Fusion}
+\label{ch:fusion}
+
+The preceding chapters treated optical emission spectroscopy (OES), laser-induced fluorescence (LIF), Thomson scattering, and interferometry as individually capable instruments, each returning a partial description of the plasma state near a bounding wall. This chapter asks what is structurally impossible for any single diagnostic to measure, and why the ion energy flux, $\Gamma_{E}$, falls into that category. The argument concerns information content, not precision: each instrument is sensitive to a different moment, projection, or line integral of the electron and ion distribution functions, $f_{\mathrm{e}}(v)$ and $f_{\mathrm{i}}(v)$, and no finite set of scalar outputs from one technique spans the function space needed to reconstruct $\Gamma_{E}$ with a defensible uncertainty. The chapter compares the four diagnostics on observables, resolution, and invasiveness; examines their over-determination and complementarity; derives why $\Gamma_{E}$ resists single-instrument recovery; formalises the cross-calibration constraints a campaign must satisfy; and proposes a fusion architecture -- Bayesian integrated data analysis -- treating $\Gamma_{E}$ as a derived posterior quantity.
+
+\section{Side-by-Side Comparison of the Core Diagnostics}
+\label{sec:sidebyside}
+
+\subsection{Optical Emission Spectroscopy}
+
+OES infers electron-population properties from spontaneously emitted spectral-line intensities, via a collisional-radiative model relating excited-state populations to the electron energy distribution function (EEDF) and ground-state density \cite{ref0237}. Emission depends on an integral of the excitation cross section weighted by the local EEDF,
+\begin{equation}
+I_{ij} \;\propto\; n_{\mathrm{e}} \, n_{0} \int_{0}^{\infty} \sigma_{\mathrm{exc}}(v)\, v \, f_{\mathrm{e}}(v) \, \mathrm{d}v ,
+\label{eq:oes_intensity}
+\end{equation}
+so OES returns an energy-weighted moment of $f_{\mathrm{e}}(v)$, and inferred $n_{\mathrm{e}}$, $T_{\mathrm{e}}$ are only as reliable as the assumed rate coefficients and EEDF shape. OES is passive and non-perturbing but normally line-integrated unless tomographic inversion is applied, reports electron-side quantities almost exclusively, and carries no information about the ion kinetics determining $\Gamma_{E}$. It remains a robust, low-cost diagnostic for time-resolved electron-temperature trends in thruster discharges \cite{ref0256}.
+
+\subsection{Laser-Induced Fluorescence}
+
+LIF probes a specific optical transition of a resonant species (commonly a metastable ion or atom state) with a narrow-linewidth, frequency-scanned laser, recording fluorescence versus detuning. The absorption profile is Doppler-shifted by the ion velocity along the laser direction, so the excitation spectrum directly reproduces a one-dimensional projection of $f_{\mathrm{i}}(v)$,
+\begin{equation}
+S(\nu) \;\propto\; \int_{-\infty}^{\infty} f_{\mathrm{i}}(v_{\parallel}) \, g\!\left(\nu - \nu_{0}\Big(1 + \frac{v_{\parallel}}{c}\Big)\right) \mathrm{d}v_{\parallel},
+\label{eq:lif_lineshape}
+\end{equation}
+where $g$ is the intrinsic lineshape and $\nu_{0}$ the unshifted transition frequency. LIF is the only technique yielding the ion velocity distribution itself, in a localized volume, rather than a bulk moment \cite{ref0292}. That specificity is also its limitation: it needs an accessible, sufficiently populated resonant transition; its signal tracks the probed-state population fraction rather than total ion density; and directional flows near sheath edges and propulsion plumes can require multiple viewing geometries to unfold the full $f_{\mathrm{i}}(v)$ \cite{ref0328}.
+
+\subsection{Thomson Scattering}
+
+Thomson scattering illuminates the plasma with a high-power laser and analyses light scattered incoherently off free electrons, giving a direct, first-principles map of the electron velocity distribution along the scattering wavevector; in the collective regime it also resolves the ion-acoustic feature, carrying $T_{\mathrm{i}}$ and effective-charge information \cite{ref0355}. Because the cross section is a fundamental constant rather than a modelled rate coefficient, it is regarded as the most nearly first-principles determination of $n_{\mathrm{e}}$ and $T_{\mathrm{e}}$ \cite{ref0384}. Its cost is instrumental: a high-energy pulsed laser and an intrinsically weak signal ($\sim\SI{6.65e-29}{\meter\squared}$) confine measurements to a point or short chord per shot, at the laser repetition rate rather than the timescale of interest. It measures ion energy content only indirectly, not directed ion flux, and is silent on the angular distribution of ion impact governing sputtering.
+
+\subsection{Interferometry}
+
+Microwave or optical interferometry measures the phase shift accumulated by a probe beam, proportional to line-integrated electron density,
+\begin{equation}
+\Delta \phi \;=\; \frac{e^{2}}{2 m_{\mathrm{e}} \epsilon_{0} c\, \omega} \int n_{\mathrm{e}}(\ell) \, \mathrm{d}\ell ,
+\label{ch11-eq:interferometry}
+\end{equation}
+where $\omega$ is the probe angular frequency and $\ell$ the chord. It offers excellent time resolution, negligible perturbation, and an essentially calibration-free phase--density relationship, making it a workhorse for real-time density monitoring \cite{ref0417}. Its limitation is dimensional: the observable is a line integral, recovering local $n_{\mathrm{e}}(\mathbf{r})$ requires an Abel inversion or multi-chord tomography, and it gives no information on $T_{\mathrm{e}}$, $T_{\mathrm{i}}$, or any moment of $f_{\mathrm{i}}(v)$.
+
+\subsection{Comparative Summary}
+
+Table~\ref{tab:diagnostic_comparison} collects the comparison, making the trade space motivating fusion explicit.
+
+\begin{table}[htbp]
+\centering
+\caption{Qualitative comparison of the four core diagnostics with respect to the quantity each most directly constrains, its typical resolution character, and its degree of intrusiveness. ``Direct'' denotes an observable related to the physical quantity by a first-principles or near-first-principles relation; ``indirect'' denotes reliance on an atomic, collisional-radiative, or inversion model.}
+\label{tab:diagnostic_comparison}
+\begin{tabularx}{\textwidth}{@{}l X X X X@{}}
+\toprule
+Diagnostic & Primary observable & Access to $f_{\mathrm{i}}(v)$ & Spatial character & Perturbation \\
+\midrule
+OES & $n_{\mathrm{e}}$, $T_{\mathrm{e}}$ (indirect, via CR model) & None (electron-side only) & Line-integrated unless tomographic & Passive, non-perturbing \\
+LIF & $f_{\mathrm{i}}(v)$ along probe axis (direct) & Direct, one velocity component per view & Localized (beam--collection overlap) & Weakly perturbing (low-intensity resonant absorption) \\
+Thomson scattering & $n_{\mathrm{e}}$, $T_{\mathrm{e}}$ (direct); $T_{\mathrm{i}}$, $Z$ (collective regime, indirect fit) & Indirect, via ion-acoustic feature only & Localized (point or short chord) & Non-perturbing, but signal-limited \\
+Interferometry & Line-integrated $n_{\mathrm{e}}$ (direct) & None & Chordal / tomographic & Non-perturbing \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Only LIF touches the ion velocity distribution directly, and even it returns a one-dimensional projection rather than the full three-dimensional $f_{\mathrm{i}}(v)$ a general energy-flux calculation needs. No individual instrument suffices alone; recommended-practice guidance for propulsion-relevant discharges confirms that standard practice is deployment of complementary suites \cite{ref0490,ref0511}.
+
+\subsection{Perturbation Mechanisms and Temporal Reach}
+
+The ``perturbation'' column deserves closer reading than a simple invasive/non-invasive dichotomy, since each technique perturbs the plasma, if at all, through a distinct channel. OES and interferometry are genuinely passive; their principal risk is contamination of the measurement (stray light, window deposition, phase drift) rather than perturbation of the plasma itself. Thomson scattering cannot measurably heat the plasma at typical fluences, but the laser can produce local photoionisation or stray-light photoemission that must be characterised and subtracted \cite{ref0384}. LIF is intermediate: resonant absorption removes population from, and can saturate, the probed transition, distorting the lineshape via optical pumping unless laser intensity stays linear.
+
+Temporal reach compounds these differences: sheaths driven by radio-frequency bias or pulsed excitation can evolve faster than several techniques' acquisition windows, since a wavelength-scanned LIF measurement averages over many sheath oscillations unless phase-locked, and a Thomson-scattering snapshot repeats only at the laser's shot rate, leaving gaps in the cycle. Interferometry, by contrast, tracks $n_{\mathrm{e}}$ continuously at bandwidths far exceeding sheath oscillation frequencies. A fused measurement of a time-varying $\Gamma_{E}(\mathbf{r},t)$ must therefore reconcile different spatial sampling volumes \emph{and} temporal apertures, developed further in Section~\ref{sec:why_no_single}.
+
+\section{Complementarity and Over-Determination of the Plasma State}
+\label{sec:complementarity}
+
+The plasma state relevant to sheath-crossing ion energy transport can be summarised, at a point and time, by $f_{\mathrm{e}}(v)$ and $f_{\mathrm{i}}(v)$ together with the local electrostatic potential $\phi(\mathbf{r})$, coupled through Poisson's equation and quasineutrality. No diagnostic measures this full object; each measures a functional of it. The four techniques split into those constraining \emph{scalar moments} (OES and Thomson scattering for $n_{\mathrm{e}}, T_{\mathrm{e}}$, the latter also weakly for $T_{\mathrm{i}}$; interferometry for line-integrated $n_{\mathrm{e}}$), and the one constraining a \emph{functional projection} (LIF for $f_{\mathrm{i}}(v_{\parallel})$).
+
+This split yields two benefits when deployed together. The first is \emph{over-determination}: OES, Thomson scattering, and interferometry each independently constrain $n_{\mathrm{e}}$ (OES and Thomson scattering also $T_{\mathrm{e}}$), so a campaign has more constraints than the minimum needed -- the raw material of cross-calibration (Section~\ref{sec:crosscal}) and outlier rejection, since agreement within stated uncertainty raises confidence in both instruments while disagreement is itself diagnostic of a systematic error or model deficiency.
+
+The second benefit is \emph{complementarity}: LIF supplies information -- the shape of $f_{\mathrm{i}}(v)$, including any non-Maxwellian tail from sheath acceleration, charge-exchange collisions, or presheath ionisation -- absent from the other three techniques' output space. Even a perfect measurement of $n_{\mathrm{e}}$ and $T_{\mathrm{e}}$ leaves the ion distribution unconstrained beyond whatever closure the analyst imposes, and this cannot be manufactured by adding more instruments of the same class. Over-determination multiplies confidence in already-accessible quantities; complementarity extends the accessible quantity set altogether.
+
+A diagnostic suite should therefore maximise both properties: enough electron-side overlap for rigorous cross-calibration, and at least one technique -- here, LIF -- reaching ion kinetic degrees of freedom the electron-side techniques cannot see. Bayesian integrated data analysis frameworks developed for magnetic-confinement devices formalise this logic, combining heterogeneous diagnostics with different forward models into a single joint inference of the plasma state \cite{ref0707,ref0712,ref0706}.
+
+Framed in information-content terms, each diagnostic supplies a small number of ``channels'' -- functionals through which information about the unknown plasma state $\boldsymbol\theta$ can pass. A second interferometer chord or OES viewing line adds channels devoted to moments already accessible to those techniques, tightening the posterior there but leaving the ion-distribution directions unconstrained; adding LIF, or a second LIF viewing angle, opens genuinely new channels into the velocity-space structure of $f_{\mathrm{i}}(v)$ that no amount of additional density channels can reach. Over-determination reduces \emph{variance} in already-observable directions; complementarity extends the \emph{rank} of the observation operator. A fusion architecture that only accumulates over-determining instruments therefore yields an increasingly precise but structurally incomplete $\Gamma_{E}$, since $q_{\mathrm{i}}$ remains in the unobserved null space until a distribution-resolving diagnostic such as LIF is included.
+
+\section{Why No Single Diagnostic Recovers the Ion Energy Flux}
+\label{sec:why_no_single}
+
+\subsection{The ion energy flux as a kinetic moment}
+
+The ion energy flux crossing a wall-normal surface is the second-order (energy-weighted) moment of $f_{\mathrm{i}}(v)$ along the surface normal,
+\begin{equation}
+\Gamma_{E}(\mathbf{r}, t) \;=\; \int_{0}^{\infty} \frac{1}{2} m_{\mathrm{i}} v^{2} \; v \, f_{\mathrm{i}}(v; \mathbf{r}, t) \, \mathrm{d}v ,
+\label{eq:gammaE_def}
+\end{equation}
+with units $\si{\watt\per\meter\squared}$ once $f_{\mathrm{i}}(v)$ is normalised so $\int f_{\mathrm{i}}(v)\,\mathrm{d}v = n_{\mathrm{i}}$. Writing $v = u_{\mathrm{i}} + w$, with $u_{\mathrm{i}} = \langle v \rangle$ the mean ion velocity and $w$ the peculiar velocity, decomposes this into bulk and kinetic contributions:
+\begin{align}
+\Gamma_{E} &= n_{\mathrm{i}} u_{\mathrm{i}} \left( \frac{1}{2} m_{\mathrm{i}} u_{\mathrm{i}}^{2} + \frac{5}{2} T_{\mathrm{i}} \right) + q_{\mathrm{i}}, \label{eq:gammaE_decomp} \\
+q_{\mathrm{i}} &= \int_{-\infty}^{\infty} \frac{1}{2} m_{\mathrm{i}} w^{2} \, w \, f_{\mathrm{i}}(w) \, \mathrm{d}w. \label{eq:heatflux_def}
+\end{align}
+The first term is the directed kinetic-plus-thermal energy flux carried by the bulk drift, expressible entirely through $n_{\mathrm{i}}$, $u_{\mathrm{i}}$, $T_{\mathrm{i}}$. The second, $q_{\mathrm{i}}$, is the conductive heat flux -- the third central moment of $f_{\mathrm{i}}(v)$ -- vanishing only if $f_{\mathrm{i}}(v)$ is exactly a (possibly drifting) Maxwellian. Sheath-accelerated ion populations generally are not: kinetic theory and particle simulations of the presheath--sheath transition consistently show skewed, cut off, or bimodal distributions, so $q_{\mathrm{i}} \neq 0$ is expected rather than exceptional near a wall.
+
+\subsection{The moment-access argument}
+
+Table~\ref{tab:diagnostic_comparison} can now be read as a statement about which terms of Equation~\eqref{eq:gammaE_decomp} each diagnostic constrains.
+
+\begin{itemize}
+\item \textbf{OES} constrains $n_{\mathrm{e}}$, $T_{\mathrm{e}}$ via Equation~\eqref{eq:oes_intensity}; neither appears explicitly in Equation~\eqref{eq:gammaE_decomp}. $T_{\mathrm{e}}$ enters $\Gamma_{E}$ only indirectly, via the presheath potential drop and the Bohm speed $u_{\mathrm{B}} = \sqrt{T_{\mathrm{e}}/m_{\mathrm{i}}}$; OES alone cannot fix $u_{\mathrm{i}}$, $T_{\mathrm{i}}$, or $q_{\mathrm{i}}$.
+\item \textbf{Thomson scattering} constrains $n_{\mathrm{e}}$, $T_{\mathrm{e}}$ directly and, in the collective regime, a weighted $T_{\mathrm{i}}$, but supplies no $u_{\mathrm{i}}$ or $q_{\mathrm{i}}$, and its $T_{\mathrm{i}}$ presupposes a Maxwellian closure in the spectral fit \cite{ref0355}.
+\item \textbf{Interferometry} constrains only line-integrated $n_{\mathrm{e}}$ (Equation~\eqref{ch11-eq:interferometry}), entering $\Gamma_{E}$ solely through density normalisation, with no energy information.
+\item \textbf{LIF} constrains the shape of $f_{\mathrm{i}}(v_{\parallel})$ (Equation~\eqref{eq:lif_lineshape}), in principle sufficient to compute $u_{\mathrm{i}}$, $T_{\mathrm{i}}$, and $q_{\mathrm{i}}$ from its first three moments -- \emph{provided} the absolute ion density is supplied externally, since fluorescence intensity tracks the (generally unknown, quenching-affected) probed-state population, not $n_{\mathrm{i}}$ itself.
+\end{itemize}
+
+The crux: LIF alone accesses the higher moments of $f_{\mathrm{i}}(v)$ determining $q_{\mathrm{i}}$, but cannot deliver an absolutely calibrated $\Gamma_{E}$ without an independently supplied density scale, since its raw signal carries only \emph{relative} shape information unless calibrated against a known scatterer or density -- a route rarely available in situ \cite{ref0292}. The three density/temperature diagnostics, conversely, supply that absolute scale with high confidence but are blind to $q_{\mathrm{i}}$. $\Gamma_{E}$ is therefore a genuinely joint product, requiring the density scale from OES, Thomson scattering, or interferometry, and the distribution shape from LIF, evaluated self-consistently at the same location and instant -- consistent with the broader finding that single-instrument inference of any moment beyond second order systematically underestimates true uncertainty, since the closure assumption substitutes for missing information \cite{ref0711}.
+
+\subsection{A further obstruction: geometry and species mixing}
+
+Two obstructions compound the moment-access problem. First, $\Gamma_{E}$ is a flux through a specific surface orientation; if ions arrive with a spread of incidence angles (oblique magnetic field, or multiple presheath ionisation sources), a single LIF chord samples only one velocity projection and misrepresents the angle-integrated flux unless multiple non-collinear views are combined \cite{ref0328}. Second, in gases with multiple charge states or species, each contributes its own term to Equation~\eqref{eq:gammaE_def}, and OES, Thomson scattering, and interferometry are essentially blind to that partition; only species- or charge-resolved probing, which LIF can in principle provide, recovers it. Every diagnostic here samples only a low-dimensional projection of a high-order functional of the plasma state.
+
+\subsection{Time-varying sheaths and the mismatch of temporal apertures}
+
+A further obstruction concerns time dependence. Where the sheath potential oscillates, as under radio-frequency bias or pulsed excitation, $\Gamma_{E}(\mathbf{r},t)$ is a time series, and Equation~\eqref{eq:gammaE_decomp} must in principle be evaluated at each phase of the drive cycle. The four diagnostics sample this series through the very different apertures noted in Section~\ref{sec:sidebyside}, so combining a phase-resolved density trace with a phase-averaged LIF shape, without an explicit model of how each observable maps onto the time-dependent state, would silently conflate an instantaneous quantity with a cycle-averaged one. Section~\ref{sec:architecture}'s forward-model formalism resolves this by including each instrument's acquisition-window function explicitly in $M_{k}(\boldsymbol{\theta})$, so a candidate state $\boldsymbol{\theta}(t)$ is compared against data only after convolution with its actual temporal aperture.
+
+\section{Cross-Calibration and Consistency Constraints}
+\label{sec:crosscal}
+
+Because $\Gamma_{E}$ must be assembled from several instruments' outputs, its reliability depends on whether those outputs are mutually consistent once transformed to a common physical basis. This section formalises the consistency requirements a multi-diagnostic campaign should satisfy before its outputs feed a fused estimate.
+
+\subsection{Overlap constraints on $n_{\mathrm{e}}$ and $T_{\mathrm{e}}$}
+
+Because OES, Thomson scattering, and interferometry all constrain $n_{\mathrm{e}}$ (OES and Thomson scattering also $T_{\mathrm{e}}$), each pair produces an independent consistency check via a normalised residual for a pair $(a, b)$ measuring the same quantity $X \in \{n_{\mathrm{e}}, T_{\mathrm{e}}\}$ at coincident space-time points,
+\begin{equation}
+\chi_{ab}^{2} \;=\; \frac{\left(X_{a} - X_{b}\right)^{2}}{\sigma_{a}^{2} + \sigma_{b}^{2}},
+\label{eq:chi2_pairwise}
+\end{equation}
+with $\sigma_{a}, \sigma_{b}$ the one-standard-deviation uncertainties. A campaign with $\chi_{ab}^{2} \sim O(1)$ across all pairs and conditions is internally consistent; systematic excursions well above unity signal an unmodelled effect, such as inaccurate excitation cross sections or a drifting calibration. Comparisons of Langmuir-probe, Thomson scattering, and optical techniques in magnetron discharges confirm such agreement is regime-dependent rather than universal \cite{ref0355}.
+
+\subsection{Absolute calibration anchoring}
+
+Not all instruments are equally trustworthy as absolute scales. Thomson scattering, whose cross section is a QED constant independent of atomic structure, is the closest available approximation to a first-principles standard for $n_{\mathrm{e}}$ and $T_{\mathrm{e}}$ \cite{ref0384}, and Bayesian treatments of its spectra propagate this calibration confidence into the posterior rather than treating it as fixed and error-free \cite{ref0684}. Interferometry, governed by a purely classical dispersion relation, is similarly close to calibration-free. OES and LIF depend on modelled or externally supplied normalisation constants and are properly treated as \emph{relative} techniques that borrow their absolute scale from the anchor instruments: a coherent strategy uses Thomson scattering and/or interferometry to fix the absolute density (and, for Thomson scattering, temperature) scale, then propagates it into the OES inversion and the LIF normalisation.
+
+\subsection{Spatial and temporal registration}
+
+A consistency check of the kind in Equation~\eqref{eq:chi2_pairwise} is only meaningful if the compared quantities refer to the same location and instant, which is nontrivial given the four techniques' different measurement volumes and integration times: OES and interferometry are frequently line-integrated, Thomson scattering is a short-pulse point or chord measurement, and LIF integrates over a finite beam-collection volume and, for a wavelength scan, a finite acquisition time. Any fused estimate of $\Gamma_{E}$ must therefore carry an explicit \emph{registration model} -- a forward mapping from the assumed local state to what each instrument would report given its sampling geometry and window -- the role played by the ``forward model'' in Bayesian integrated data analysis \cite{ref0713}. Neglecting registration is a common source of apparent inconsistency; recommended-practice guidance for propulsion and processing-plasma diagnostics emphasises standardising acquisition geometry and timing to minimise it \cite{ref0511,ref0490}.
+
+\subsection{Consistency as a diagnostic in its own right}
+
+Persistent, well-characterised disagreement between instruments, once registration and calibration anchoring are accounted for, is not a campaign failure but a source of physical information. A systematic offset between Thomson-scattering $T_{\mathrm{i}}$ (from the ion-acoustic feature under a Maxwellian closure) and LIF-derived $T_{\mathrm{i}}$ (from the second moment of the directly measured $f_{\mathrm{i}}(v)$) is itself evidence of non-Maxwellian structure, since the two would agree exactly were the closure assumption exact -- an additional channel of physical inference about the higher-order moments, $q_{\mathrm{i}}$ foremost, motivating the fusion architecture of Section~\ref{sec:architecture}.
+
+\subsection{A worked illustration of pairwise inconsistency}
+
+To make Equation~\eqref{eq:chi2_pairwise} concrete, consider a hypothetical (illustrative, not measured) exercise in which OES and interferometry both report the electron density near the sheath edge. Interferometry, the near-calibration-free anchor, returns $n_{\mathrm{e}} = \SI{5.0e17}{\per\cubic\meter}$ with $\SI{5}{\percent}$ uncertainty; OES, inverted at an assumed $T_{\mathrm{e}} = \SI{3.0}{\electronvolt}$, returns $n_{\mathrm{e}} = \SI{7.5e17}{\per\cubic\meter}$ with $\SI{15}{\percent}$ uncertainty, dominated by excitation-rate-coefficient uncertainty. Propagating both into Equation~\eqref{eq:chi2_pairwise} gives $\chi^{2}_{ab} \approx 4.7$, well above the $O(1)$ threshold expected of consistent measurements. Since interferometry carries lower relative uncertainty, the natural response is to interrogate the OES model rather than average the two values: a biased assumed $T_{\mathrm{e}}$ propagates directly into a biased inferred $n_{\mathrm{e}}$ through the excitation cross section. Adopting an anchored $T_{\mathrm{e}}$ as external input should push the residual toward unity; persistence points to a deeper deficiency. Pairwise residuals are thus used diagnostically, not merely reported \cite{ref0355}.
+
+\section{Conceptual Architecture of the Fused Measurement}
+\label{sec:architecture}
+
+\subsection{From instrument outputs to a single plasma-state posterior}
+
+The preceding sections establish that $\Gamma_{E}$ cannot be read off any single instrument and must be assembled from heterogeneous, differently calibrated observables. The natural framework is Bayesian integrated data analysis (IDA), in which a state vector $\boldsymbol{\theta} = \{n_{\mathrm{e}}(\mathbf{r}), T_{\mathrm{e}}(\mathbf{r}), f_{\mathrm{i}}(v; \mathbf{r})\}$ on a grid spanning the presheath and sheath is inferred jointly from all diagnostic data sets $\{d_{k}\}$ via Bayes' theorem,
+\begin{equation}
+p(\boldsymbol{\theta} \mid \{d_{k}\}) \;\propto\; p(\boldsymbol{\theta}) \prod_{k} p(d_{k} \mid \boldsymbol{\theta}),
+\label{eq:bayes_ida}
+\end{equation}
+where $p(\boldsymbol{\theta})$ encodes prior physical knowledge (e.g. the Bohm criterion, or smoothness of $n_{\mathrm{e}}(\mathbf{r})$) and each likelihood $p(d_{k} \mid \boldsymbol{\theta})$ is built from a forward model $M_{k}(\boldsymbol{\theta})$ synthesising the expected reading of instrument $k$ under an instrument-specific noise model,
+\begin{equation}
+p(d_{k} \mid \boldsymbol{\theta}) \;\propto\; \exp\!\left[-\frac{1}{2}\left(d_{k} - M_{k}(\boldsymbol{\theta})\right)^{\!\top} \Sigma_{k}^{-1} \left(d_{k} - M_{k}(\boldsymbol{\theta})\right)\right].
+\label{eq:likelihood_k}
+\end{equation}
+This formalism has been demonstrated for joint inference of kinetic profiles with magnetic equilibrium reconstruction \cite{ref0706}, combination of heterogeneous fusion diagnostics under a single probabilistic model \cite{ref0707}, and multi-diagnostic Bayesian modelling at stellarator and tokamak facilities \cite{ref0713}. Here the four forward models are $M_{\mathrm{OES}}(\boldsymbol{\theta})$ from Equation~\eqref{eq:oes_intensity}; $M_{\mathrm{Thomson}}(\boldsymbol{\theta})$ from the scattering spectrum; $M_{\mathrm{interf}}(\boldsymbol{\theta})$, the line integral of Equation~\eqref{ch11-eq:interferometry}; and $M_{\mathrm{LIF}}(\boldsymbol{\theta})$, the convolution of Equation~\eqref{eq:lif_lineshape} with the instrument function. Once $p(\boldsymbol{\theta} \mid \{d_{k}\})$ is obtained -- by direct maximisation for a Gaussian-linearised problem, or Markov-chain Monte Carlo otherwise \cite{ref0710,ref0727} -- $\Gamma_{E}$ is computed as a \emph{derived} quantity via Equation~\eqref{eq:gammaE_def} on posterior samples, so its uncertainty is a physically consistent propagation of all instrument uncertainties and forward-model imperfections rather than an ad hoc combination of separately reported error bars.
+
+\subsection{Schematic data flow}
+
+Figure~\ref{fig:fusion_architecture} sketches this architecture. Raw outputs from the four diagnostics feed forward models compared, inside the inference engine, against a candidate plasma-state trajectory constrained by sheath-physics priors (quasineutrality, the Bohm criterion, Poisson's equation in the collisionless or weakly collisional limit), yielding a posterior over $\Gamma_{E}(\mathbf{r}, t)$ from which a point estimate and uncertainty interval are extracted.
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+ node distance=8mm and 14mm,
+ every node/.style={font=\small},
+ box/.style={draw, thick, rectangle, align=center, minimum height=9mm, minimum width=28mm, inner sep=2mm},
+ engine/.style={draw, thick, rectangle, align=center, minimum height=16mm, minimum width=34mm, inner sep=2mm, double},
+ arr/.style={-Latex, thick}
+]
+ \node[box] (oes) at (0,4.5) {OES\\[1pt]\footnotesize $n_{\mathrm{e}}, T_{\mathrm{e}}$};
+ \node[box] (lif) at (0,1.5) {LIF\\[1pt]\footnotesize $f_{\mathrm{i}}(v_{\parallel})$};
+ \node[box] (ts) at (0,-1.5) {Thomson scattering\\[1pt]\footnotesize $n_{\mathrm{e}}, T_{\mathrm{e}}, T_{\mathrm{i}}$};
+ \node[box] (interf) at (0,-4.5) {Interferometry\\[1pt]\footnotesize line $n_{\mathrm{e}}$};
+
+ \node[engine] (engine) at (5.2,0) {Bayesian\\integrated data\\analysis engine\\[2pt]\footnotesize forward models $M_{k}(\boldsymbol{\theta})$\\ + sheath-physics priors};
+
+ \node[box, minimum width=32mm] (state) at (10.6,0) {Posterior state\\[1pt]\footnotesize $n_{\mathrm{e}}(\mathbf r), T_{\mathrm{e}}(\mathbf r), f_{\mathrm{i}}(v;\mathbf r)$};
+
+ \node[box, minimum width=32mm, minimum height=12mm] (out) at (10.6,-4) {$\Gamma_{E}(\mathbf r,t)$\\[1pt]\footnotesize with propagated\\uncertainty};
+
+ \draw[arr] (oes) -- (engine);
+ \draw[arr] (lif) -- (engine);
+ \draw[arr] (ts) -- (engine);
+ \draw[arr] (interf) -- (engine);
+ \draw[arr] (engine) -- (state);
+ \draw[arr] (state) -- (out);
+\end{tikzpicture}
+\caption{Schematic (illustrative, not measured) conceptual architecture for a fused ion-energy-flux estimate. Four heterogeneous diagnostics supply data to instrument-specific forward models inside a Bayesian integrated data analysis engine, which combines them with sheath-physics priors to produce a posterior plasma state; the ion energy flux $\Gamma_{E}$ is then evaluated as a derived moment of that posterior, carrying a propagated, cross-instrument uncertainty rather than a single-instrument error bar.}
+\label{fig:fusion_architecture}
+\end{figure}
+
+\subsection{Priors from sheath theory}
+
+The prior $p(\boldsymbol{\theta})$ is where the sheath-theoretic content of this monograph enters the fusion architecture. Rather than leaving $n_{\mathrm{e}}(\mathbf{r})$, $T_{\mathrm{e}}(\mathbf{r})$, and $f_{\mathrm{i}}(v; \mathbf{r})$ unconstrained, it can encode the Bohm criterion as a soft constraint on ion drift speed at the sheath edge, the monotonic decay of $n_{\mathrm{e}}$ toward the wall, and a parameterised family of $f_{\mathrm{i}}(v)$ shapes (Maxwellian, shifted Maxwellian, or a truncated/skewed form) rather than an unrestricted nonparametric distribution. Such priors regularise the inversion where coverage is sparse and state explicitly which features of the inferred $\Gamma_{E}$ are data-driven versus prior-driven \cite{ref0709}.
+
+\subsection{Surrogate models for tractability}
+
+A full nonlinear Bayesian inversion with expensive forward models (a collisional-radiative solve for OES, a kinetic sheath solve for the LIF-constrained closure) can be prohibitively slow for time-resolved or high-throughput analysis. A practical resolution, already demonstrated for profile inference at stellarator facilities, is training fast neural-network surrogates for the forward models or the posterior itself, cutting inference time by orders of magnitude while retaining calibrated uncertainty \cite{ref0728,ref0731}. Such surrogates transfer directly to a sheath-diagnostics pipeline, allowing near-real-time evaluation of $\Gamma_{E}(\mathbf{r}, t)$ from streaming data -- essential for a live process-control or thruster-health signal rather than a post-hoc tool \cite{ref0719}.
+
+\subsection{Tomographic extensions}
+
+Where any instrument is deployed in a multi-chord or multi-view configuration, the architecture extends naturally to a joint tomographic inversion, with $M_{k}(\boldsymbol{\theta})$ mapping a two- or three-dimensional state onto the full set of observations and Gaussian-process priors enforcing spatial smoothness, as demonstrated for combined Thomson scattering and interferometer diagnostics \cite{ref0683}; model-selection methods in comparable settings prevent overfitting in underdetermined, multi-instrument divertor geometries \cite{ref0685}. Extending the architecture this way would resolve $\Gamma_{E}(\mathbf{r}, t)$ across the footprint of an extended plasma-facing surface -- the natural end goal for spatially resolved erosion or heat-load prediction.
+
+\subsection{Validation loop}
+
+A fused measurement architecture is only as trustworthy as its validation: the same posterior machinery that produces $\Gamma_{E}$ also produces posterior-predictive checks, where synthetic readings generated from posterior samples of $\boldsymbol{\theta}$ are compared against held-out or independently acquired data, closing the loop with the cross-calibration constraints of Section~\ref{sec:crosscal}. Systematic reviews of integrated data analysis identify this validation step, not the inference step itself, as the primary determinant of whether a fused quantity can be trusted for design decisions \cite{ref0712}.
+
+\section{Summary}
+\label{sec:fusion_summary}
+
+This chapter has argued, on structural rather than practical grounds, that $\Gamma_{E}$ cannot be recovered from any single diagnostic among OES, LIF, Thomson scattering, and interferometry. Each accesses a different, low-order projection or moment of the electron and ion distribution functions: OES and Thomson scattering constrain electron-side density and temperature; interferometry constrains line-integrated density with essentially no calibration overhead; and LIF alone reaches the ion velocity distribution, but only as a relative, one-dimensional projection requiring external density anchoring. Because $\Gamma_{E}$ decomposes into a bulk convective term set by density, drift, and temperature, and a conductive heat-flux term set by the third moment of $f_{\mathrm{i}}(v)$, no diagnostic subset omitting either the density scale or the ion-distribution shape delivers a complete estimate. The four techniques are simultaneously over-determined -- enabling rigorous cross-calibration -- and complementary, since only LIF supplies the higher-moment ion information the others cannot provide at any amount of deployment. A coherent campaign must enforce explicit consistency constraints -- pairwise residual checks, calibration anchoring, and spatial/temporal registration -- before combining outputs via Bayesian integrated data analysis, which fuses instrument-specific forward models and sheath-physics priors into a single posterior plasma state from which $\Gamma_{E}$ is evaluated with propagated, physically grounded uncertainty. This architecture, with its surrogate-model and tomographic extensions, sets the stage for the quantitative fusion methodology that follows.

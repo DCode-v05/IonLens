@@ -1,0 +1,60 @@
+\chapter{Physical Constants, Units, and Notation}
+\label{app:notation}
+
+This appendix collects the physical constants, unit conventions, and notational
+choices used throughout the monograph. It complements the Nomenclature in the
+front matter.
+
+\section{Physical constants}
+\begin{longtable}{@{}p{6.8cm}p{2.8cm}p{4.4cm}@{}}
+\toprule
+\textbf{Constant} & \textbf{Symbol} & \textbf{Value (SI)} \\
+\midrule
+\endhead
+Elementary charge & $e$ & \SI{1.602176634e-19}{\coulomb} \\
+Electron mass & $m_{\mathrm{e}}$ & \SI{9.1093837015e-31}{\kilogram} \\
+Proton mass & $m_{\mathrm{p}}$ & \SI{1.67262192369e-27}{\kilogram} \\
+Boltzmann constant & $k_{\mathrm{B}}$ & \SI{1.380649e-23}{\joule\per\kelvin} \\
+Vacuum permittivity & $\varepsilon_{0}$ & \SI{8.8541878128e-12}{\farad\per\metre} \\
+Speed of light & $c$ & \SI{2.99792458e8}{\metre\per\second} \\
+Planck constant & $h$ & \SI{6.62607015e-34}{\joule\second} \\
+Atomic mass unit & $u$ & \SI{1.66053906660e-27}{\kilogram} \\
+Avogadro constant & $N_{\mathrm{A}}$ & \SI{6.02214076e23}{\per\mole} \\
+\bottomrule
+\end{longtable}
+
+\section{Unit conventions}
+Plasma temperatures are expressed as energies in electronvolts
+(\SI{1}{\electronvolt} $\leftrightarrow$ \SI{11604}{\kelvin} to four significant
+figures). Number densities are quoted in \si{\per\cubic\metre}; where the
+low-temperature-plasma literature is followed, values may also appear in
+\si{\per\cubic\centi\metre} (\SI{1}{\per\cubic\centi\metre} $=$
+\SI{1e6}{\per\cubic\metre}). Energy fluxes are given in \si{\watt\per\square\metre}
+and particle fluxes in \si{\per\square\metre\per\second}. Pressures follow the SI
+pascal, with the equivalence \SI{1}{\pascal} $\approx$ \SI{7.5}{mTorr} noted where
+processing pressures are discussed.
+
+\section{Frequently used relations}
+\begin{longtable}{@{}p{5.2cm}p{9.2cm}@{}}
+\toprule
+\textbf{Quantity} & \textbf{Expression} \\
+\midrule
+\endhead
+Debye length & $\lambda_{\mathrm{D}} = \sqrt{\varepsilon_{0} k_{\mathrm{B}} T_{\mathrm{e}} / (n_{\mathrm{e}} e^{2})}$ \\
+Electron plasma frequency & $\omega_{\mathrm{pe}} = \sqrt{n_{\mathrm{e}} e^{2} / (\varepsilon_{0} m_{\mathrm{e}})}$ \\
+Bohm velocity & $u_{\mathrm{B}} = \sqrt{k_{\mathrm{B}} T_{\mathrm{e}} / m_{\mathrm{i}}}$ \\
+Ion (Bohm) flux & $\Gamma_{\mathrm{i}} = n_{\mathrm{s}} u_{\mathrm{B}}$ \\
+Floating-sheath potential drop & $\Delta\phi \approx \dfrac{k_{\mathrm{B}} T_{\mathrm{e}}}{2e}\,\ln\!\left(\dfrac{m_{\mathrm{i}}}{2\pi m_{\mathrm{e}}}\right)$ \\
+Ion energy flux & $\Gamma_{E} = \displaystyle\int \tfrac{1}{2} m_{\mathrm{i}} v^{2}\, v\, f_{\mathrm{i}}(v)\, \mathrm{d}v$ \\
+\bottomrule
+\end{longtable}
+
+\section{Notational conventions}
+Vectors are set in bold ($\bm{E}$, $\bm{v}$); scalars in italic. Subscripts
+$\mathrm{e}$ and $\mathrm{i}$ denote electron and ion quantities; a subscript
+$\mathrm{s}$ denotes evaluation at the sheath edge; a subscript $\mathrm{w}$
+denotes the wall. The symbol $f_{\mathrm{i}}(\bm{v})$ denotes the ion velocity
+distribution function; angle brackets $\langle\cdot\rangle$ denote a
+velocity-space average. Reconstructed (inverted) quantities carry a hat, e.g.
+$\hat{\Gamma}_{E}$, to distinguish them from the underlying true value
+$\Gamma_{E}$.

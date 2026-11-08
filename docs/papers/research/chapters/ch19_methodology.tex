@@ -1,0 +1,257 @@
+\chapter{Proposed System Architecture and Methodology}
+\label{ch:method}
+
+The preceding chapters established the ion energy flux $\Gamma_{E}$ crossing a plasma sheath as the quantity of interest. This chapter specifies the architecture, hardware, software pipeline, data-management discipline, and target-hardware interfaces of a system measuring $\Gamma_{E}$ non-invasively and in near-real time: optical and electrical observables are fused, via a forward model and regularized inverse solver, into a self-consistent $f_{\mathrm{i}}(v)$ at the sheath edge with a calibrated uncertainty budget, delivered to an ion thruster, a plasma etch reactor, and a fusion-edge simulation code.
+
+\section{End-to-End System Architecture}
+\label{sec:method-architecture}
+
+\subsection{Design Rationale and Top-Level Partition}
+
+The instrument comprises three loosely coupled subsystems: an \emph{optical/electrical front end} sampling the plasma non-invasively; a \emph{DAQ layer} digitizing, timestamping, and buffering raw signals; and an \emph{inversion engine} converting calibrated signals into a self-consistent $f_{\mathrm{i}}(v)$ and, downstream, $\Gamma_{E}$, treating heterogeneous diagnostics as independent likelihoods over a common posterior \cite{ref0706,ref0712,ref0711}.
+
+Each cycle: a pulsed laser (LIF) or biased grid probes the plasma near the sheath edge; PMTs/photodiodes collect fluorescence, and a collector records ion current versus retarding potential; both channels are digitized synchronously, calibrated, and preprocessed; a forward model predicts each channel's reading for a trial $f_{\mathrm{i}}(v)$, and a regularized solver minimizes a misfit-plus-penalty objective; curvature about the optimum yields credible intervals on $f_{\mathrm{i}}(v)$, $u_{\mathrm{B}}$, $\Gamma_{E}$; the data product is archived and streamed downstream (Figure~\ref{fig:architecture-block}).
+
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+ node distance=1.05cm and 1.6cm,
+ box/.style={draw, thick, minimum width=3.1cm, minimum height=1.0cm, align=center, font=\small},
+ arr/.style={-{Latex[length=2mm]}, thick}
+]
+\node[box] (opt) {Optical/electrical\\front end};
+\node[box, right=of opt] (daq) {Acquisition \&\\synchronization};
+\node[box, right=of daq] (cal) {Calibration \&\\preprocessing};
+\node[box, below=of cal] (fwd) {Forward model\\$F(x)$};
+\node[box, left=of fwd] (inv) {Regularized\\inverse solver};
+\node[box, left=of inv] (unc) {Uncertainty\\propagation};
+\node[box, below=of inv] (out) {Data product\\\& archive};
+
+\draw[arr] (opt) -- (daq);
+\draw[arr] (daq) -- (cal);
+\draw[arr] (cal) -- (fwd);
+\draw[arr] (fwd) -- (inv);
+\draw[arr] (inv) -- (unc);
+\draw[arr] (inv) -- (out);
+\draw[arr] (inv.south) .. controls +(0,-1.0) and +(0,-1.0) .. (fwd.south)
+ node[midway, below, font=\scriptsize] {iterate};
+\end{tikzpicture}
+\caption{Block diagram: data flow from the front end through acquisition, calibration, the forward-model/inverse-solver loop, uncertainty propagation, and the archived data product.}
+\label{fig:architecture-block}
+\end{figure}
+
+\subsection{Optical Front End}
+\label{sec:opt-front-end}
+
+Two complementary channels probe the ion population across the presheath-sheath transition. The first is a tunable diode laser for LIF on a metastable transition of the working-gas ion, scanned across the Doppler-broadened absorption profile; under weak saturation, fluorescence intensity versus detuning is proportional to the projection of $f_{\mathrm{i}}(v)$ onto the laser direction, giving the velocity-resolved tail dominating $\Gamma_{E}$'s moments.
+
+The second is an RFEA or gridless Faraday-type collector intercepting a small solid angle of flux beyond the sheath edge:
+\begin{equation}
+I_{\mathrm{c}}(V_{\mathrm{r}}) = q A_{\mathrm{c}} \int_{v_{\min}(V_{\mathrm{r}})}^{\infty} v\, f_{\mathrm{i}}(v)\, \mathrm{d}v ,
+\label{eq:rfea-integral}
+\end{equation}
+with $A_{\mathrm{c}}$ collector area, $q$ ion charge, and $v_{\min}(V_{\mathrm{r}})$ the minimum speed overcoming $V_{\mathrm{r}}$. Differentiating $I_{\mathrm{c}}$ recovers the energy distribution but is noise-ill-conditioned, addressed by inversion (Section~\ref{sec:pipeline}).
+
+Both channels are minimally invasive — LIF non-perturbing, the RFEA/collector intercepting only a small flux fraction — cross-validating an intrusive against a non-intrusive channel \cite{ref0490,ref0511,ref0496}.
+
+\subsection{Acquisition Subsystem}
+\label{sec:acquisition}
+
+The acquisition subsystem digitizes both channels and auxiliary diagnostics on a common backplane in two modes: \emph{swept}, stepping detuning/bias slowly and averaging for signal-to-noise; and \emph{single-shot}, capturing a full sweep within one quasi-stationary pulse, trading signal-to-noise for the temporal resolution needed for time-resolved $\Gamma_{E}$.
+
+\subsection{Inversion Engine}
+\label{sec:inversion-engine-overview}
+
+The computational core, the inversion engine returns a self-consistent $f_{\mathrm{i}}(v)$, $\Gamma_{E}$, and uncertainty from calibrated signals, treating LIF and RFEA/collector as independent likelihood terms on the same $f_{\mathrm{i}}(v)$ within one Bayesian/regularized-least-squares framework rather than reconciling channels after the fact \cite{ref0707,ref0710}.
+
+\section{Hardware Subsystems and Their Integration}
+\label{sec:hardware}
+
+\subsection{Subsystem Inventory}
+
+Table~\ref{tab:hardware-inventory} lists the principal subsystems, each a replaceable, upgradeable unit.
+
+\begin{table}[htbp]
+\centering
+\caption{Principal hardware subsystems and their integration role (representative design targets, not measured specifications).}
+\label{tab:hardware-inventory}
+\begin{tabularx}{\textwidth}{@{}l X l@{}}
+\toprule
+Subsystem & Function & Interface \\
+\midrule
+Tunable diode laser & Excitation source for LIF & Analog scan control, TTL trigger \\
+Fiber launch \& collection optics & Deliver/collect light near sheath edge & Fiber-coupled, fixed \\
+Photomultiplier / avalanche photodiode & Convert photons to electrical signal & Analog output to digitizer \\
+Retarding field energy analyzer & Energy-selective ion collection & Swept bias, analog output \\
+Auxiliary electrostatic probe & Local $T_{\mathrm{e}}$, $n_{\mathrm{e}}$, plasma potential & Swept bias, analog output \\
+Multichannel digitizer & Synchronous digitization of all channels & Common clock/trigger backplane \\
+Timing and trigger unit & Distributes clock, sequences scan/sweep & Hardwired TTL/LVDS fan-out \\
+Acquisition host computer & Buffering, calibration, archiving & Local bus; network to inversion \\
+Inversion compute node & Forward model \& inverse solve & Network-attached, batch/streaming \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Timing and Synchronization}
+\label{sec:timing}
+
+Because LIF and RFEA/collector are treated as simultaneous observations of a common $f_{\mathrm{i}}(v)$, timing skew comparable to the plasma's evolution time corrupts the inversion. A timing/trigger unit distributes one master clock to the laser scan, bias sweep, and digitizer, so every sample is timestamped in one domain (Table~\ref{tab:timing-budget}).
+
+\begin{table}[htbp]
+\centering
+\caption{Representative timing budget for one cycle in single-shot mode (illustrative allocations, not measured latencies).}
+\label{tab:timing-budget}
+\begin{tabular}{@{}lS[table-format=3.1]l@{}}
+\toprule
+Stage & {Allocation} & Unit \\
+\midrule
+Laser/bias step settling & 5.0 & \si{\micro\second} \\
+PMT/collector signal integration & 20.0 & \si{\micro\second} \\
+Digitizer conversion \& buffer write & 2.0 & \si{\micro\second} \\
+Inter-channel synchronization margin & 1.0 & \si{\micro\second} \\
+Full sweep (per energy/frequency point $\times$ 64 points) & 1.8 & \si{\milli\second} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Synchronization is enforced at two levels: a hardware trigger backplane keeps laser and RFEA bias steps in lock-step so each data row is one physical instant; and, in software, preprocessing (Section~\ref{sec:preprocessing}) rejects any cycle whose skew exceeds tolerance.
+
+\subsection{Mechanical and Electromagnetic Integration}
+
+The optical head mounts on a translation stage, profiling the presheath-to-sheath transition rather than one fixed location. Shielding and differential signal transmission suppress pickup from plasma-source power electronics, the dominant interference source in Section~\ref{sec:interfaces}'s environments.
+
+\section{Software Pipeline}
+\label{sec:pipeline}
+
+The software pipeline converts raw digitized samples into a physically consistent $f_{\mathrm{i}}(v)$ and $\Gamma_{E}$ through five independently testable stages — calibration, preprocessing, forward modeling, solving, uncertainty quantification — each with a well-defined input/output contract, making Section~\ref{sec:data-repro}'s reproducibility enforceable.
+
+\subsection{Calibration}
+\label{sec:calibration}
+
+Calibration maps raw counts/currents to physical quantities: for LIF, wavelength and intensity calibrations correcting for transmission and quantum efficiency; for RFEA/collector, a bias-voltage calibration of the sweep generator and a gain/offset calibration of the amplifier, against traceable references before each campaign. Formally, $s_c = \mathcal{C}_c(r_c; \boldsymbol{\theta}_c)$ for channel $c$'s invertible map $\mathcal{C}_c$; $\boldsymbol{\theta}_c$'s uncertainty is propagated into the inversion likelihood (Section~\ref{sec:uq}) rather than discarded \cite{ref0709}.
+
+\subsection{Preprocessing}
+\label{sec:preprocessing}
+
+Preprocessing performs synchronization validation, baseline subtraction, outlier rejection (median-absolute-deviation filter), and resampling onto a common grid, since LIF is parameterized by detuning and RFEA by retarding voltage:
+\begin{equation}
+\Delta\nu = \frac{v_{\parallel}}{\lambda_0}, \qquad
+\tfrac{1}{2} m_{\mathrm{i}} v^2 = q V_{\mathrm{r}},
+\label{eq:param-map}
+\end{equation}
+with $\Delta\nu$ the detuning from rest frequency $\lambda_0$ and $m_{\mathrm{i}}$ the ion mass, mapping both channels onto a common speed coordinate $v$.
+
+\subsection{Forward Model}
+\label{sec:forward-model}
+
+The forward model $F$ predicts each channel's reading for a trial $f_{\mathrm{i}}(v)$. Stacking channels as $\mathbf{d} = (d_{\mathrm{LIF}}, d_{\mathrm{RFEA}})$,
+\begin{equation}
+\mathbf{d} = F[f_{\mathrm{i}}](\mathbf{p}) + \mathbf{n},
+\label{ch19-eq:forward-general}
+\end{equation}
+with $\mathbf{p}$ the instrument settings and $\mathbf{n}$ zero-mean noise of covariance $\Sigma_{\mathbf{n}}$. For LIF, the operator convolves $f_{\mathrm{i}}$ with the instrument line-shape:
+\begin{equation}
+F_{\mathrm{LIF}}[f_{\mathrm{i}}](\Delta\nu) = \eta \int_{-\infty}^{\infty} f_{\mathrm{i}}(v_{\parallel})\, \Phi(\Delta\nu - v_{\parallel}/\lambda_0)\, \mathrm{d}v_{\parallel},
+\label{eq:forward-lif}
+\end{equation}
+with $\eta$ a collection-efficiency constant and $\Phi$ the line-shape. For RFEA/collector, the operator is Eq.~\eqref{eq:rfea-integral} augmented by a grid transparency $\mathcal{T}$:
+\begin{equation}
+F_{\mathrm{RFEA}}[f_{\mathrm{i}}](V_{\mathrm{r}}) = q A_{\mathrm{c}} \mathcal{T} \int_{v_{\min}(V_{\mathrm{r}})}^{\infty} v\, f_{\mathrm{i}}(v)\, \mathrm{d}v .
+\label{eq:forward-rfea}
+\end{equation}
+
+The model embeds the kinetic Bohm criterion at the sheath edge as a soft, penalized constraint,
+\begin{equation}
+\int_{0}^{\infty} \frac{f_{\mathrm{i}}(v)}{v^2}\, \mathrm{d}v \;\le\; \frac{n_{\mathrm{i}}}{u_{\mathrm{B}}^2}, \qquad u_{\mathrm{B}} = \sqrt{\frac{k_{\mathrm{B}} T_{\mathrm{e}}}{m_{\mathrm{i}}}},
+\label{eq:bohm-constraint}
+\end{equation}
+since real populations may deviate from the idealized marginal-Bohm condition, improving conditioning of an underdetermined problem \cite{ref0685}.
+
+\subsection{Solver}
+\label{sec:solver}
+
+The inverse problem recovers $\hat f_{\mathrm{i}}(v)$ (discretized $\mathbf{x} \in \mathbb{R}^{N}$) best explaining $\mathbf{d}$: linear (RFEA) or mildly nonlinear (LIF), ill-posed since Eq.~\eqref{eq:rfea-integral} is a smoothing operator whose naive inversion amplifies noise into oscillations. The solver adopts Tikhonov-regularized least squares,
+\begin{equation}
+\hat{\mathbf{x}} = \operatorname*{arg\,min}_{\mathbf{x} \ge 0} \left\{ \left\| \Sigma_{\mathbf{n}}^{-1/2}\left(A\mathbf{x} - \mathbf{d}\right) \right\|_2^2 + \alpha \left\| L \mathbf{x} \right\|_2^2 \right\},
+\label{ch19-eq:tikhonov}
+\end{equation}
+with $A$ the discretized forward operator, $L$ a discrete second-derivative operator, $\alpha$ the regularization parameter, and $\mathbf{x} \ge 0$ enforcing $f_{\mathrm{i}}(v) \ge 0$, per Tikhonov methodology for tomographic/spectroscopic inverse problems \cite{ref0677,ref0692}. $\alpha$ is chosen each cycle via an L-curve or generalized-cross-validation criterion \cite{ref0695}; the resulting quadratic program is solved by an active-set/interior-point method, $N \sim 10^2$ being small enough not to bottleneck.
+
+Once $\hat{\mathbf{x}}$ is obtained, the ion energy flux is the flux-weighted second moment,
+\begin{equation}
+\Gamma_{E} = n_{\mathrm{i}} \int_{0}^{\infty} \left(\tfrac{1}{2} m_{\mathrm{i}} v^2\right) v\, \hat f_{\mathrm{i}}(v)\, \mathrm{d}v
+\;\approx\; n_{\mathrm{i}} \sum_{j=1}^{N} \left(\tfrac{1}{2} m_{\mathrm{i}} v_j^2\right) v_j\, \hat f_{\mathrm{i}}(v_j)\, \Delta v ,
+\label{eq:gamma-e}
+\end{equation}
+with $n_{\mathrm{i}}$ the local ion density and $\Delta v$ the grid step. In the cold-ion, collisionless limit the sheath-edge population is a delta function at $v = u_{\mathrm{B}}$, and Eq.~\eqref{eq:gamma-e} reduces to $\Gamma_{E} \to n_{\mathrm{i}} u_{\mathrm{B}} \left(\tfrac{1}{2} m_{\mathrm{i}} u_{\mathrm{B}}^2\right)$; the pipeline generalizes this to arbitrary non-Maxwellian distributions.
+
+Boundary placement is sanity-checked against the analytic Child-Langmuir sheath profile $\phi(x)/\phi_0 = -(1-x/s)^{4/3}$.
+
+\subsection{Uncertainty Quantification}
+\label{sec:uq}
+
+Every reported $\Gamma_{E}$ carries a credible interval from three sources: measurement noise ($\Sigma_{\mathbf{n}}$); calibration uncertainty in $\boldsymbol{\theta}_c$; and discretization/regularization bias from $\alpha$ and grid resolution. For the linearized, Gaussian case, the posterior covariance of $\hat{\mathbf{x}}$ is
+\begin{equation}
+\Sigma_{\mathbf{x}} \approx \left( A^{\mathsf{T}} \Sigma_{\mathbf{n}}^{-1} A + \alpha L^{\mathsf{T}} L \right)^{-1},
+\label{ch19-eq:posterior-cov}
+\end{equation}
+propagated through Eq.~\eqref{eq:gamma-e} via $\sigma_{\Gamma_E}^2 \approx \mathbf{w}^{\mathsf{T}} \Sigma_{\mathbf{x}} \mathbf{w}$, $\mathbf{w}$ being the moment-weight vector $\left(\tfrac{1}{2} m_{\mathrm{i}} v_j^2\right) v_j \Delta v$, consistent with Bayesian integrated-data-analysis conventions for fusion diagnostics \cite{ref0713}.
+
+Near the non-negativity boundary, where the posterior is markedly non-Gaussian, the pipeline falls back to Markov-chain Monte Carlo sampling \cite{ref0710,ref0727}; since full MCMC is too slow for near-real-time use, it also supports a neural-network surrogate trained offline on forward-model evaluations \cite{ref0728,ref0731}. Structural uncertainty (line-shape, grid transparency, collisionality) is treated separately; facility-pressure systematics can dominate total uncertainty in Hall-thruster models unless explicitly modeled \cite{ref0719}.
+
+\section{Data Management and Reproducibility}
+\label{sec:data-repro}
+
+\subsection{Data Products and Provenance}
+
+Each cycle produces raw digitized samples with timestamps; calibrated, preprocessed signals; the reconstructed $\hat f_{\mathrm{i}}(v)$ with $\Sigma_{\mathbf{x}}$; and the derived $\Gamma_{E}$ with its credible interval, each carrying a provenance record — calibration version, selected $\alpha$, commit hash, cycle index — tracing it back to the models, priors, and calibration data used \cite{ref0712}.
+
+\subsection{Reproducibility Discipline}
+
+Three practices keep the pipeline reproducible: calibration coefficients are versioned, never overwritten in place; the forward model and solver are deterministic given their inputs (seeds stored with outputs), so re-running archived data reproduces the product within a documented tolerance; and the surrogate-model training pipeline is version-controlled and re-validated against the reference MCMC solver before promotion \cite{ref0731}.
+
+\subsection{Archive Structure}
+
+Table~\ref{tab:data-hierarchy} summarizes the archive tiers.
+
+\begin{table}[htbp]
+\centering
+\caption{Archive tiers, contents, and retention policy.}
+\label{tab:data-hierarchy}
+\begin{tabularx}{\textwidth}{@{}l X l@{}}
+\toprule
+Tier & Contents & Retention \\
+\midrule
+Raw & Digitized samples, timestamps, instrument settings & Permanent (compressed) \\
+Calibrated & Physically scaled signals, calibration version tag & Permanent \\
+Reconstructed & $\hat f_{\mathrm{i}}(v)$, $\Sigma_{\mathbf{x}}$, solver diagnostics ($\alpha$, residual norm) & Permanent \\
+Derived & $\Gamma_{E}$, credible interval, provenance record & Permanent, indexed for query \\
+Surrogate models & Trained network weights, training-set hash, validation report & Versioned, superseded copies archived \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Interfaces to Target Hardware}
+\label{sec:interfaces}
+
+The instrument interoperates with three classes of target hardware, each with distinct front-end, timing, and data-product constraints: an ion thruster, a plasma-etch reactor, and a fusion-edge simulation code for cross-validation.
+
+\subsection{Ion Thruster Interface}
+
+The instrument mounts external to the discharge channel, sampling the near-plume or channel-exit sheath without contacting hot walls. Because thruster discharges exhibit breathing-mode and ionization-instability oscillations, single-shot acquisition is default, cycles phase-locked to an external trigger from the discharge-current monitor \cite{ref0490}. The derived $\Gamma_{E}$ is exposed to the test-stand data system, correlated with thrust-stand and mass-flow telemetry \cite{ref0511}, and follows the compact-package precedent of in-flight diagnostics for an onboard variant \cite{ref0496}.
+
+\subsection{Plasma Etcher Interface}
+
+The instrument interfaces with a capacitively or inductively coupled etch reactor, sampling the sheath adjacent to the wafer or a witness electrode. The dominant constraint is synchronization to the RF bias waveform: the timing unit locks acquisition phase to a chosen fraction of the period, enabling phase-resolved reconstruction of $f_{\mathrm{i}}(v)$ and $\Gamma_{E}$ where cadence permits, else cycle-averaged. The derived $\Gamma_{E}$ drives etch rate and is formatted as a boundary condition for etch-profile models needing the incident flux — and, where available, the full energy distribution — rather than one characteristic energy.
+
+\subsection{Edge Simulator Interface}
+
+For cross-validation, $\hat f_{\mathrm{i}}(v)$, $\Sigma_{\mathbf{x}}$, and $\Gamma_{E}$ are formatted against boundary-condition outputs of an edge/sheath simulation code, exporting $f_{\mathrm{i}}(v)$ on the same grid for a full distribution-level comparison \cite{ref0712}, letting the credible interval of Section~\ref{sec:uq} be checked for coverage against synthetic-data ground truth.
+
+\subsection{Common Interface Contract}
+
+All three platforms share a common interface: a synchronization input for an external trigger or phase reference, a streaming/batch output in the format of Table~\ref{tab:data-hierarchy}, and a metadata channel reporting instrument health (laser lock, digitizer saturation, solver convergence) so a consumer can distinguish a small $\Gamma_{E}$ from an invalid reconstruction. This lets the code of Section~\ref{sec:pipeline} be shared verbatim across deployments, only front-end hardware and timing reference differing.
+
+\section{Summary}
+
+This chapter presented the proposed architecture for a non-invasive, near-real-time instrument quantifying $\Gamma_{E}$: a two-channel front end (LIF and an RFEA) feeding a synchronized acquisition subsystem and a pipeline of calibration, preprocessing, a physically constrained forward model, a Tikhonov-regularized non-negative inverse solver, and covariance-propagation uncertainty quantification with a neural-network surrogate for fast posteriors. Reproducibility rests on versioned calibration artifacts, deterministic processing, and a provenance-tracked archive. The same pipeline, differing only in front-end hardware and timing reference, interfaces to an ion thruster, a plasma-etch reactor, and a fusion-edge simulation code, enabling both deployment and distribution-level validation. The next chapter presents the validation strategy and expected performance envelope.

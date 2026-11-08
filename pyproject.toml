@@ -1,0 +1,173 @@
+#  IonLens — workspace root.
+#
+#  This file is not a distributable package. It exists to (a) declare the uv
+#  workspace, (b) hold the single source of truth for lint / type / test
+#  configuration, and (c) pin the development toolchain.
+#
+#  Package layout and the build-vs-buy policy are specified in docs/08-software-architecture.md.
+#  The choice of uv as workspace manager is recorded in docs/adr/ADR-006-toolchain.md.
+
+[project]
+name = "ionlens-workspace"
+version = "0.0.0"
+description = "Workspace root for the IonLens monorepo — not published."
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Workspace
+# ─────────────────────────────────────────────────────────────────────────────
+
+[tool.uv.workspace]
+members = ["packages/*", "plugins/*"]
+
+[tool.uv.sources]
+ionlens-core = { workspace = true }
+ionlens-physics = { workspace = true }
+ionlens-optics = { workspace = true }
+ionlens-instruments = { workspace = true }
+ionlens-detectors = { workspace = true }
+ionlens-inverse = { workspace = true }
+ionlens-uq = { workspace = true }
+ionlens-validation = { workspace = true }
+ionlens-experiment = { workspace = true }
+ionlens-publish = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "hypothesis>=6.122",
+    "mypy>=1.14",
+    "ruff>=0.9",
+    # PyYAML ships no inline types; the stubs keep ionlens.core.params under --strict.
+    "types-PyYAML>=6.0",
+]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Lint / format
+# ─────────────────────────────────────────────────────────────────────────────
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["packages/*/src", "packages/*/tests"]
+# Ruff formats fenced code blocks inside Markdown. The planning documents (docs/) are
+# Baseline artifacts whose listings must match what was reviewed and signed off; a
+# formatter silently rewriting them would corrupt the record. Excluded deliberately.
+extend-exclude = ["docs/", "refs/"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "A",    # flake8-builtins
+    "C4",   # flake8-comprehensions
+    "PT",   # flake8-pytest-style
+    "RET",  # flake8-return
+    "SIM",  # flake8-simplify
+    "ARG",  # flake8-unused-arguments
+    "PTH",  # flake8-use-pathlib
+    "NPY",  # numpy-specific
+    "RUF",  # ruff-specific
+]
+ignore = [
+    # Physics code uses single-character names that match the published equations.
+    # Renaming `n_e` to `electron_density` in a discretised operator makes the code
+    # harder to check against the paper, not easier.
+    "E741",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests are allowed magic numbers and long lines in tabulated expectations.
+"**/tests/**" = ["ARG001", "ARG002"]
+
+# ionlens-core and ionlens-physics carry `requires-python = ">=3.11,<3.13"` (see their
+# pyproject.toml and ADR-013): they are the two packages the L2 PIC benchmark needs, and
+# the only JAX build proven to work on the reference machine's RTX A4000 —
+# jaxlib 0.4.13+cuda11.cudnn86 — ships no wheel above cp311. So these two packages spell
+# type aliases as `X: TypeAlias = ...` and generics with an explicit `TypeVar`.
+#
+# That is not a downgrade: both spellings are fully valid on 3.12 and mypy resolves them
+# identically. The project loses nothing and gains a wider deployable range. UP040/UP047
+# would rewrite them back to `type X = ...` and `def f[T]`, which is 3.12-only syntax and
+# would put the packages back out of the working GPU environment, so both rules are off
+# *here only*. The other four packages stay at `>=3.12` and keep the rules enforced.
+"packages/ionlens-core/**" = ["UP040", "UP047"]
+"packages/ionlens-physics/**" = ["UP040", "UP047"]
+
+[tool.ruff.lint.pep8-naming]
+# Physics conventions: `T_e`, `n_0`, `V_w`, `Gamma_E` are correct names here.
+ignore-names = ["*_e", "*_i", "*_g", "*_w", "*_s", "*_D", "*_E", "*_L", "*_RF", "N_*", "T_*", "E_*"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Types
+# ─────────────────────────────────────────────────────────────────────────────
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+disallow_any_generics = true
+# Every package's source root. `ionlens` is an implicit namespace package, so a path
+# missing here makes mypy resolve the same file under two module names and report
+# phantom duplicate-definition errors. Append a package here when you add one.
+mypy_path = "packages/ionlens-core/src:packages/ionlens-physics/src:packages/ionlens-instruments/src:packages/ionlens-experiment/src:packages/ionlens-inverse/src:packages/ionlens-validation/src"
+namespace_packages = true
+explicit_package_bases = true
+
+[[tool.mypy.overrides]]
+# Third-party scientific stack ships incomplete or absent stubs.
+# pint is deliberately NOT on this list: it ships py.typed, and ionlens.core.units is
+# checked against its real signatures.
+module = ["scipy.*", "h5py.*", "zarr.*", "pyarrow.*", "sympy.*", "matplotlib.*", "dolfinx.*", "ufl.*", "basix.*", "petsc4py.*", "mpi4py.*"]
+ignore_missing_imports = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tests
+# ─────────────────────────────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["packages"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+]
+markers = [
+    # doc 08 §8: physics correctness tests are reported separately from software tests.
+    "physics: physics verification test (MMS, convergence, conservation, analytic limits)",
+    "statistical: statistical calibration test (coverage, SBC) — slow, sampling-based",
+    "integration: full manifest-to-artifact round trip",
+    "slow: takes more than ~10 s; excluded from the per-commit gate",
+    "gpu: requires a CUDA device; skipped on machines without one",
+    "fenicsx: requires the FEniCSx/PETSc stack; skipped where unavailable",
+]
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["packages"]
+omit = ["*/tests/*"]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@overload",
+    "class .*\\(Protocol\\):",
+    "\\.\\.\\.",
+]
