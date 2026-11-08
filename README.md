@@ -1,179 +1,152 @@
-# IonLens
+# IonLens — Virtual Plasma Laboratory
 
-**A Virtual Plasma Laboratory for physics-constrained inverse reconstruction of ion energy flux across plasma sheaths.**
+![Python](https://img.shields.io/badge/Python_3.12-3776AB?style=flat&logo=python&logoColor=white) ![NumPy](https://img.shields.io/badge/NumPy-013243?style=flat&logo=numpy&logoColor=white) ![SciPy](https://img.shields.io/badge/SciPy-8CAAE6?style=flat&logo=scipy&logoColor=white) ![SymPy](https://img.shields.io/badge/SymPy-3B5526?style=flat&logo=sympy&logoColor=white) ![FEniCSx](https://img.shields.io/badge/FEniCSx-1F4E79?style=flat&logo=python&logoColor=white) ![JAX](https://img.shields.io/badge/JAX-A8B9CC?style=flat&logo=google&logoColor=black) ![uv](https://img.shields.io/badge/uv-DE5FE9?style=flat&logo=uv&logoColor=white) ![pytest](https://img.shields.io/badge/pytest-0A9EDC?style=flat&logo=pytest&logoColor=white)
 
-Team Astrophage · Techathon 2.0 (Naari Shakti) · Plasma Technologies for Industry & Society · AIC RRCAT π-Hub Foundation, DAE
+## Overview
+
+Ion energy flux is the energy that ions carry into a surface facing a plasma. It decides how fast a wafer etches or a coating grows, but it cannot be measured directly. Every probe that can see it disturbs it, and every probe that does not disturb it sees only part of the picture.
+
+IonLens is a physics-constrained inverse diagnostics framework for plasma sheaths. It asks one question: given only non-perturbing optical signals — optical emission spectra, laser-induced fluorescence lineshapes, Thomson scattering spectra and interferometric phase — can the ion energy flux be reconstructed in space and time, with honest uncertainty?
+
+It answers that as a regularised, Bayesian inverse problem. A forward chain built from first-principles sheath and kinetic physics turns a known plasma state into synthetic measurements. The inverse solver then recovers the state from those measurements alone, without ever seeing the truth, and a validation engine compares the result against the hidden truth. That closed loop is what makes the accuracy claims defensible without a laboratory.
+
+Built by Team Astrophage for Techathon 2.0 (Naari Shakti), track *Plasma Technologies for Industry & Society*, hosted by AIC RRCAT π-Hub Foundation, DAE. It is not a plasma simulator and not a digital twin.
+
+## Key Features
+
+- **Four-stage forward chain** `F = F₄∘F₃∘F₂∘F₁`: sheath physics, emission and scattering response, optical transport, and detector noise.
+- **Sealed-truth barrier.** The inverse layer depends on no forward model, and a CI test checks the import graph so it stays that way.
+- **Physics hierarchy:** L0 analytic sheath models (the verification anchor), L1 fluid solver on FEniCSx, and an L2 particle-in-cell level that targets JAX on the GPU.
+- **Real atomic data loaders** for LXCat cross sections, NIST ASD transition data and OpenADAS, plus Boltzmann / EEDF integration.
+- **Parameter registry with a literal-lint rule.** Every number traces to a published source, a standard database or a declared design parameter. A guess is tagged as a guess.
+- **Manifest engine:** one YAML file per experiment, run with `ionlens run`, re-checked bit-identical with `ionlens reproduce`, and diffed with `ionlens compare`.
+- **Provenance embedded in every artifact** written to HDF5, Zarr or Parquet.
+- **Verification and validation kept apart** — different suites, different reports, different gates.
+
+## How It Works
+
+### The closed loop
+
+```
+TRUE PLASMA STATE x                (known only because we synthesised it)
+   │
+   ▼  F₁  sheath / fluid / kinetic (PIC) physics
+   ▼  F₂  collisional-radiative emission, LIF, Thomson, refractive index
+   ▼  F₃  optical transport: geometry, apertures, aberration, stray light
+   ▼  F₄  detector: QE, shot / read / dark noise, ADC, dead pixels
+   │
+MEASUREMENTS y = F(x) + ε          ◄── the truth x is now hidden
+   │
+   ▼  physics-constrained inverse solver (regularised / Bayesian)
+   │
+RECOVERED STATE x̂, posterior p(x|y)  →  ION ENERGY FLUX Γ_E(x̂) ± σ
+   │
+   ▼  validation engine: compare with hidden truth, decompose the error budget
+```
+
+### Specification first
+
+The plan was written before the code. Fifteen numbered documents in [`docs/`](docs/) — charter, requirements, system design, physics models, measurement models, inverse problem, error budget, V&V, architecture, data provenance, compute plan, roadmap, commercialisation, reproducibility and risk register — are normative. The code is written against them section by section. When the code shows a document is wrong, the fix is recorded as an architecture decision in [`docs/adr/`](docs/adr/), not applied silently.
+
+### Hard constraints
+
+1. **No hardware, no laboratory, no real experimental data.** All measurements are synthetic.
+2. **No unsolved problems.** Every component is a known, published method. The contribution is integrating, verifying and validating them.
+3. **One NVIDIA RTX A4000 (16 GB).** Every headline result must be reachable on it.
+4. **No hidden assumptions.** Every assumption is a named, versioned, logged parameter.
+
+## Results / Highlights
+
+- **Phase 1 (Foundation) complete — Gate G-1 met**, with one criterion amended by ADR-010.
+- **1,488 tests** in the workspace environment plus **92** under FEniCSx.
+- **`mypy --strict` clean**, **98 % core coverage**, and an `ASSUMED`-parameter count of **0**.
+- Verification checks **V-01, V-02, V-03 and V-04 pass**; manifest reproduction gate **G-1.3 passes**.
+- Verified on two machines: macOS/arm64 and the reference RTX A4000 under WSL2 Ubuntu 24.04.
+- Implementation surfaced real corrections to the baseline documents — e.g. the self-consistent Child–Langmuir sheath thickness is 1.14 mm, not 0.89 mm (ADR-007).
+- Delivered with a research monograph, a conference paper and a Techathon deck under [`docs/papers/`](docs/papers/) and [`docs/presentation/`](docs/presentation/).
+
+## Tech Stack
+
+- **Language:** Python 3.12 (core and physics also run on 3.11 for the GPU JAX build)
+- **Scientific stack:** NumPy, SciPy (CODATA constants, special functions, linear algebra), SymPy (manufactured solutions), Pint (units)
+- **PDE / kinetics:** FEniCSx with PETSc and MPI (L1 fluid), JAX on CUDA (L2 PIC)
+- **Configuration:** OmegaConf, PyYAML
+- **Storage:** HDF5 (h5py), Zarr, Apache Arrow / Parquet
+- **Tooling:** uv workspace, Hatchling, Ruff, mypy (strict), pytest, Hypothesis
+- **Papers:** LaTeX
+
+## Getting Started
+
+### Prerequisites
+
+- Python 3.12
+- [uv](https://docs.astral.sh/uv/)
+- Optional: FEniCSx / PETSc for the L1 fluid tests, and a CUDA GPU for the L2 PIC level
+
+### Installation
+
+```bash
+git clone https://github.com/DCode-v05/IonLens.git
+cd IonLens
+uv sync
+```
+
+### Running
+
+```bash
+uv run ionlens run packages/ionlens-experiment/examples/b02-reference-operating-point.yaml
+uv run ionlens reproduce <run-id>          # re-runs from the archived manifest and verifies
+uv run ionlens compare <run-id-a> <run-id-b>
+```
+
+Run the checks:
+
+```bash
+uv run pytest                  # FEniCSx and GPU tests skip where the stack is missing
+uv run mypy packages
+uv run ruff check .
+```
+
+## Usage
+
+- Describe an experiment in one YAML manifest — operating point, solver, instruments. Two examples are in [`packages/ionlens-experiment/examples/`](packages/ionlens-experiment/examples/).
+- `ionlens run` executes it and writes artifacts that carry their own provenance.
+- `ionlens reproduce` proves a past run is bit-identical; `ionlens compare` diffs two runs.
+- Read the documents in [`docs/`](docs/) in order, starting with the [Charter](docs/00-charter.md), to see what each part is meant to do.
+
+## Project Structure
+
+```
+IonLens/
+├── packages/
+│   ├── ionlens-core/          # Protocols, state model, units, parameter registry, provenance
+│   ├── ionlens-physics/       # F₁: L0 analytic, L1 fluid (FEniCSx), L2 kinetic sheath models
+│   ├── ionlens-instruments/   # F₂: collisional-radiative emission, lineshapes, spectrograph
+│   ├── ionlens-inverse/       # Control parameters, priors, per-channel likelihoods
+│   ├── ionlens-validation/    # Convergence studies, error norms, sealed truth, benchmarks
+│   └── ionlens-experiment/    # Manifest engine and the ionlens run/reproduce/compare CLI
+├── docs/
+│   ├── 00-charter.md … 14-risk-register.md   # The normative specification
+│   ├── adr/                   # Architecture decision records
+│   ├── papers/                # Research monograph and conference paper (LaTeX + PDF)
+│   ├── presentation/          # Techathon deck and presenter guide
+│   └── commercialization/     # Commercialisation assessment
+├── metrics/                   # ASSUMED-parameter baseline
+├── refs/                      # Techathon brief and original proposal
+├── pyproject.toml             # uv workspace, lint, type and test configuration
+└── uv.lock
+```
+
+Licence: to be decided before any public release — see [Charter §9](docs/00-charter.md). Until then, all rights reserved by Team Astrophage.
 
 ---
 
-## What this is
+## Contact
 
-This repository is the reference implementation of a **physics-constrained inverse
-diagnostics framework** for plasma sheaths. It is not a plasma simulator, and it is not
-a digital twin.
+<table>
+  <tr><td><b>Portfolio:</b> <a href="https://www.denistan.me">Denistan</a></td><td><b>LinkedIn:</b> <a href="https://www.linkedin.com/in/denistanb">denistanb</a></td></tr>
+  <tr><td><b>GitHub:</b> <a href="https://github.com/DCode-v05">DCode-v05</a></td><td><b>LeetCode:</b> <a href="https://leetcode.com/u/Denistan_B">Denistan_B</a></td></tr>
+  <tr><td colspan="2" align="center"><b>Email:</b> <a href="mailto:denistanb05@gmail.com">denistanb05@gmail.com</a></td></tr>
+</table>
 
-The scientific object of the project is a single, precisely posed question:
-
-> Given a set of **non-perturbing optical observables** — optical emission spectra,
-> laser-induced fluorescence lineshapes, Thomson scattering spectra, and interferometric
-> phase — can the **ion energy flux** delivered to a plasma-facing surface be reconstructed,
-> resolved in space and time, with **quantified and honest uncertainty**?
-
-Ion energy flux is not directly measurable. Every instrument that can see it perturbs it;
-every instrument that does not perturb it sees only a projection. The framework closes the
-gap by treating the problem as a regularised, Bayesian **inverse problem** whose forward
-operator is built from first-principles sheath and kinetic physics.
-
-## The closed loop
-
-Everything in this repository exists to support one loop, and to interrogate it from
-every angle a reviewer could think of:
-
-```
-             TRUE PLASMA STATE  x
-                     │                 (known only because we synthesised it)
-                     ▼
-        ┌────────────────────────┐
-        │   Forward physics F₁   │     sheath / fluid / kinetic (PIC) hierarchy
-        └────────────────────────┘
-                     ▼
-        ┌────────────────────────┐
-        │  Emission & scattering │     F₂ : collisional-radiative, LIF, Thomson,
-        │      response  F₂      │          refractive index
-        └────────────────────────┘
-                     ▼
-        ┌────────────────────────┐
-        │   Optical transport    │     F₃ : geometry, apertures, aberration,
-        │        F₃              │          transmission, stray light
-        └────────────────────────┘
-                     ▼
-        ┌────────────────────────┐
-        │  Detector & digitiser  │     F₄ : QE, shot/read/dark noise, ADC,
-        │        F₄              │          blooming, dead pixels, jitter
-        └────────────────────────┘
-                     ▼
-              MEASUREMENTS  y = F(x) + ε        F = F₄∘F₃∘F₂∘F₁
-                     │
-                     │   ◄── the ground truth x is now HIDDEN
-                     ▼
-        ┌────────────────────────┐
-        │  Physics-constrained   │     regularised / Bayesian inversion
-        │    inverse solver      │     with identifiability analysis
-        └────────────────────────┘
-                     ▼
-          RECOVERED STATE  x̂  ,  posterior p(x|y)
-                     ▼
-          RECOVERED ION ENERGY FLUX  Γ_E(x̂)  ± σ
-                     ▼
-        ┌────────────────────────┐
-        │   Validation engine    │     compare against the hidden truth,
-        │  error budget · UQ     │     decompose every error contribution
-        └────────────────────────┘
-```
-
-The inverse solver never sees the truth. That is the entire point, and it is what makes
-the accuracy claims defensible without a laboratory.
-
-## Documentation
-
-The plan is written before the code. Read in order:
-
-| # | Document | What it settles |
-|---|----------|-----------------|
-| 00 | [Charter](docs/00-charter.md) | Identity, scope, non-goals, hard constraints, success criteria |
-| 01 | [Requirements & Trade Study](docs/01-requirements-and-trade-study.md) | What must be observable, and *why these four diagnostics* |
-| 02 | [System Design Specification](docs/02-system-design-spec.md) | The complete virtual laboratory: chamber, optics, lasers, detectors, DAQ, timing |
-| 03 | [Physics Model Specification](docs/03-physics-models.md) | Sheath hierarchy, kinetics, collisions, atomic data |
-| 04 | [Measurement Model Specification](docs/04-measurement-models.md) | Forward operators for OES, LIF, Thomson, interferometry |
-| 05 | [Inverse Problem Specification](docs/05-inverse-problem.md) | Formal statement, regularisation, samplers, identifiability |
-| 06 | [Uncertainty & Error Budget](docs/06-uncertainty-and-error-budget.md) | Propagation chain, budget decomposition, calibration of the UQ itself |
-| 07 | [Verification & Validation](docs/07-verification-and-validation.md) | MMS, convergence, benchmark suite, ablation and robustness matrix |
-| 08 | [Software Architecture](docs/08-software-architecture.md) | Packages, API contracts, plugin discovery, data model |
-| 09 | [Data, Assets & Provenance](docs/09-data-and-provenance.md) | Every external dataset, its licence, and its citation |
-| 10 | [Compute & Infrastructure Plan](docs/10-compute-and-infrastructure.md) | A4000-first budget, scaling path, cost model |
-| 11 | [Roadmap & Work Breakdown](docs/11-roadmap-and-wbs.md) | Phases, deliverables, acceptance gates |
-| 12 | [Commercialisation](docs/12-commercialisation.md) | Product shape, TRL ladder, IP posture |
-| 13 | [Reproducibility & Publication](docs/13-reproducibility-and-publication.md) | Experiment manifests, figure pipeline, archival |
-| 14 | [Risk Register](docs/14-risk-register.md) | What can kill this, and the mitigation for each |
-
-Architecture decisions are recorded in [`docs/adr/`](docs/adr/).
-
-Techathon material lives alongside the specification:
-
-| Folder | Contents |
-|---|---|
-| [`docs/papers/research/`](docs/papers/research/) | Research monograph (LaTeX source and compiled PDF) |
-| [`docs/papers/conference/`](docs/papers/conference/) | Conference paper (LaTeX source and compiled PDF) |
-| [`docs/presentation/`](docs/presentation/) | Techathon deck, presenter guide, speaker script |
-| [`docs/commercialization/`](docs/commercialization/) | Commercialization assessment and its explainer |
-
-## Hard constraints this plan is built under
-
-These are not preferences. Every document is written to respect them.
-
-1. **No physical hardware, no laboratory, no real experimental data.** All measurements are
-   synthetic, produced by the forward chain. Every number that enters the forward chain
-   traces to a published source, a standard database, or an explicitly declared design
-   parameter — never to an unattributed guess.
-2. **No unsolved problems.** No new theorems, no open conjectures, no claims of a physics
-   breakthrough. Every component is a known, published method. The contribution is the
-   *integration, verification, and rigorous validation* of those methods into a coherent
-   framework, at an engineering standard that does not currently exist as open software.
-3. **Compute: a single NVIDIA RTX A4000 (16 GB, Ampere) at first availability**, with
-   better compute assumed to arrive later. The plan is explicitly tiered so that every
-   headline result is reachable on the A4000, and the larger compute only *widens* the
-   study rather than enabling it.
-4. **No hidden assumptions.** Every assumption becomes a named, versioned, logged parameter.
-   If a value is a guess, it is tagged as a guess and it appears in the sensitivity study.
-
-## Status
-
-**Phase 1 — Foundation, in progress.** Phase 0 remains the specification; the documents
-above are normative and the code is written against them section by section.
-
-| WBS | Item | State |
-|---|---|---|
-| 1.1 | `ionlens-core` — protocols, state model, units, provenance | **Done** |
-| 1.2 | Parameter registry + literal-lint rule | **Done** |
-| 1.3 | Manifest engine, `ionlens run` / `reproduce` / `compare` | **Done** — G-1.3 passes |
-| 1.4 | Storage layer with embedded provenance | **Done** |
-| 1.5 | L0 analytic sheath models | **Done** — V-03 anchor |
-| 1.6 | L1 fluid solver (FEniCSx), V-01 / V-02 | **Done** — V-01, V-02, V-04 pass |
-| 1.7 | Atomic-data loaders (LXCat, NIST ASD, OpenADAS) | **Done** |
-| 1.8 | Boltzmann / EEDF integration | **Done** |
-| 1.9 | CI gates, G-1 gate report | **Done** |
-
-**Gate G-1 is met**, with G-1.2 amended by ADR-010.
-
-Verified on both the development machine (macOS/arm64) and the doc 10 §1 reference
-machine (RTX A4000, WSL2 Ubuntu 24.04): 1 488 tests in the workspace environment plus 92
-under FEniCSx, `mypy --strict` clean, 98 % core coverage, `ASSUMED` count 0.
-
-### Corrections to the Baseline documents
-
-Implementation has produced three corrections, each recorded as an ADR rather than
-silently applied. This is the process working as doc 11 G-1.4 anticipates, not a defect.
-
-- **[ADR-007](docs/adr/ADR-007-child-langmuir-thickness.md)** — doc 01 §2.2 evaluates the
-  Child–Langmuir sheath thickness with `λ_D` at the bulk density, but doc 03 §2.3 derives
-  the expression by matching to the Bohm flux, which fixes `λ_D` at the sheath edge. The
-  self-consistent value is 1.14 mm, not 0.89 mm. `Γ_E` contains no `s`, so **V-03 is
-  unaffected** and doc 01 §2.3's transit-time argument survives.
-- **ADR-007 §related** — doc 03 §2.1 states `γ_i = 3` in the Bohm speed while doc 03 §2.3's
-  own arithmetic uses the cold-ion form, as does doc 01 §2.2.
-- **[ADR-008](docs/adr/ADR-008-manifest-substrate.md)** — PyYAML cannot parse doc 08 §6's
-  own example manifest: YAML 1.1's float resolver requires a signed exponent, so `1.0e17`
-  loads as a string.
-- **[ADR-009](docs/adr/ADR-009-eedf-solver.md)** — neither Boltzmann solver named in
-  doc 08 §2 is usable; `bolos` calls a SciPy API removed in 1.14, at exactly the three
-  integrals doc 03 §3.2 needs.
-- **[ADR-010](docs/adr/ADR-010-v03-sheath-thickness-gate.md)** — V-03's sheath-thickness
-  criterion is unreachable anywhere in the doc 01 R-ENV-4 envelope, and doc 03 §2.1
-  understates how strongly `s` depends on the sheath-edge definition.
-- **The bias sign** — doc 08 §6's manifest writes `bias: -250.0 V`; doc 03 §2.2 uses `V_w`
-  as a positive magnitude. Settled in `ionlens.core.state.params`.
-
-## Licence
-
-TBD before any public release — see [Charter §9](docs/00-charter.md). Until then, all
-rights reserved by Team Astrophage.
+Made with ❤️ by **Denistan B**
