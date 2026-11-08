@@ -51,3 +51,11 @@ mlruns/
 .coverage.*
 coverage.xml
 htmlcov/
+
+# Env files and logs
+.env
+.env.*
+!.env.example
+Thumbs.db
+*.tsbuildinfo
+.ipynb_checkpoints/
