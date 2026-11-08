@@ -164,9 +164,6 @@ class VelocityDistribution:
                 f"distribution has shape {values.shape}, expected {expected} (n_z, n_v)"
             )
         if np.any(values < 0.0):
-            # A distribution function is a phase-space density. A negative entry is not
-            # a small numerical wobble to tolerate: whatever produced it is wrong, and
-            # every moment taken afterwards inherits the error without showing it.
             raise ValueError(
                 f"{self.species.name} distribution has negative values; "
                 "a phase-space density cannot be negative"

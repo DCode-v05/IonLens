@@ -48,15 +48,10 @@ __all__ = [
     "write_quantity",
 ]
 
-#: Lossless codec. See the module docstring for why nothing lossy appears here.
 COMPRESSION: Final[str] = "gzip"
 
-#: gzip level. Four is the knee of the curve for float64 field data: most of the ratio of
-#: level 9 at a small fraction of the write cost, which matters when doc 10 §7 budgets
-#: 860 GB of raw fields regenerated on demand rather than stored.
 COMPRESSION_LEVEL: Final[int] = 4
 
-#: Attribute carrying a dataset's units, following the netCDF/CF convention.
 UNITS_ATTRIBUTE: Final[str] = "units"
 
 

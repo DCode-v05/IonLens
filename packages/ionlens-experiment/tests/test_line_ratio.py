@@ -97,8 +97,6 @@ def _line_fluxes(state) -> tuple[float, float]:
 class TestTheSpectrumActuallyHasTwoLines:
     @pytest.mark.physics
     def test_both_line_regions_carry_signal(self) -> None:
-        # Vacuous-guard: every assertion below is meaningless if the second line never made
-        # it into the emitted spectrum.
         near, far = _line_fluxes(_state(3.0))
 
         assert near > 0.0
@@ -123,12 +121,8 @@ class TestTheRatioCancelsTheCalibration:
 
     @pytest.mark.physics
     def test_a_uniform_scale_error_moves_both_lines_and_not_their_ratio(self) -> None:
-        # A radiometric calibration error multiplies the whole spectrum by one factor,
-        # because both lines share the optics. So it must cancel in the ratio *exactly* —
-        # to floating point, not approximately. If this fails, the two lines are not on a
-        # shared calibration path and the case for a ratio collapses.
         near, far = _line_fluxes(_state(3.0))
-        scale = 1.06  # the registry's own 6 % radiometric uncertainty
+        scale = 1.06
 
         scaled_near, scaled_far = near * scale, far * scale
 
@@ -155,8 +149,6 @@ class TestTheRatioCarriesTemperature:
 
     @pytest.mark.physics
     def test_the_ratio_is_monotonic_across_the_prior_range(self) -> None:
-        # Non-monotonic would mean two temperatures produce the same ratio — a degeneracy
-        # introduced by the very observable meant to break one.
         ratios = []
         for t_e in (2.0, 3.0, 4.0, 5.0, 6.0):
             near, far = _line_fluxes(_state(t_e))
@@ -169,10 +161,6 @@ class TestTheRatioCarriesTemperature:
 
     @pytest.mark.physics
     def test_the_two_lines_have_genuinely_different_thresholds(self) -> None:
-        # The mechanism behind property 2. Equal thresholds would make the two lines respond
-        # to T_e identically and their ratio flat — this asserts the *cause*, so a future
-        # edit that equalises them fails here with a readable reason rather than failing the
-        # statistical test above mysteriously.
         from ionlens.experiment.closed_loop import (
             _RADIATING_ENERGY_EV,
             _SECOND_RADIATING_ENERGY_EV,

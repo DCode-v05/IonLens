@@ -97,42 +97,12 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: Relative curvature (this eigenvalue / the largest eigenvalue in the same
-#: decomposition) at or above which a direction is classified
-#: :attr:`IdentifiabilityVerdict.IDENTIFIABLE`.
-#:
-#: `1e-2` because the marginal standard deviation along a direction with relative
-#: curvature `r` is `1/sqrt(r)` times the best-constrained direction's, and
-#: `1/sqrt(1e-2) = 10`: an error bar an order of magnitude wider than the tightest one is
-#: still a number a reader can use. See the module docstring for why this is a chosen
-#: convention rather than a derived quantity.
 STRONG_IDENTIFIABILITY_FLOOR: Final[float] = 1.0e-2
 
-#: Relative curvature at or above which a direction is at least
-#: :attr:`IdentifiabilityVerdict.WEAKLY_IDENTIFIABLE`; below it, :attr:`
-#: IdentifiabilityVerdict.NON_IDENTIFIABLE`.
-#:
-#: `1e-6`, three orders of magnitude below :data:`STRONG_IDENTIFIABILITY_FLOOR`, because
-#: `1/sqrt(1e-6) = 1000`: a thousand-fold-wider error bar than the tightest direction is
-#: doc 05 §6's null space in every practical sense, whatever its literal (positive)
-#: eigenvalue. This is deliberately looser than :mod:`ionlens.inverse.laplace`'s
-#: `_MINIMUM_RELATIVE_CURVATURE` (`1e-9`), which is a numerical safety floor for inverting
-#: a Hessian, not a scientific judgement about interpretability — this module's floor is
-#: reached, and a direction is reported as non-identifiable, well before that one would
-#: refuse to invert the matrix at all.
 WEAK_IDENTIFIABILITY_FLOOR: Final[float] = 1.0e-6
 
-#: Smallest fraction of the dominant |coefficient| a component must reach to appear in a
-#: printed parameter combination (:attr:`ParameterDirection.combination`).
-#:
-#: `0.05`: components below 5 % of the largest one in the same eigenvector are, in every
-#: case this project's parameterisation produces, floating-point residue rather than
-#: physics — dropping them makes the combination readable without silently hiding a term
-#: that matters.
 _COMBINATION_DISPLAY_FLOOR: Final[float] = 0.05
 
-#: Decimal places shown for each coefficient in a printed combination. Two, to match the
-#: precision doc 05 §6.2's own worked example ("0.71 log n_0 - 0.70 log T_e") is stated to.
 _COMBINATION_DECIMALS: Final[int] = 2
 
 
@@ -451,17 +421,8 @@ def cramer_rao_bound(fisher_information: ArrayLike) -> FloatArray:
     safe_eigenvalues = np.where(identifiable_mask, eigenvalues, 1.0)
     inverse_eigenvalues = np.where(identifiable_mask, 1.0 / safe_eigenvalues, np.inf)
 
-    # A coordinate with an exactly-zero projection onto a non-identifiable direction
-    # (component_sq == 0) must contribute exactly 0 to that coordinate's variance, not
-    # ``0 * inf = nan``. Machine epsilon, not a literal 0.0 comparison, because a
-    # component that is merely floating-point residue from an off-diagonal
-    # decomposition must be treated the same way an exact zero is.
     component_sq = eigenvectors**2
     with np.errstate(invalid="ignore"):
-        # `0 * inf` raises `invalid value encountered in multiply` even though the
-        # result is discarded by the `np.where` below whenever component_sq is
-        # negligible; the warning is suppressed only around this one expression, not
-        # around the sum, so a genuine nan elsewhere would still surface.
         raw_contribution = component_sq * inverse_eigenvalues[np.newaxis, :]
     contribution = np.where(component_sq > np.finfo(np.float64).eps, raw_contribution, 0.0)
     variances = contribution.sum(axis=1)
@@ -527,9 +488,4 @@ def _validate_square_symmetric(matrix: ArrayLike, *, name: str) -> FloatArray:
         raise ValueError(f"{name} must be a square matrix, got shape {array.shape}")
     if not np.all(np.isfinite(array)):
         raise ValueError(f"{name} contains non-finite entries")
-    # Symmetrised rather than rejected if asymmetric: a matrix assembled from finite
-    # differences (ionlens.inverse.laplace's Hessian, or J^T Sigma^-1 J built in stages) is
-    # symmetric only up to roundoff, and eigh reading a single triangle would silently
-    # choose one side rather than average them — the same reasoning laplace.py's
-    # module-level comment gives for its own Hessian.
     return np.asarray(0.5 * (array + array.T), dtype=np.float64)

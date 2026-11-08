@@ -13,7 +13,6 @@ from ionlens.core.units import Q_
 from ionlens.experiment import ManifestSolver, resolve_plasma
 from ionlens.experiment.solvers import AnalyticSheathForwardSolver
 
-#: doc 03 §2.3's headline number at RP-1, to the precision ADR-007 records it.
 V03_GAMMA_E_WATT_PER_M2 = 6576.94
 
 
@@ -59,8 +58,6 @@ class TestConfiguration:
         assert matrix_state != child.solve(params, None)
 
     def test_it_refuses_a_key_it_does_not_own(self, solver: AnalyticSheathForwardSolver) -> None:
-        # doc 08 §6's own forward block sets `n_ppc`, which belongs to the PIC solver.
-        # Pointing the analytic solver at that manifest is a mistake worth naming.
         with pytest.raises(ValueError, match="n_ppc"):
             solver.configure(SolverConfig(values={"n_ppc": 1000}))
 

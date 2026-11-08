@@ -60,18 +60,11 @@ from ionlens.physics.eedf.solver import (
 )
 from ionlens.validation.convergence import RefinementLevel, assert_design_order, observed_order
 
-# ── synthetic gases (doc 09 §5: nothing downloaded) ─────────────────────────────
 
-#: ``m_e / M`` for argon.
 ARGON_MASS_RATIO = 1.36e-5
 
-#: The magnitude of argon's momentum-transfer cross section near its peak. Used as a
-#: *constant* here, which is what makes the Druyvesteyn form exact; the point of matching
-#: argon's magnitude is that the reduced fields at which the closed forms are exercised
-#: are then the reduced fields of a real argon discharge.
 ARGON_LIKE_SIGMA_M2 = 2e-19
 
-#: 300 K in eV — RP-1's neutral temperature (doc 01 §2.1).
 ROOM_TEMPERATURE_EV = 0.025852
 
 ARGON_IONISATION_EV = 15.76
@@ -163,9 +156,6 @@ def _druyvesteyn_mean_energy_ev(reduced_field_td: float) -> float:
     )
 
 
-# ── the Maxwellian limit ────────────────────────────────────────────────────────
-
-
 def _relaxed_solution() -> EedfSolution:
     """Elastic only, vanishing field: the electrons must equilibrate with the gas."""
     grid = EnergyGrid.linear(max_ev=0.6, n_cells=600)
@@ -219,8 +209,6 @@ class TestTheEinsteinRelation:
 
     @pytest.mark.physics
     def test_it_holds_for_an_energy_dependent_momentum_transfer_too(self) -> None:
-        # The relation is a property of the Maxwellian, not of the cross section, so a
-        # solver that only satisfied it for a constant sigma_m would be passing by luck.
         grid = EnergyGrid.linear(max_ev=0.6, n_cells=600)
         solver = TwoTermSolver(
             kinetics=_constant_frequency_kinetics(grid),
@@ -233,9 +221,6 @@ class TestTheEinsteinRelation:
 
     @pytest.mark.physics
     def test_the_characteristic_energy_is_two_thirds_of_the_mean_energy(self) -> None:
-        # True *because* the relaxed distribution is Maxwellian. Where it is not — every
-        # field of interest to doc 03 §3.2 — the two differ, and the difference is a
-        # measurement of the non-Maxwellian correction rather than an assumption about it.
         solution = _relaxed_solution()
 
         assert solution.characteristic_energy_ev == pytest.approx(
@@ -249,14 +234,9 @@ class TestTheEinsteinRelation:
             reduced_field_td=30.0
         )
 
-        # A Druyvesteyn has D/mu = <eps> Gamma(3/4)^2 / Gamma(5/4)^2 * ... — the point is
-        # only that it is *not* (2/3)<eps>, which is what a Maxwellian analysis assumes.
         assert solution.characteristic_energy_ev != pytest.approx(
             solution.effective_temperature_ev, rel=0.05
         )
-
-
-# ── the Druyvesteyn limit ───────────────────────────────────────────────────────
 
 
 def _druyvesteyn_solution(reduced_field_td: float = 30.0, n_cells: int = 1000) -> EedfSolution:
@@ -285,8 +265,6 @@ class TestTheDruyvesteynLimit:
 
     @pytest.mark.physics
     def test_the_shape_is_emphatically_not_maxwellian(self) -> None:
-        # doc 03 §3.2's whole premise. Compared at equal mean energy, which is the
-        # like-for-like comparison because that is what a Maxwellian fit would report.
         solution = _druyvesteyn_solution()
         maxwell = solution.grid.normalise(
             maxwellian_eedf(
@@ -299,14 +277,10 @@ class TestTheDruyvesteynLimit:
 
     @pytest.mark.physics
     def test_the_scale_energy_is_proportional_to_the_reduced_field(self) -> None:
-        # eps_0 ~ (E/N) exactly, so doubling the field must double the mean energy.
         low = _druyvesteyn_solution(reduced_field_td=20.0)
         high = _druyvesteyn_solution(reduced_field_td=40.0)
 
         assert high.mean_energy_ev / low.mean_energy_ev == pytest.approx(2.0, rel=1e-3)
-
-
-# ── transport integrals ─────────────────────────────────────────────────────────
 
 
 class TestReducedMobility:
@@ -357,9 +331,6 @@ class TestReducedMobility:
         )
 
     def test_the_reduced_mobility_is_positive(self) -> None:
-        # Sign convention: the magnitude is returned. Electrons drift against E, and a
-        # signed mobility would have every downstream expression carrying a minus sign
-        # that half the call sites would forget.
         grid = EnergyGrid.linear(max_ev=100.0, n_cells=400)
         solver = TwoTermSolver(kinetics=_constant_kinetics(grid))
 
@@ -373,9 +344,6 @@ class TestReducedMobility:
         assert solution.drift_velocity_m_per_s == pytest.approx(
             solution.reduced_mobility * 10.0 * TOWNSEND_V_M2
         )
-
-
-# ── rate coefficients ───────────────────────────────────────────────────────────
 
 
 def _ionising_solver(grid: EnergyGrid, *, sigma_m2: float = 3e-21) -> TwoTermSolver:
@@ -407,9 +375,6 @@ class TestRateCoefficients:
 
     @pytest.mark.physics
     def test_the_growth_rate_equals_the_ionisation_rate_coefficient(self) -> None:
-        # An exact discrete identity: summing the operator's rows leaves only the net
-        # particle creation, which is the ionisation rate integral. If the inelastic
-        # redistribution and the rate integral disagree, this is where it shows.
         grid = EnergyGrid.linear(max_ev=400.0, n_cells=800)
 
         solution = _ionising_solver(grid).solve(reduced_field_td=40.0)
@@ -420,16 +385,12 @@ class TestRateCoefficients:
 
     @pytest.mark.physics
     def test_the_growth_model_omission_is_reported_and_small(self) -> None:
-        # The solver drops Hagelaar & Pitchford's growth correction to sigma_m. The
-        # omission is bounded rather than assumed small: this ratio is what bounds it.
         grid = EnergyGrid.linear(max_ev=400.0, n_cells=800)
 
         assert _ionising_solver(grid).solve(reduced_field_td=40.0).growth_correction < 1e-3
 
     @pytest.mark.physics
     def test_excitation_cools_the_electrons(self) -> None:
-        # An inelastic channel is an energy sink; adding one at fixed E/N must lower
-        # <eps>. This is doc 03 §3.2's depleted tail, measured.
         grid = EnergyGrid.linear(max_ev=200.0, n_cells=600)
         bare = TwoTermSolver(kinetics=_constant_kinetics(grid))
         cooled = TwoTermSolver(
@@ -479,8 +440,6 @@ class TestRateCoefficients:
         rates = solver.solve(reduced_field_td=20.0).excitation_rate_coefficients
 
         assert set(rates) == {"low", "high"}
-        # The higher threshold samples a more depleted part of the tail, and on a
-        # Druyvesteyn tail 1.5 eV of threshold is three orders of magnitude.
         assert rates["high"] < rates["low"]
 
     def test_the_ionisation_channel_is_excluded_from_the_excitation_rates(self) -> None:
@@ -523,19 +482,11 @@ class TestIonisationSharing:
 
     @pytest.mark.physics
     def test_equal_sharing_puts_more_electrons_in_the_lowest_cell(self) -> None:
-        # Both electrons leave with half the excess energy, and because the ionising
-        # population sits just above threshold that half is close to zero — so equal
-        # sharing feeds the bottom of the grid *two* slow electrons where one-takes-all
-        # feeds it one slow and one fast. The two rules therefore bracket the low-energy
-        # population, which is what makes the choice worth exposing rather than fixing.
         one = self._solve(IonisationSharing.ONE_TAKES_ALL)
         equal = self._solve(IonisationSharing.EQUAL_SHARING)
 
         assert equal.f0[0] > one.f0[0]
         assert equal.mean_energy_ev != pytest.approx(one.mean_energy_ev, rel=1e-4)
-
-
-# ── the distribution itself, not only its moments ───────────────────────────────
 
 
 class TestTheDistributionIsAvailable:
@@ -546,7 +497,6 @@ class TestTheDistributionIsAvailable:
         grid = EnergyGrid.linear(max_ev=100.0, n_cells=600)
         solution = TwoTermSolver(kinetics=_constant_kinetics(grid)).solve(reduced_field_td=10.0)
 
-        # F(eps) = f0 sqrt(eps) is the energy distribution proper; integral F deps = 1.
         assert float(np.sum(solution.energy_distribution * grid.widths_ev)) == pytest.approx(
             1.0, rel=1e-3
         )
@@ -555,8 +505,6 @@ class TestTheDistributionIsAvailable:
     def test_the_tail_is_depleted_relative_to_a_maxwellian_of_the_same_mean_energy(
         self,
     ) -> None:
-        # doc 03 §3.2: "the high-energy tail — the part that matters for ionisation and
-        # for OES line ratios — is depleted." Quantified here rather than asserted.
         grid = EnergyGrid.linear(max_ev=60.0, n_cells=1200)
         solution = TwoTermSolver(kinetics=_constant_kinetics(grid), gas_temperature_ev=0.0).solve(
             reduced_field_td=5.0
@@ -570,8 +518,6 @@ class TestTheDistributionIsAvailable:
         above = grid.centres_ev >= ARGON_IONISATION_EV
         maxwell_tail = float(np.dot(maxwell[above], grid.cell_masses[above]))
 
-        # Not a marginal effect: four orders of magnitude at the argon ionisation
-        # threshold, for a distribution a Maxwellian analysis would call 1.9 eV.
         assert solution.tail_fraction_above(ARGON_IONISATION_EV) < 1e-3 * maxwell_tail
 
     def test_a_tail_fraction_of_zero_energy_is_the_whole_population(self) -> None:
@@ -589,16 +535,9 @@ class TestTheDistributionIsAvailable:
         assert "10" in repr(solution)
 
 
-# ── convergence and refusal ─────────────────────────────────────────────────────
-
-
 class TestConvergence:
     @pytest.mark.physics
     def test_the_mean_energy_converges_at_second_order_in_the_cell_width(self) -> None:
-        # The exponential scheme evaluates its coefficients at cell boundaries, which on a
-        # uniform grid are the exact midpoints between adjacent cell centres, so the
-        # discretisation is second order. Measured against the Druyvesteyn closed form,
-        # not against a fine-grid solution, so the study cannot converge to its own error.
         exact = _druyvesteyn_mean_energy_ev(30.0)
 
         levels = [
@@ -613,9 +552,6 @@ class TestConvergence:
 
     @pytest.mark.physics
     def test_a_graded_grid_also_converges_at_second_order(self) -> None:
-        # The expectation is that giving up the exact-midpoint property of a uniform grid
-        # costs an order. It does not, and the docstring of ionlens.physics.eedf.grid says so
-        # only because this measures it.
         exact = _druyvesteyn_mean_energy_ev(30.0)
 
         levels = []
@@ -707,8 +643,6 @@ class TestTheGridTruncationCheck:
 
     @pytest.mark.physics
     def test_a_grid_too_short_for_the_field_is_reported(self) -> None:
-        # Silent truncation is the classic way a Boltzmann solve produces a plausible and
-        # entirely wrong answer: the result is still smooth, normalised and positive.
         grid = EnergyGrid.linear(max_ev=2.0, n_cells=200)
         solver = TwoTermSolver(kinetics=_constant_kinetics(grid), gas_temperature_ev=0.0)
 
@@ -725,10 +659,6 @@ class TestTheGridTruncationCheck:
 class TestDegenerateStartingPoints:
     @pytest.mark.physics
     def test_a_grid_far_hotter_than_the_default_guess_still_starts(self) -> None:
-        # The default initial guess is a 1 eV Maxwellian. On a grid whose first cell
-        # centre is tens of keV that underflows to zero everywhere, and normalising it
-        # would raise. The fallback is a uniform distribution — a poor guess, but a
-        # non-degenerate one, and the converged answer does not depend on it.
         grid = EnergyGrid.linear(max_ev=1e5, n_cells=1)
 
         solution = TwoTermSolver(kinetics=_constant_kinetics(grid)).solve(reduced_field_td=10.0)
@@ -736,9 +666,6 @@ class TestDegenerateStartingPoints:
         assert solution.mean_energy_ev > 0.0
 
     def test_the_growth_correction_of_a_collisionless_solution_is_zero(self) -> None:
-        # Unreachable through the solver, because a zero momentum-transfer cross section
-        # is refused at assembly. Constructed directly so that the guard is exercised
-        # rather than left as an unreached branch that might be wrong.
         grid = EnergyGrid.linear(max_ev=10.0, n_cells=4)
         solution = EedfSolution(
             grid=grid,

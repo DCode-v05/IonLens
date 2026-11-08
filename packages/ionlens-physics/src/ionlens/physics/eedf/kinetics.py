@@ -71,10 +71,8 @@ __all__ = [
 
 FloatArray: TypeAlias = NDArray[np.float64]
 
-#: What to do above the tabulated range. See the module docstring: refusing.
 DEFAULT_ABOVE_GRID: ExtrapolationPolicy = DEFAULT_ABOVE
 
-#: What to do below it, where no threshold already fixes the answer.
 DEFAULT_BELOW_GRID: ExtrapolationPolicy = DEFAULT_BELOW
 
 
@@ -319,12 +317,8 @@ def kinetics_from_set(
         InelasticChannel(
             reaction=section.reaction,
             process=section.process,
-            # A threshold process always carries one; the parser refuses otherwise.
             threshold_ev=float(section.threshold_ev or 0.0),
             sigma_m2=interpolate_cross_section(section, grid.centres_ev, below=below, above=above),
-            # Also at the boundaries: this channel contributes to the effective
-            # momentum-transfer cross section of Reid eq. (4), which the flux terms and
-            # the mobility sum both evaluate there.
             sigma_edge_m2=interpolate_cross_section(
                 section, grid.boundaries_ev, below=below, above=above
             ),

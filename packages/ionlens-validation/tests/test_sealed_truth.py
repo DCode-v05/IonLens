@@ -42,8 +42,6 @@ from ionlens.validation.sealed import (
 
 class TestTheSeal:
     def test_the_truth_cannot_be_read_before_an_estimate_is_committed(self) -> None:
-        # The whole point. If this raises, an inverse crime requires deliberate
-        # circumvention rather than a moment's inattention.
         sealed = SealedTruth(value=6577.0, name="Gamma_E")
 
         with pytest.raises(InverseCrimeError, match="before an estimate has been committed"):
@@ -57,7 +55,6 @@ class TestTheSeal:
         assert sealed.value == 6577.0
 
     def test_an_estimate_cannot_be_changed_once_committed(self) -> None:
-        # Otherwise the barrier is theatre: commit anything, read the truth, then "revise".
         sealed = SealedTruth(value=6577.0, name="Gamma_E")
         sealed.commit_estimate(6510.0, tier=Tier.T0)
 
@@ -71,8 +68,6 @@ class TestTheSeal:
             _ = sealed.value
 
     def test_repr_does_not_leak_the_value_before_commitment(self) -> None:
-        # A sealed value that prints itself in a traceback, a debugger or a log is not
-        # sealed. This is the leak that would actually happen in practice.
         sealed = SealedTruth(value=6577.0, name="Gamma_E")
 
         assert "6577" not in repr(sealed)
@@ -85,8 +80,6 @@ class TestTheSeal:
         assert "6577" in repr(sealed)
 
     def test_an_array_valued_truth_is_sealed_the_same_way(self) -> None:
-        # The IEDF is the deliverable doc 03 §4.3 cares most about and it is a
-        # distribution, so sealing only scalars would leave the important case open.
         sealed = SealedTruth(value=np.array([1.0, 2.0, 3.0]), name="IEDF")
 
         with pytest.raises(InverseCrimeError):
@@ -116,8 +109,6 @@ class TestTheError:
 
 class TestTierLabelling:
     def test_a_result_must_carry_a_tier(self) -> None:
-        # doc 05 §7.2 makes the label mandatory, so it is a required argument. A default
-        # would be chosen by whoever was in a hurry, which is exactly the failure mode.
         sealed = SealedTruth(value=1.0, name="x")
 
         with pytest.raises(TypeError):
@@ -130,12 +121,9 @@ class TestTierLabelling:
         assert sealed.tier is Tier.T2
 
     def test_tiers_are_ordered_by_honesty(self) -> None:
-        # T2 is the honest one. The ordering exists so a report can assert "this figure is
-        # at least T2" rather than string-matching a label.
         assert Tier.T0 < Tier.T1 < Tier.T2
 
     def test_the_configuration_maps_to_the_right_tier(self) -> None:
-        # doc 05 §7.2's table, as a function rather than as a comment somebody follows.
         assert (
             tier_of_configuration(same_model=True, noise=False, imperfect_calibration=False)
             is Tier.T0
@@ -150,22 +138,16 @@ class TestTierLabelling:
         )
 
     def test_a_mismatched_model_without_noise_is_not_claimable_as_t2(self) -> None:
-        # The tempting half-measure: mismatch the models, skip the noise and the imperfect
-        # calibration, and call it honest. doc 05 §7.1 requires all of the mismatches.
         with pytest.raises(TierMismatchError, match="noise"):
             tier_of_configuration(same_model=False, noise=False, imperfect_calibration=True)
 
     def test_claiming_t2_without_imperfect_calibration_is_refused(self) -> None:
-        # doc 04 §7.3's *estimated* instrument response is one of doc 05 §7.1's mandatory
-        # mismatches, and it is the one most easily forgotten because the true response is
-        # already in the simulation.
         with pytest.raises(TierMismatchError, match="calibration"):
             tier_of_configuration(same_model=False, noise=True, imperfect_calibration=False)
 
 
 class TestTheReportingRule:
     def test_a_t1_result_cannot_be_relabelled_as_t2(self) -> None:
-        # doc 05 §7.2: "Reporting T1 as if it were T2 is treated as a project defect."
         sealed = SealedTruth(value=1.0, name="x")
         sealed.commit_estimate(1.0, tier=Tier.T1)
 
@@ -179,8 +161,6 @@ class TestTheReportingRule:
         sealed.assert_at_least(Tier.T1)
 
     def test_t0_failure_is_reported_as_a_bug_not_a_result(self) -> None:
-        # doc 05 §7.2: "Failing T0 means a bug; nothing else is meaningful until it passes."
-        # So the T0 check is phrased as an assertion about the code, not a measurement.
         sealed = SealedTruth(value=6577.0, name="Gamma_E")
         sealed.commit_estimate(4000.0, tier=Tier.T0)
 
@@ -194,9 +174,6 @@ class TestTheReportingRule:
         sealed.assert_t0_consistency(tolerance=1e-6)
 
     def test_asserting_t0_consistency_on_a_non_t0_result_is_refused(self) -> None:
-        # A T1 result is noisy by construction and will not recover to numerical
-        # tolerance. Running the T0 check on it would either fail spuriously or, with a
-        # loose tolerance, silently pass and mean nothing.
         sealed = SealedTruth(value=1.0, name="x")
         sealed.commit_estimate(1.0, tier=Tier.T1)
 

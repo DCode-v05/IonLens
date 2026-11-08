@@ -27,19 +27,13 @@ class ProvenanceClass(StrEnum):
     which kind of thing it is.
     """
 
-    #: From a standard evaluated database, with version and access date.
     MEASURED = "MEASURED"
-    #: From a specific paper, cited.
     PUBLISHED = "PUBLISHED"
-    #: From a real commercial component datasheet, with part number.
     SPEC = "SPEC"
-    #: A free design choice. Therefore a variable in the sensitivity study.
     DESIGN = "DESIGN"
-    #: Could not be sourced. A defect; the count trends to zero.
     ASSUMED = "ASSUMED"
 
 
-#: Classes that assert traceability and must therefore name what they trace to.
 _SOURCED_CLASSES = frozenset(
     {ProvenanceClass.MEASURED, ProvenanceClass.PUBLISHED, ProvenanceClass.SPEC}
 )

@@ -70,7 +70,7 @@ class TestScatteringWavenumber:
 
 class TestCheckIncoherentRegime:
     def test_it_accepts_the_rp1_alpha(self) -> None:
-        check_incoherent_regime(0.0015)  # must not raise
+        check_incoherent_regime(0.0015)
 
     def test_it_refuses_an_alpha_at_the_coherent_crossover(self) -> None:
         with pytest.raises(CoherentScatteringRegimeError, match="TS-2"):
@@ -186,7 +186,5 @@ class TestRelativisticWeightingFactor:
         weighting = relativistic_weighting_factor(offsets_nm)
         implied_exponential = spectrum_values / weighting
 
-        # The Gaussian-only spectrum, isolated by dividing the weighting factor back out,
-        # must itself be <= 1 everywhere and exactly 1 on the laser line.
         assert np.all(implied_exponential <= 1.0 + 1.0e-12)
         assert implied_exponential[1] == pytest.approx(1.0)

@@ -60,17 +60,6 @@ __all__ = [
     "LogProb",
 ]
 
-#: One channel's contribution to the doc 05 §3.2 log-likelihood, in nats.
-#:
-#: Deliberately a bare ``float`` and not a wrapper. Two things could be argued into it and
-#: both are wrong here. A "no contribution" sentinel for a channel gated off by doc 01
-#: IF-6 would be summed by accident the first time somebody wrote ``sum(terms)``; the gate
-#: is ``Instrument.is_informative``, evaluated *before* the term is asked for, so the
-#: absence is expressed by there being no term rather than by a value meaning none. And a
-#: units wrapper would be false precision: a log-probability is dimensionless, and the
-#: base is fixed at ``e`` across every engine in doc 05 §5.
-#:
-#: ``-inf`` is legal and meaningful: a proposal that violates a hard constraint.
 LogProb: TypeAlias = float
 
 
@@ -147,9 +136,6 @@ class CalibrationSet:
         for reference in self.references:
             existing = seen.get(reference.quantity)
             if existing is not None:
-                # doc 01 SYS-3 asks for a single documented reference source per chain.
-                # With two, whichever the loader reached first would set the absolute
-                # scale, and doc 01 N2 propagates that error straight into Gamma_i.
                 raise ValueError(
                     f"two standards certify {reference.quantity!r}: {existing.name!r} and "
                     f"{reference.name!r}. doc 01 SYS-3 requires a single documented "
@@ -243,9 +229,6 @@ class Calibration:
         if self.state is CalibrationState.ESTIMATED and not any(
             value > 0.0 for value in self.relative_uncertainty.values()
         ):
-            # An estimated response with no uncertainty anywhere is the true response
-            # wearing the honest label: indistinguishable in the artifact, and it makes
-            # the doc 06 §4 calibration terms vanish from the budget without a trace.
             raise ValueError(
                 f"calibration for {self.instrument_id!r} calls itself estimated but has "
                 "zero uncertainty everywhere. doc 04 §7.3 derives the estimated response "

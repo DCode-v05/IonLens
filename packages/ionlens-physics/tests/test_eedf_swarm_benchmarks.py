@@ -49,8 +49,6 @@ from ionlens.validation.swarm import (
     benchmarks_for,
 )
 
-#: The absolute floor described in the module docstring. Below this, the two published
-#: columns agree so closely that the comparison is measuring their grids, not ours.
 ABSOLUTE_FLOOR = 0.005
 
 
@@ -159,10 +157,6 @@ class TestTheReidRampGas:
 
     @pytest.mark.physics
     def test_the_whole_of_reids_own_table_is_reproduced(self) -> None:
-        # Reid tabulates eight fields from 1 to 40 Td, four more than Flynn. Checking the
-        # trend across all of them catches an error that happens to be small at the three
-        # fields Flynn reports. Reid quotes his own Boltzmann uncertainty as 0.2%, so 2%
-        # here is loose against his numbers and tight against a wrong solver.
         grid = _reid_grid()
         worst = 0.0
         for point in benchmarks_for("reid-ramp", terms=2, source="reid"):
@@ -173,9 +167,6 @@ class TestTheReidRampGas:
 
     @pytest.mark.physics
     def test_the_transverse_diffusion_matches_the_published_value(self) -> None:
-        # N*D_T is the one quantity all three sources report independently, and the one
-        # that confirmed the unit reading of Reid's table. It is also the moment most
-        # sensitive to the shape of f0 rather than its width.
         two, ten = _paired("reid-ramp", 1.0)
         solution = _solve(REID_RAMP, _reid_grid(), 1.0)
 
@@ -197,8 +188,6 @@ class TestTheLucasSaeleeGas:
 
     @pytest.mark.physics
     def test_the_ionisation_rate_coefficient_matches_the_published_value(self) -> None:
-        # The reason this gas is here at all. doc 11 WBS 1.8 asks for rate coefficients
-        # against published values; the Reid gas has no ionisation channel to check.
         two, ten = _paired("lucas-saelee", 30.0)
         solution = _solve(LUCAS_SAELEE, _lucas_saelee_grid(), 30.0)
 
@@ -228,10 +217,6 @@ class TestTheLucasSaeleeGas:
 
     @pytest.mark.physics
     def test_the_energy_sharing_rule_is_reported_rather_than_chosen_silently(self) -> None:
-        # ADR-009 exposes the sharing rule because the published sources do not state
-        # theirs. The two rules bracket any real sharing distribution, so the published
-        # value must lie between them — if it does not, the disagreement is not about
-        # sharing and blaming it on sharing would be a rationalisation.
         two, _ = _paired("lucas-saelee", 30.0)
         grid = _lucas_saelee_grid()
 
@@ -252,13 +237,6 @@ class TestTheBenchmarkHarnessItself:
 
     @pytest.mark.physics
     def test_an_elastic_only_momentum_transfer_fails_the_gate(self) -> None:
-        # The regression guard for the defect this benchmark found. Reid eq. (4) makes
-        # the momentum-transfer cross section the sum of the elastic one and every
-        # inelastic one; using the elastic alone put the drift velocity 52 % high at
-        # 24 Td while every internal test stayed green.
-        #
-        # Reconstructed here by hand rather than by a flag on the solver: a switch that
-        # can restore the wrong physics is a switch somebody can set.
         grid = _reid_grid()
         correct = kinetics_from_model_gas(REID_RAMP, grid)
         elastic_only = ElectronKinetics(
@@ -282,14 +260,6 @@ class TestTheBenchmarkHarnessItself:
 
     @pytest.mark.physics
     def test_a_wrong_ramp_slope_fails_the_gate(self) -> None:
-        # A second, independent perturbation. Reid studied k from 1 to 50 A^2/eV and
-        # tabulated how much the transport coefficients move with it, so a 20 % error in
-        # k is a perturbation the published table itself says should be visible.
-        #
-        # The mass ratio, by contrast, is *not* a usable control here: at 24 Td the Reid
-        # gas loses essentially all its energy inelastically, so doubling m_e/M moves the
-        # mean energy by under 0.01 %. That is physics worth knowing rather than a
-        # weakness in the benchmark, and it is why this control perturbs the ramp.
         (original,) = REID_RAMP.channels
 
         def steeper(energy_ev: np.ndarray) -> np.ndarray:

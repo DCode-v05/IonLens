@@ -63,7 +63,6 @@ def _geometric_widths(*, total: float, n_cells: int, stretch: float) -> NDArray[
 
     powers = np.arange(n_cells, dtype=np.float64)
     if stretch == 1.0:
-        # The degenerate case: the closed form below divides by zero here.
         return np.full(n_cells, total / n_cells)
 
     first = total * (stretch - 1.0) / (stretch**n_cells - 1.0)
@@ -83,7 +82,6 @@ class SpatialGrid:
     def __post_init__(self) -> None:
         object.__setattr__(self, "z_m", _frozen_axis(self.z_m, name="z", reject_negative=True))
 
-    # ── constructors ────────────────────────────────────────────────────────────
 
     @classmethod
     def from_quantity(cls, z: Quantity) -> SpatialGrid:
@@ -109,7 +107,6 @@ class SpatialGrid:
         widths = _geometric_widths(total=span, n_cells=n_points - 1, stretch=stretch)
         return cls(z_m=np.concatenate([[0.0], np.cumsum(widths)]))
 
-    # ── views ───────────────────────────────────────────────────────────────────
 
     @property
     def z(self) -> ArrayQuantity:
@@ -235,7 +232,6 @@ class PhaseGrid:
         doc 02 §10.3 requires this to stay compatible with the 2 ns minimum ICCD gate;
         the check belongs to the instrument, which knows its own gate.
         """
-        # pint's division is typed as returning Any; the operands make the result a time.
         return cast("ScalarQuantity", self.period / self.n_bins)
 
     @property

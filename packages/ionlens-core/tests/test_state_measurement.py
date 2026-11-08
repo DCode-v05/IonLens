@@ -73,9 +73,6 @@ class TestAbsoluteAcquisitionWindow:
         assert magnitude_in(window.stop, "s") == pytest.approx(12.0)
 
     def test_a_seven_hundred_second_accumulation_is_still_one_window(self) -> None:
-        # doc 02 §10.1: a Thomson point is ~7000 shots over ~700 s. Doc 05 §3.2 warns
-        # that treating that and a 2 ns gate as "the same instant" is straightforwardly
-        # false, so the long integral has to be representable as itself.
         window = AcquisitionWindow.absolute(start=Q_(0.0, "s"), duration=Q_(700.0, "s"))
 
         assert magnitude_in(window.duration, "s") == pytest.approx(700.0)
@@ -117,15 +114,11 @@ class TestPhaseLockedAcquisitionWindow:
         assert magnitude_in(window.duration, "ns") == pytest.approx(73.7 / 16)
 
     def test_duty_cycle_is_the_gate_as_a_fraction_of_the_rf_period(self) -> None:
-        # doc 02 §10.1 tabulates OES as "2 ns gate in 73.7 ns period => 2.7 %".
         window = AcquisitionWindow.phase_locked(grid=_phase_grid(), bin_index=0, gate=Q_(2.0, "ns"))
 
         assert window.duty_cycle == pytest.approx(0.027, abs=1e-3)
 
     def test_an_explicit_accumulation_sets_the_wall_clock_span(self) -> None:
-        # doc 02 §10.1: Thomson accumulates ~700 s of wall clock into a 5 ns gate. The
-        # gate is what the doc 05 §3.2 integral runs over; the 700 s is what the doc 02
-        # §10.3 drift assumption has to survive, so both have to be recorded.
         window = AcquisitionWindow.phase_locked(
             grid=_phase_grid(),
             bin_index=3,
@@ -142,14 +135,10 @@ class TestPhaseLockedAcquisitionWindow:
             AcquisitionWindow.phase_locked(grid=_phase_grid(), bin_index=16)
 
     def test_rejects_a_negative_bin_index(self) -> None:
-        # Negative indices would silently wrap under Python indexing, putting the
-        # observation in a bin nobody chose.
         with pytest.raises(ValueError, match="outside the 16-bin grid"):
             AcquisitionWindow.phase_locked(grid=_phase_grid(), bin_index=-1)
 
     def test_rejects_a_gate_wider_than_the_phase_bin(self) -> None:
-        # doc 02 §10.3 sizes the bins to stay "compatible with the 2 ns minimum gate".
-        # A gate straddling two bins smears exactly the phase resolution it exists for.
         with pytest.raises(ValueError, match="wider than the phase bin"):
             AcquisitionWindow.phase_locked(grid=_phase_grid(), bin_index=0, gate=Q_(10.0, "ns"))
 
@@ -169,9 +158,6 @@ class TestPhaseLockedAcquisitionWindow:
             )
 
     def test_names_its_bin_when_printed(self) -> None:
-        # The repr is what appears in a failed-assertion diff, and "AcquisitionWindow(...)"
-        # with no bin would make a phase-registration bug unreadable at exactly the moment
-        # it needs reading.
         window = AcquisitionWindow.phase_locked(grid=_phase_grid(), bin_index=5)
 
         assert "phase bin 5/16" in repr(window)
@@ -196,8 +182,6 @@ class TestAcquisitionWindowInvariants:
             AcquisitionWindow.absolute(start=Q_(0.0, "m"), duration=Q_(2.0, "ns"))
 
     def test_allows_a_pre_trigger_start(self) -> None:
-        # doc 02 §10.2: a pre-trigger baseline window is a legitimate acquisition, so
-        # t = 0 carries no privileged meaning on the shared latent time base.
         window = AcquisitionWindow.absolute(start=Q_(-5.0, "ns"), duration=Q_(2.0, "ns"))
 
         assert window.start_s == pytest.approx(-5e-9)
@@ -211,8 +195,6 @@ class TestAcquisitionWindowInvariants:
             AcquisitionWindow(start=Q_(0.0, "s"), duration=Q_(2.0, "ns"), phase_grid=_phase_grid())
 
     def test_asking_an_absolute_window_for_its_phase_raises(self) -> None:
-        # Returning None here would be worse: a caller that forgot to check would feed
-        # a phase of zero into an accumulation and never see it.
         with pytest.raises(ValueError, match="no phase bin"):
             _ = _gate().phase_centre_rad
 
@@ -225,14 +207,9 @@ class TestAcquisitionWindowInvariants:
 
 class TestCalibrationState:
     def test_the_estimated_calibration_is_the_honest_one(self) -> None:
-        # doc 04 §7.3: the pipeline works with data corrected by an *imperfect*
-        # calibration, exactly as in a real experiment.
         assert not CalibrationState.ESTIMATED.is_inverse_crime
 
     def test_applying_the_true_calibration_is_an_inverse_crime(self) -> None:
-        # doc 04 §7.3 names it: applying the true calibration "would be a form of
-        # inverse crime and would understate the error". Machine-checkable, not a matter
-        # of whoever is reading the code remembering it.
         assert CalibrationState.TRUE.is_inverse_crime
 
 
@@ -276,8 +253,6 @@ class TestObservable:
             Observable(instrument_id="  ", values=np.array([1.0]), units="count", window=_gate())
 
     def test_rejects_units_the_registry_cannot_parse(self) -> None:
-        # An artifact whose units string is not a unit is an artifact that cannot be
-        # read back (doc 08 §7), and the failure would surface at analysis time.
         with pytest.raises(ValueError, match="not a unit"):
             Observable(
                 instrument_id="oes",
@@ -300,8 +275,6 @@ class TestObservable:
             Observable(instrument_id="oes", values=np.array([]), units="count", window=_gate())
 
     def test_rejects_a_bare_scalar(self) -> None:
-        # Even a single-channel photodiode reading is one *sample*, not a scalar; keeping
-        # the rank uniform is what lets the likelihood iterate without a shape branch.
         with pytest.raises(ValueError, match="got a scalar"):
             Observable(instrument_id="oes", values=np.array(1.0), units="count", window=_gate())
 
@@ -344,7 +317,6 @@ class TestObservable:
 
 class TestMeasurement:
     def test_carries_a_per_sample_uncertainty(self) -> None:
-        # doc 01 SYS-4: without per-sample error the joint fit cannot be posed.
         measurement = _measurement(values=(10.0, 20.0), uncertainty=(1.0, 2.0))
 
         np.testing.assert_allclose(measurement.uncertainty, [1.0, 2.0])
@@ -372,8 +344,6 @@ class TestMeasurement:
         )
 
     def test_defaults_to_the_estimated_calibration(self) -> None:
-        # doc 04 §7.3: the pipeline is never handed the true calibration by default,
-        # because that is an inverse crime that understates the error.
         measurement = Measurement(
             instrument_id="oes",
             values=np.array([1.0]),
@@ -401,8 +371,6 @@ class TestMeasurement:
             )
 
     def test_rejects_a_scalar_uncertainty_that_would_silently_broadcast(self) -> None:
-        # A uncertainty that broadcasts is the defect that produces a confident wrong
-        # posterior: every sample inherits one channel's error bar without complaint.
         with pytest.raises(ValueError, match="same shape"):
             Measurement(
                 instrument_id="oes",
@@ -421,8 +389,6 @@ class TestMeasurement:
             _measurement(values=(1.0, 2.0), uncertainty=(0.1, np.inf))
 
     def test_allows_a_zero_uncertainty(self) -> None:
-        # A gated-off channel (doc 01 IF-6) legitimately reports zero; rejecting it here
-        # would push the special case into every instrument.
         measurement = _measurement(values=(0.0, 0.0), uncertainty=(0.0, 0.0))
 
         np.testing.assert_allclose(measurement.uncertainty, [0.0, 0.0])
@@ -448,8 +414,6 @@ class TestMeasurement:
         np.testing.assert_allclose(measurement.uncertainty, [1.0, 2.0])
 
     def test_drops_to_an_observable_for_comparison_with_the_forward_model(self) -> None:
-        # doc 04 §9: `observe` and `forward` come from the same code path, so the noisy
-        # result must be reducible to the shape the noiseless one has.
         measurement = _measurement()
 
         observable = measurement.as_observable()
@@ -462,8 +426,6 @@ class TestMeasurement:
 
 class TestMeasurementSetOrdering:
     def test_iterates_in_an_order_fixed_by_content_not_by_insertion(self) -> None:
-        # doc 00 E3: a reduction over a set that iterated in insertion order would not
-        # be bit-for-bit reproducible across processes.
         oes = _measurement("oes")
         thomson = _measurement("thomson")
 
@@ -504,8 +466,6 @@ class TestMeasurementSetContents:
         assert len(MeasurementSet.of(_measurement("oes"), _measurement("lif"))) == 2
 
     def test_counts_every_sample_not_every_record(self) -> None:
-        # The doc 05 §3.2 likelihood sums over observations, not over records: one LIF
-        # record is a whole 200-point frequency scan (doc 02 §10.1).
         wide = _measurement("lif", values=(1.0, 2.0, 3.0), uncertainty=(1.0, 1.0, 1.0))
 
         assert MeasurementSet.of(_measurement("oes"), wide).n_observations == 5
@@ -537,7 +497,6 @@ class TestMeasurementSetContents:
         assert measurements.by_instrument("thomson") == ()
 
     def test_dropping_a_channel_leaves_the_others_untouched(self) -> None:
-        # doc 02 §13 F-02: "LIF unavailable — channel removed from the likelihood".
         measurements = MeasurementSet.of(_measurement("oes"), _measurement("lif"))
 
         remaining = measurements.without_instrument("lif")
@@ -546,8 +505,6 @@ class TestMeasurementSetContents:
         assert measurements.instrument_ids == ("lif", "oes")
 
     def test_can_be_empty_once_every_channel_has_been_dropped(self) -> None:
-        # The degraded configurations of doc 02 §13 are reached by filtering, so an
-        # empty intermediate set is legitimate and must not raise.
         empty = MeasurementSet.of(_measurement("oes")).without_instrument("oes")
 
         assert len(empty) == 0
@@ -568,8 +525,6 @@ class TestMeasurementSetContents:
         assert measurements.instrument_ids == ("oes", "thomson")
 
     def test_equality_ignores_the_order_the_records_arrived_in(self) -> None:
-        # The direct consequence of ordering by content (doc 00 E3): two runs that emitted
-        # the same observations in different orders produced the same dataset.
         oes, lif = _measurement("oes"), _measurement("lif")
 
         assert MeasurementSet.of(oes, lif) == MeasurementSet.of(lif, oes)

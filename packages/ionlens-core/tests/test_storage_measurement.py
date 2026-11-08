@@ -107,9 +107,6 @@ class TestMeasurementSetRoundTrip:
     def test_the_per_sample_uncertainty_survives_bit_for_bit(
         self, tmp_path: Path, measurements: MeasurementSet, record: Provenance
     ) -> None:
-        # doc 01 SYS-4: without per-sample error the inversion cannot be posed. An
-        # uncertainty that came back broadcast or rounded produces a confident wrong
-        # posterior, and nothing in the output says so.
         write_measurement_set(tmp_path / "y.h5", measurements, provenance=record)
         recovered = read_measurement_set(tmp_path / "y.h5").measurements
 
@@ -130,8 +127,6 @@ class TestMeasurementSetRoundTrip:
     def test_a_phase_locked_window_keeps_its_bin_grid_and_accumulation(
         self, tmp_path: Path, measurements: MeasurementSet, record: Provenance
     ) -> None:
-        # doc 02 §10.3: the accumulation span is what benchmark B-09 needs to quantify
-        # drift-induced phase smearing. It is not recoverable from the gate width.
         write_measurement_set(tmp_path / "y.h5", measurements, provenance=record)
         recovered = read_measurement_set(tmp_path / "y.h5").measurements
 
@@ -152,8 +147,6 @@ class TestMeasurementSetRoundTrip:
         assert recovered.by_instrument("oes")[0].units == "count"
 
     def test_the_calibration_state_survives(self, tmp_path: Path, record: Provenance) -> None:
-        # doc 04 §7.3 names using the true calibration an inverse crime. A round trip
-        # that lost the flag would let a crime-committing run be archived as an honest one.
         crime = Measurement(
             instrument_id="lif",
             values=_awkward(3, seed=99),
@@ -172,8 +165,6 @@ class TestMeasurementSetRoundTrip:
     def test_several_records_from_one_channel_are_all_kept(
         self, tmp_path: Path, measurements: MeasurementSet, record: Provenance
     ) -> None:
-        # A "measurement" is a set spread over minutes (doc 02 §10.1), so one instrument
-        # contributes many records. Keying the group by instrument must not collapse them.
         write_measurement_set(tmp_path / "y.h5", measurements, provenance=record)
 
         recovered = read_measurement_set(tmp_path / "y.h5").measurements
@@ -193,8 +184,6 @@ class TestMeasurementSetOnDisk:
     def test_there_is_one_group_per_instrument(
         self, tmp_path: Path, measurements: MeasurementSet, record: Provenance
     ) -> None:
-        # doc 08 §7 states the layout, and it is the layout an analyst browsing the file
-        # with h5ls needs: channels are the unit of ablation (doc 02 §13).
         write_measurement_set(tmp_path / "y.h5", measurements, provenance=record)
 
         with h5py.File(tmp_path / "y.h5", "r") as handle:
@@ -238,9 +227,6 @@ class TestMeasurementSetRefusesAnUnwritableChannelName:
     def test_an_instrument_id_containing_a_path_separator_is_refused(
         self, tmp_path: Path, record: Provenance
     ) -> None:
-        # HDF5 reads "/" as a group separator, so an id containing one would silently
-        # nest the channel somewhere nobody asked for and read back under a different
-        # name. Instrument ids are plugin-supplied (doc 08 §10), so this is reachable.
         awkward = Measurement(
             instrument_id="oes/iccd",
             values=_awkward(2, seed=5),

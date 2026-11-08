@@ -137,51 +137,22 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: The doc 08 §7 artifact group this channel writes to.
 THOMSON_INSTRUMENT_ID: Final[InstrumentId] = "thomson"
 
-#: What :meth:`ThomsonInstrument.forward` and :meth:`observe` return: a photoelectron
-#: count per spectral channel, doc 02 §7.1's "photon-counting experiment" made explicit
-#: in the returned quantity rather than only in the noise model.
 PHOTON_COUNT_UNITS: Final[str] = "dimensionless"
 
-# ── the TS-S2 / TS-S3 detector axis ─────────────────────────────────────────────────
 
-#: TS-S2.
 SPECTRAL_COVERAGE_MIN_NM: Final[float] = 520.0
-#: TS-S2.
 SPECTRAL_COVERAGE_MAX_NM: Final[float] = 545.0
-#: TS-S3.
 N_SPECTRAL_CHANNELS: Final[int] = 20
-#: The width of one TS-S3 channel, derived from TS-S2's coverage: 1.25 nm.
 CHANNEL_WIDTH_NM: Final[float] = (
     SPECTRAL_COVERAGE_MAX_NM - SPECTRAL_COVERAGE_MIN_NM
 ) / N_SPECTRAL_CHANNELS
 
-#: Which spatial grid point the measurement volume sits at. Mirrors
-#: :class:`~ionlens.instruments.probe.langmuir.instrument.LangmuirProbe`'s
-#: ``_DEFAULT_Z_INDEX``: RP-1 is a bulk-plasma reference point (doc 02 §3.3 regime B), and
-#: Thomson's 90 um resolution element (TS-O3) is small enough that a manifest scanning it
-#: through the sheath overrides this per point rather than this default trying to guess
-#: one.
 _DEFAULT_Z_INDEX: Final[int] = -1
 
-#: Smallest counting variance, in photoelectrons, the Poisson floor below will divide by
-#: — mirrors ``OesInstrument._MINIMUM_VARIANCE_COUNTS`` for the same reason: a channel
-#: expecting zero counts still receives none with probability one, and a zero-variance
-#: report there is infinitely (and wrongly) confident about an ordinary observation.
 _MINIMUM_VARIANCE_COUNTS: Final[float] = 1.0
 
-#: Smallest per-channel *expected* photoelectron count :meth:`ThomsonInstrument.likelihood`
-#: will accept a ``coherent_discrepancy`` term against.
-#:
-#: A Poisson(lambda) random variable has skewness ``1 / sqrt(lambda)``; at lambda = 20 that
-#: is ~0.22, the conventional rule-of-thumb point at which a symmetric Gaussian becomes a
-#: defensible stand-in for a Poisson pmf (e.g. Casella & Berger, *Statistical Inference*,
-#: 2nd ed., §5.3's discussion of the normal approximation to a sum of count variables — a
-#: Poisson is itself a limit of a Binomial sum). See ``likelihood``'s docstring, "Model
-#: discrepancy on a Poisson channel", for why this floor exists and why it is expected to
-#: bind at this project's own RP-1 reference point.
 _COHERENT_GAUSSIAN_MINIMUM_EXPECTED_COUNTS: Final[float] = 20.0
 
 
@@ -244,7 +215,6 @@ class ThomsonInstrument:
         self._rng = generator(root_seed, Stream.PHOTONS)
         self._calibration_rng = generator(root_seed, Stream.CALIBRATION)
 
-    # ── configuration ───────────────────────────────────────────────────────────
 
     def configure(self, cfg: InstrumentConfig) -> None:
         """Apply one entry of the manifest's ``instruments:`` list — doc 08 §6.
@@ -304,7 +274,6 @@ class ThomsonInstrument:
         )
         return self._calibration
 
-    # ── the axis ────────────────────────────────────────────────────────────────
 
     def wavelength_axis_nm(self) -> FloatArray:
         """The TS-S3 channel centre wavelengths — 20 bins tiling TS-S2's 520-545 nm."""
@@ -313,7 +282,6 @@ class ThomsonInstrument:
         )
         return np.asarray((edges[:-1] + edges[1:]) / 2.0, dtype=np.float64)
 
-    # ── the doc 02 §7.1 consequence 2 refusal, exposed rather than hidden ────────
 
     def required_accumulation_s(
         self,
@@ -334,7 +302,6 @@ class ThomsonInstrument:
             n_phase_bins=n_phase_bins,
         )
 
-    # ── the shared code path — doc 04 §9 ────────────────────────────────────────
 
     def forward(self, state: PlasmaState, w: AcquisitionWindow) -> Observable:
         """The noiseless photoelectron spectrum the likelihood compares against — doc 04 §9."""
@@ -410,7 +377,6 @@ class ThomsonInstrument:
         uncertainty = np.sqrt(counting_variance + stray_subtraction_term**2) / count_scale
         return np.asarray(values, dtype=np.float64), np.asarray(uncertainty, dtype=np.float64)
 
-    # ── the physics ─────────────────────────────────────────────────────────────
 
     def _spectral_weights(self, *, electron_temperature_ev: float) -> FloatArray:
         """Fraction of the total signal each TS-S3 channel receives.
@@ -496,7 +462,6 @@ class ThomsonInstrument:
             "required_accumulation_s() to find a window this channel can actually see."
         )
 
-    # ── the likelihood and the gate ─────────────────────────────────────────────
 
     def likelihood(
         self,
@@ -666,19 +631,11 @@ class ThomsonInstrument:
                     "defensible for this channel at that operating point."
                 )
             rows.append(np.asarray(coherent_discrepancy, dtype=np.float64))
-        # `None` here means nothing coherent was supplied, and the pre-existing Poisson
-        # likelihood is returned unchanged and bit for bit — which is what protects every
-        # existing caller of this method from a change only opt-in callers asked for.
         basis = stack_coherent_rows(rows, expected_shape=expected.shape)
         if basis is None:
             poisson = counts * np.log(expected) - expected - special.gammaln(counts + 1.0)
             return float(np.sum(poisson))
 
-        # Floor the counting variance at one photoelectron, exactly as
-        # `OesInstrument.likelihood`'s own coherent branch does and for the same reason: this
-        # branch is Gaussian on every channel, and a channel expecting ~0 counts would
-        # otherwise get weight 1/epsilon and dominate the whole likelihood. Same constant and
-        # same reasoning as `_MINIMUM_VARIANCE_COUNTS` above.
         return coherent_gaussian_log_prob(
             residual=(counts - expected).reshape(-1),
             variance=np.maximum(expected.reshape(-1), _MINIMUM_VARIANCE_COUNTS),
@@ -748,7 +705,6 @@ class ThomsonInstrument:
     def __repr__(self) -> str:
         return f"ThomsonInstrument({self.instrument_id!r})"
 
-    # ── internal guards ─────────────────────────────────────────────────────────
 
     def _require_configured(self) -> _Settings:
         if self._settings is None:

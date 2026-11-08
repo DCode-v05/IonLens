@@ -64,15 +64,8 @@ def _params(*, n_0: float = 1.0e17, T_i_ev: float = 0.05, bias_v: float = -250.0
     )
 
 
-#: A synthetic quasineutrality-departure profile for the 5-point ``_GRID``: monotonically
-#: falling from the wall (index 0) toward the bulk (index 4), crossing the registered
-#: ``sheath.edge_tolerance`` (0.01) between indices 2 and 3. The outermost index at or
-#: above tolerance is therefore 2 — neither the wall nor the bulk boundary — which is
-#: what makes ``_state()`` usable for testing that the default measurement location is
-#: the sheath edge and not the wall.
 _DEPARTURE = np.array([0.5, 0.15, 0.03, 0.004, 0.0005])
 
-#: The outermost grid index of ``_DEPARTURE`` at or above ``sheath.edge_tolerance``.
 _SHEATH_EDGE_INDEX = 2
 
 
@@ -599,7 +592,6 @@ class TestConfigurationAndReprs:
         velocities = instrument.scan_velocities()
 
         assert magnitude_in(velocities, "m/s").size == 51
-        # +/-4 GHz over sin(15 deg) at 668.614 nm.
         expected = 668.614e-9 * 4.0e9 / math.sin(math.radians(15.0))
         assert magnitude_in(velocities, "m/s").max() == pytest.approx(expected, rel=1e-9)
 

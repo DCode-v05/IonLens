@@ -94,27 +94,9 @@ type FloatArray = NDArray[np.float64]
 _C_M_PER_S: float = float(magnitude_in(SPEED_OF_LIGHT, "m/s"))
 _K_B_J_PER_K: float = float(magnitude_in(BOLTZMANN, "J/K"))
 
-#: Fraction of the population that may fall outside the tuning window before
-#: :attr:`TuningCoverage.is_truncated` reports the scan as clipped.
-#:
-#: One part in a thousand. Doc 06 §4 budgets whole systematics at the percent level, so a
-#: truncation an order of magnitude below that is genuinely negligible and anything above
-#: it is a piece of the distribution the instrument did not measure and the inversion must
-#: not be allowed to assume.
 TRUNCATION_TOLERANCE: float = 1.0e-3
 
-#: Largest velocity-grid spacing, in units of the homogeneous line width, that the
-#: velocity integral will accept.
-#:
-#: One sample per full width is already marginal — the trapezoid error on a Lorentzian
-#: sampled that coarsely is tens of percent — but it is where the answer stops being
-#: merely inaccurate and starts being arbitrary, and it is the threshold a caller can be
-#: told about without the guard firing on a legitimately coarse but adequate grid. See
-#: :func:`_check_velocity_grid_resolves` for how this was found.
 MIN_SAMPLES_PER_HOMOGENEOUS_WIDTH: float = 1.0
-
-
-# ── the doc 04 §3.2 mapping ─────────────────────────────────────────────────────
 
 
 def doppler_detuning_hz(
@@ -164,9 +146,6 @@ def thermal_doppler_1e_halfwidth(
     kelvin = float(magnitude_in(temperature.to("K", "boltzmann"), "K"))
     speed = math.sqrt(2.0 * _K_B_J_PER_K * kelvin / species.mass_kg)
     return Q_(transition.pump_frequency_hz * speed * projection_factor / _C_M_PER_S, "Hz")
-
-
-# ── the scan ────────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, eq=False, slots=True)
@@ -235,13 +214,8 @@ class DetuningScan:
         )
 
     def __repr__(self) -> str:
-        # Converted through pint rather than divided by 1e9: doc 08 §5's literal rule has
-        # no carve-out for numbers whose author was confident they did not matter.
         edge = Q_(float(self.detuning_hz[-1]), "Hz").to("GHz")
         return f"DetuningScan({self.n_points} points, +/-{edge:.3g~P})"
-
-
-# ── the tuning-range limit, as a measured quantity ──────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -314,14 +288,9 @@ def tuning_coverage(
     )
 
 
-# ── the signal ──────────────────────────────────────────────────────────────────
-
-
 def _check_z_index(distribution: VelocityDistribution, z_index: int) -> None:
     n_points = distribution.grid.n_points
     if not 0 <= z_index < n_points:
-        # Negative indices are refused rather than wrapped: Python would read -1 as the
-        # far boundary of the domain, which is bulk plasma, and report it as the wall.
         raise IndexError(
             f"grid index {z_index} is outside the {n_points}-point spatial grid. "
             "The wall is index 0 (doc 02 §2); a negative index would silently select the "
@@ -416,8 +385,6 @@ def fluorescence_response(
         laser=laser,
     )
 
-    # Detuning of each velocity class from line centre: an (n_v,) row broadcast against
-    # the (n_detuning, 1) scan column below.
     ion_shift = doppler_detuning_hz(
         velocity,
         pump_frequency_hz=transition.pump_frequency_hz,
@@ -427,10 +394,6 @@ def fluorescence_response(
 
     excited = np.zeros_like(residual)
     for component in components:
-        # Each component is treated as an independent saturating sub-transition carrying
-        # weight `component.weight`. At B = 0 every component sits at the same shift and
-        # the weights sum to one, so this reduces *exactly* to the unsplit result — which
-        # is what makes the zero-field case a verification anchor rather than a limit.
         response = lorentzian_response(residual - component.shift_hz, fwhm_hz=homogeneous_fwhm_hz)
         excited += component.weight * steady_state_excited_fraction(
             saturation=pump,

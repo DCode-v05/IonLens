@@ -62,9 +62,6 @@ def maxwellian(grid: EnergyGrid, t_e_ev: float) -> NDArray[np.float64]:
     return grid.normalise(maxwellian_eedf(grid.centres_ev, electron_temperature_ev=t_e_ev))
 
 
-# ── Klein-Rosseland ─────────────────────────────────────────────────────────────
-
-
 @pytest.mark.physics
 def test_de_excitation_obeys_detailed_balance_for_a_maxwellian(
     grid: EnergyGrid, system: LevelSystem
@@ -119,15 +116,7 @@ def test_detailed_balance_is_not_hard_wired(grid: EnergyGrid, system: LevelSyste
         * np.exp(impact.threshold_ev / ((2.0 / 3.0) * mean_energy_ev))
         * excitation
     )
-    # A Druyvesteyn distribution of the same mean energy has a depleted tail and a
-    # correspondingly fatter body. The excitation integral, which lives in the tail above
-    # 11.5 eV, is suppressed; the superelastic integral, which samples the body, is not.
-    # So the ratio between them departs from the Maxwellian relation by nearly an order of
-    # magnitude, and in the direction the physics says it should.
     assert de_excitation > 2.0 * maxwellian_prediction
-
-
-# ── V-25: the two density limits ────────────────────────────────────────────────
 
 
 @pytest.mark.physics
@@ -141,10 +130,6 @@ def test_low_density_limit_is_corona(grid: EnergyGrid, system: LevelSystem) -> N
     t_e_ev = 3.0
     f0 = maxwellian(grid, t_e_ev)
     n_e, n_g = 1e10, 1.6e20
-    # The metastable needs its wall term even here. Without one it has no loss channel
-    # that survives n_e -> 0, so it climbs to its LTE value and pumps every level above it
-    # collisionally — there is no corona limit for a level with no non-collisional loss,
-    # which is itself worth knowing.
     model = CollisionalRadiativeModel(system=system, grid=grid, wall_loss_per_s={"m": 1.0e4})
 
     populations = model.solve(electron_density_per_m3=n_e, ground_density_per_m3=n_g, f0=f0)
@@ -174,10 +159,6 @@ def test_a_metastable_at_low_density_is_limited_by_the_wall(
 
     populations = model.solve(electron_density_per_m3=n_e, ground_density_per_m3=n_g, f0=f0)
 
-    # Every excitation out of the ground state that ends on a level cascading into the
-    # metastable arrives there, because in the corona limit each of those levels radiates
-    # everything it receives. So the source is k_gm *plus* k_gp, not k_gm alone — and
-    # getting that wrong is exactly how a cascade term goes missing unnoticed.
     def rate(lower: str, upper: str) -> float:
         pair = (lower, upper)
         impact = next(c for c in system.electron_impact if (c.lower, c.upper) == pair)
@@ -201,9 +182,6 @@ def test_high_density_limit_is_boltzmann(grid: EnergyGrid, system: LevelSystem) 
     n_g = 1.6e20
     model = CollisionalRadiativeModel(system=system, grid=grid, wall_loss_per_s={"m": 1.0e4})
 
-    # Far above anything physical, and deliberately so: this is a limit, and the approach
-    # to it goes as A_ul / (n_e K_ul), which for the resonance line needs 1e28 m^-3 before
-    # the radiative channel is negligible at the 1e-3 level being asserted.
     populations = model.solve(electron_density_per_m3=1e28, ground_density_per_m3=n_g, f0=f0)
 
     for level in system.levels[1:]:
@@ -229,9 +207,6 @@ def test_the_approach_to_lte_is_monotone_in_density(grid: EnergyGrid, system: Le
     assert np.all(np.diff(densities) > 0.0)
     boltzmann = 1.6e20 * 5.0 * np.exp(-METASTABLE_ENERGY_EV / 3.0)
     assert densities[-1] == pytest.approx(boltzmann, rel=0.05)
-
-
-# ── structure ───────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.physics
@@ -294,9 +269,6 @@ def test_wall_quenching_depletes_the_metastable(grid: EnergyGrid, system: LevelS
     assert fast.solve(**kwargs)["m"] < slow.solve(**kwargs)["m"]  # type: ignore[arg-type]
 
 
-# ── doc 04 §2.3: trapping is not optional ───────────────────────────────────────
-
-
 @pytest.mark.physics
 def test_radiation_trapping_raises_the_metastable_population(
     grid: EnergyGrid, system: LevelSystem, trapped_system: LevelSystem
@@ -324,10 +296,6 @@ def test_radiation_trapping_raises_the_metastable_population(
     assert trapped_populations["r"] > 100.0 * thin_populations["r"]
     assert trapped_populations.escape_factors[("r", "g")] < 1e-2
     assert trapped_populations.escape_factors[("p", "m")] == 1.0
-    # ...and the resonant level feeds the metastable collisionally, which is the mechanism
-    # doc 04 §2.3 names. The effect on the metastable is real but modest here because the
-    # synthetic system also excites it directly from the ground state; in argon the
-    # 1s4/1s5 mixing is much stronger than the direct channel and the pumping dominates.
     assert trapped_populations["m"] > 1.02 * thin_populations["m"]
 
 
@@ -373,9 +341,6 @@ def test_a_starved_iteration_budget_raises(
     )
     with pytest.raises(CrConvergenceError, match="escape-factor"):
         model.solve(electron_density_per_m3=1e17, ground_density_per_m3=1.6e20, f0=f0)
-
-
-# ── contract ────────────────────────────────────────────────────────────────────
 
 
 def test_solve_rejects_a_negative_electron_density(grid: EnergyGrid, system: LevelSystem) -> None:

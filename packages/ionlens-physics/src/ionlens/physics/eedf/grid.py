@@ -49,16 +49,10 @@ from numpy.typing import ArrayLike, NDArray
 
 __all__ = ["EnergyGrid"]
 
-#: A quantity sampled on the grid, in SI magnitudes except energies, which are eV.
 FloatArray: TypeAlias = NDArray[np.float64]
 
-#: Exponent of the geometric weight in :meth:`EnergyGrid.quadratic`.
 _QUADRATIC_EXPONENT: Final[float] = 2.0
 
-#: How closely cell widths must agree before a grid counts as uniform. Not a physical
-#: tolerance: the widths of a ``linspace`` differ in their last bits, and this only has to
-#: separate that from a deliberately graded grid, whose widths differ by orders of
-#: magnitude. It decides which family :meth:`EnergyGrid.refined` rebuilds in.
 _UNIFORMITY_TOLERANCE: Final[float] = 1e-12
 
 
@@ -107,7 +101,6 @@ class EnergyGrid:
             raise ValueError("cell boundaries must be strictly increasing")
         object.__setattr__(self, "boundaries_ev", boundaries)
 
-    # ── the two families ────────────────────────────────────────────────────────
 
     @classmethod
     def linear(cls, *, max_ev: float, n_cells: int) -> Self:
@@ -153,7 +146,6 @@ class EnergyGrid:
         widths = self.widths_ev
         return bool(np.allclose(widths, widths[0], rtol=_UNIFORMITY_TOLERANCE, atol=0.0))
 
-    # ── geometry ────────────────────────────────────────────────────────────────
 
     @property
     def n_cells(self) -> int:
@@ -188,7 +180,6 @@ class EnergyGrid:
         """
         return self._weights(0)
 
-    # ── quadrature ──────────────────────────────────────────────────────────────
 
     def _weights(self, order: int) -> FloatArray:
         """``integral_cell eps**(order + 1/2) deps``, analytically."""

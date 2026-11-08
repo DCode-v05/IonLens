@@ -46,35 +46,20 @@ __all__ = [
     "manifest_sha256",
 ]
 
-#: Reported as the commit when the checkout cannot be interrogated at all.
-#:
-#: A sentinel rather than an exception because provenance capture must never be the
-#: reason a run dies; the record simply states what it could not establish.
 UNKNOWN_COMMIT: Final[str] = "unknown"
 
-#: Anything a manifest may hold once loaded from YAML.
-#:
-#: Quoted because the alias is *recursive* — see the identical note on
-#: :data:`ionlens.core.protocols.config.ConfigValue`. A ``TypeAlias`` assignment evaluates its
-#: right-hand side eagerly, so ``ManifestValue`` must be forward-referenced as a string.
 ManifestValue: TypeAlias = (
     "str | int | float | bool | Sequence[ManifestValue] | Mapping[str, ManifestValue] | None"
 )
 
-#: Anything a serialised provenance record may hold: the types HDF5 attributes and YAML
-#: sidecars carry without a custom representer (doc 08 §7).
 ProvenanceValue: TypeAlias = str | bool | int | dict[str, str]
 
-#: The enum coerced by :func:`_parse_enum`. The pre-PEP-695 spelling of
-#: ``def _parse_enum[E: StrEnum]``.
 E = TypeVar("E", bound=StrEnum)
 
 _SHA256_PATTERN: Final[re.Pattern[str]] = re.compile(r"[0-9a-f]{64}")
 
 _LOCK_FILENAME: Final[str] = "uv.lock"
 
-# Long enough that a cold index refresh on a large checkout completes; short enough that
-# a hung git cannot stall a batch of runs.
 _GIT_TIMEOUT_S: Final[float] = 30.0
 
 
@@ -117,9 +102,6 @@ class EnvironmentLockSource(StrEnum):
 
     UV_LOCK = "uv.lock"
     INSTALLED_DISTRIBUTIONS = "importlib.metadata"
-
-
-# ── canonical hashing ────────────────────────────────────────────────────────────────
 
 
 def manifest_sha256(payload: ManifestValue) -> str:
@@ -169,9 +151,6 @@ def manifest_sha256(payload: ManifestValue) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
-# ── environment probes ───────────────────────────────────────────────────────────────
-
-
 def _default_repo_root() -> Path:
     """The checkout this module was imported from, or the working directory.
 
@@ -183,7 +162,6 @@ def _default_repo_root() -> Path:
         if (candidate / _LOCK_FILENAME).is_file() or (candidate / ".git").exists():
             return candidate
 
-    # An installed wheel with no checkout above it. The probes then degrade explicitly.
     return Path.cwd()
 
 
@@ -199,8 +177,6 @@ def _git_output(root: Path, *args: str) -> str | None:
             timeout=_GIT_TIMEOUT_S,
         )
     except (OSError, subprocess.SubprocessError):
-        # git absent, the directory gone, or the call hung. All three mean one thing to
-        # the caller: the checkout could not be interrogated.
         return None
 
     if result.returncode != 0:
@@ -237,7 +213,6 @@ def git_state(repo_root: Path | None = None) -> tuple[str, bool]:
 
     status = _git_output(root, "status", "--porcelain")
     if status is None:
-        # The commit is known but its cleanliness is not, so assume the worst.
         return commit, True
 
     return commit, bool(status)
@@ -264,14 +239,9 @@ def environment_lock_hash(repo_root: Path | None = None) -> tuple[str, Environme
     if lock.is_file():
         return hashlib.sha256(lock.read_bytes()).hexdigest(), EnvironmentLockSource.UV_LOCK
 
-    # Distribution scan order follows the filesystem, so it is sorted before hashing;
-    # unsorted, one unchanged environment would hash differently on consecutive runs.
     pins = sorted(f"{dist.name}=={dist.version}" for dist in distributions())
     digest = hashlib.sha256("\n".join(pins).encode("utf-8")).hexdigest()
     return digest, EnvironmentLockSource.INSTALLED_DISTRIBUTIONS
-
-
-# ── field parsing ────────────────────────────────────────────────────────────────────
 
 
 def _parse_enum(value: str | E, enum_cls: type[E], name: str) -> E:
@@ -302,8 +272,6 @@ def _as_bool(value: object, name: str) -> bool:
 
 
 def _as_int(value: object, name: str) -> int:
-    # ``bool`` is a subclass of ``int``; a flag arriving where a seed belongs is a
-    # mistake worth naming rather than silently reading as 0 or 1.
     if isinstance(value, bool) or not isinstance(value, int):
         raise TypeError(f"{name} must be an integer, got {type(value).__name__} {value!r}")
     return value
@@ -324,9 +292,6 @@ def _as_utc_datetime(value: object, name: str) -> datetime:
         return datetime.fromisoformat(_as_str(value, name))
     except ValueError as exc:
         raise ValueError(f"{name} must be an ISO 8601 timestamp, got {value!r}") from exc
-
-
-# ── the record ───────────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -365,10 +330,6 @@ class Provenance:
     environment_lock_source: EnvironmentLockSource
     created_utc: datetime
     ionlens_version: str
-    # Excluded from the hash, not from equality. ``MappingProxyType`` is unhashable, and
-    # the alternative — dropping it from equality too — would make two records that
-    # disagree about which PETSc built them compare equal, which is worse than a hash
-    # that leans on the other eight fields.
     solver_versions: Mapping[str, str] = field(hash=False)
     tier: Tier
 
@@ -376,8 +337,6 @@ class Provenance:
         for name in ("manifest_sha256", "environment_lock_hash"):
             digest = getattr(self, name)
             if not _SHA256_PATTERN.fullmatch(digest):
-                # Catches storing a path or a truncated display hash, either of which
-                # would be indistinguishable from a real digest once in the archive.
                 raise ValueError(
                     f"{name} must be 64 lowercase hexadecimal characters, got {digest!r}"
                 )
@@ -388,8 +347,6 @@ class Provenance:
             )
 
         if self.created_utc.utcoffset() is None:
-            # A naive timestamp cannot be ordered against one written elsewhere, which
-            # is the only reason to record it.
             raise ValueError(f"created_utc must be timezone-aware, got {self.created_utc!r}")
 
         object.__setattr__(self, "created_utc", self.created_utc.astimezone(UTC))
@@ -401,8 +358,6 @@ class Provenance:
                 self.environment_lock_source, EnvironmentLockSource, "environment_lock_source"
             ),
         )
-        # Copy before wrapping: a proxy over the caller's own dict would let a later
-        # edit rewrite the history of an artifact that has already been written.
         object.__setattr__(self, "solver_versions", MappingProxyType(dict(self.solver_versions)))
 
     @classmethod

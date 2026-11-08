@@ -35,9 +35,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Final, NamedTuple
 
-# pyarrow ships no stubs; the suppression lives in the root pyproject alongside the
-# rest of the untyped scientific stack, so there is one place to look when one of them
-# starts shipping types.
 import pyarrow as pa
 import pyarrow.parquet as pq
 
@@ -62,15 +59,10 @@ _METRIC_COLUMN: Final[str] = "metric"
 _VALUE_COLUMN: Final[str] = "value"
 _UNITS_COLUMN: Final[str] = "units"
 
-#: Key under which the doc 08 §7 block lives in the file-level metadata.
 _PROVENANCE_KEY: Final[bytes] = b"ionlens_provenance"
 
-#: Lossless codec. Nothing in doc 08 §7's table may round a stored number, and a metric
-#: that drifted by a bit in storage would be indistinguishable from one that regressed.
 _COMPRESSION: Final[str] = "zstd"
 
-#: Columns carrying the doc 08 §7 provenance block. All non-nullable: a row that cannot
-#: name the commit it was measured at is not a row the regression store can use.
 _PROVENANCE_COLUMN_TYPES: Final[dict[str, pa.DataType]] = {
     "manifest_sha256": pa.string(),
     "git_commit": pa.string(),
@@ -78,13 +70,8 @@ _PROVENANCE_COLUMN_TYPES: Final[dict[str, pa.DataType]] = {
     "seed": pa.int64(),
     "environment_lock_hash": pa.string(),
     "environment_lock_source": pa.string(),
-    # A string, not a Parquet timestamp. It is the exact ISO 8601 text the record round
-    # trips through, offset included, and it is the same text the HDF5 and Zarr artifacts
-    # carry — so one query can join a metric row to the state file it came from.
     "created_utc": pa.string(),
     "ionlens_version": pa.string(),
-    # JSON text, as everywhere else in this package. Parquet has a map type; using it here
-    # would make this the one artifact whose provenance block needs its own decoder.
     "solver_versions": pa.string(),
     "tier": pa.string(),
 }

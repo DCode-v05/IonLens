@@ -16,9 +16,6 @@ from ionlens.experiment.digest import (
 
 class TestWhatTheDigestCovers:
     def test_it_ignores_only_the_field_that_records_when_the_run_happened(self) -> None:
-        # doc 08 §7 puts `created_utc` in every artifact, and doc 13 §2 lists it under the
-        # *execution*, not the result. Excluding anything else would let a run change its
-        # commit, seed or tier and still claim to have reproduced.
         assert set(EXECUTION_ONLY_FIELDS) == {"created_utc"}
 
     def test_changing_one_stored_value_changes_the_digest(self, tmp_path: Path) -> None:

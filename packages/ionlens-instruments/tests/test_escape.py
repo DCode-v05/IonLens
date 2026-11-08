@@ -30,8 +30,6 @@ from ionlens.instruments.oes.escape import (
     slab_escape_probability,
 )
 
-# ── the independent reference ───────────────────────────────────────────────────
-
 
 def _escape_probability_by_quadrature(
     tau_0: float, *, n_depth: int = 4001, n_mu: int = 2001
@@ -52,9 +50,6 @@ def _escape_probability_by_quadrature(
     return float(np.trapezoid(per_depth, depth) / tau_0)
 
 
-# ── V-26: the analytic thin limit ───────────────────────────────────────────────
-
-
 @pytest.mark.physics
 @pytest.mark.parametrize("shape", list(LineProfileShape))
 def test_escape_factor_tends_to_one_as_the_gas_thins(shape: LineProfileShape) -> None:
@@ -67,9 +62,6 @@ def test_escape_factor_tends_to_one_as_the_gas_thins(shape: LineProfileShape) ->
 def test_escape_factor_is_exactly_one_at_zero_opacity() -> None:
     for shape in LineProfileShape:
         assert escape_factor(0.0, shape=shape) == 1.0
-
-
-# ── the external check on the escape probability ────────────────────────────────
 
 
 @pytest.mark.physics
@@ -94,13 +86,9 @@ def test_slab_escape_probability_is_accurate_where_the_closed_form_cancels() -> 
     """Below ~1e-6 the closed form is ``1 - 1`` in double precision; the series is not."""
     tau = 1e-12
     assert slab_escape_probability(tau) == pytest.approx(1.0, abs=1e-10)
-    # The leading correction is -(tau/2)(psi(3) - ln tau); check the sign and the size.
     small = 1e-6
     predicted = 1.0 - 0.5 * small * (float(special.digamma(3)) - np.log(small))
     assert slab_escape_probability(small) == pytest.approx(predicted, rel=1e-9)
-
-
-# ── the published asymptotics ───────────────────────────────────────────────────
 
 
 @pytest.mark.physics
@@ -164,9 +152,6 @@ def test_wings_help_so_a_broadened_line_escapes_more_easily() -> None:
     assert monochromatic < doppler < lorentz
 
 
-# ── shape and contract ──────────────────────────────────────────────────────────
-
-
 @pytest.mark.physics
 @pytest.mark.parametrize("shape", list(LineProfileShape))
 def test_escape_factor_decreases_monotonically_with_opacity(shape: LineProfileShape) -> None:
@@ -184,9 +169,6 @@ def test_escape_factor_rejects_a_negative_opacity() -> None:
 def test_slab_escape_probability_rejects_a_negative_optical_depth() -> None:
     with pytest.raises(ValueError, match="cannot be negative"):
         slab_escape_probability(np.array([-0.1]))
-
-
-# ── the opacity itself ──────────────────────────────────────────────────────────
 
 
 def _resonance_line() -> TrappedLine:

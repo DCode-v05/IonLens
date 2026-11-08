@@ -52,10 +52,8 @@ _RP1_N_E = 1.0e17
 _RP1_T_E = 3.0
 _RP1_VP = 12.0
 
-#: The doc 02 §7.1 "~700 s" accumulation for 3 % at RP-1 (doc 06 §4 term 8).
 _RP1_WINDOW = AcquisitionWindow.absolute(start=Q_(0.0, "s"), duration=Q_(696.7, "s"))
 
-#: A window too short to see anything at all — a single laser shot.
 _SINGLE_SHOT_WINDOW = AcquisitionWindow.absolute(start=Q_(0.0, "s"), duration=Q_(0.1, "s"))
 
 
@@ -424,8 +422,6 @@ class TestAssumedAccumulationBudgetIsRegistered:
         assert entry.units == "s"
 
     def test_a_wider_accumulation_budget_lowers_the_detection_floor(self) -> None:
-        # required_accumulation_s(...) scales as 1/n_e, so the floor is proportional to
-        # 1/budget; quadrupling the budget must quarter the floor, not merely change it.
         default_floor = _configured().metadata().detection_floor.threshold.magnitude
 
         wider_registry = _registry_with(
@@ -487,10 +483,6 @@ class TestTheCoherentCalibrationTerm:
         return instrument.observe(state, _RP1_WINDOW), instrument.forward(state, _RP1_WINDOW)
 
     def test_the_flag_defaults_off_and_reproduces_the_poisson_term_bit_for_bit(self) -> None:
-        # The load-bearing property: every existing caller of this method — and every
-        # published regression baseline scored through it — must be unaffected by an option
-        # only opt-in callers asked for. Exact equality, not allclose: "close" would let a
-        # refactor of the Poisson branch through unnoticed.
         observed, predicted = self._observation_and_prediction()
         instrument = ThomsonInstrument(root_seed=17)
         instrument.configure(InstrumentConfig(values={}))
@@ -507,18 +499,10 @@ class TestTheCoherentCalibrationTerm:
         without = instrument.likelihood(observed, predicted)
         with_term = instrument.likelihood(observed, predicted, calibration_uncertainty=True)
 
-        # Not merely different — the whole point is that admitting a 6.6 % coherent
-        # uncertainty must make the fit *less* discriminating, never more. A term that
-        # tightened the likelihood would be the mean-variance coupling artefact
-        # `closed_loop` records, not a calibration budget.
         assert with_term != without
         assert np.isfinite(with_term)
 
     def test_a_true_calibration_measurement_is_a_no_op(self) -> None:
-        # doc 04 §7.3 permits the true response "for verification", and a run that used it
-        # has no calibration error to score. The guard is on the measurement's own record
-        # rather than on the caller remembering, so this must hold without the caller
-        # having to drop the flag.
         state = _state()
         instrument = ThomsonInstrument(root_seed=17)
         instrument.configure(InstrumentConfig(values={}))
@@ -573,9 +557,6 @@ class TestCoherentModelDiscrepancy:
         )
 
     def test_none_reproduces_the_poisson_likelihood_bit_for_bit(self) -> None:
-        # The load-bearing property: every existing caller of this method — and every
-        # published regression baseline scored through it — must be unaffected by an
-        # argument only opt-in callers asked for. Exact equality, not allclose.
         instrument = ThomsonInstrument(root_seed=3)
         pred = self._prediction(50.0)
         obs = self._measurement(pred, offset=3.0)
@@ -585,9 +566,6 @@ class TestCoherentModelDiscrepancy:
         )
 
     def test_a_discrepancy_below_the_count_floor_is_refused(self) -> None:
-        # A channel expecting far fewer than _MINIMUM_COUNTS photoelectrons is exactly the
-        # regime doc 02 §7.1's 0.008 pe/channel/shot describes at RP-1 — the floor must
-        # bind here rather than silently approximating a Poisson of mean ~5 as a Gaussian.
         instrument = ThomsonInstrument(root_seed=3)
         pred = self._prediction(5.0)
         assert _MINIMUM_COUNTS > 5.0
@@ -643,9 +621,6 @@ class TestCoherentModelDiscrepancy:
         assert with_term < without
 
     def test_matches_the_shared_coherent_kernel_computed_independently(self) -> None:
-        # Reconstructed from the public ionlens.instruments.coherent building blocks, so the
-        # method's internal composition of counts/expected/variance cannot silently
-        # disagree with the shared Woodbury kernel it claims to be built from.
         instrument = ThomsonInstrument(root_seed=3)
         pred = self._prediction(500.0)
         obs = self._measurement(pred, offset=4.0)
@@ -668,8 +643,6 @@ class TestCoherentModelDiscrepancy:
     def test_calibration_uncertainty_alone_is_unaffected_by_the_new_floor_check(
         self,
     ) -> None:
-        # The count-floor check only guards the discrepancy path; calibration_uncertainty
-        # on its own (no discrepancy) must still work below the floor, exactly as before.
         instrument = ThomsonInstrument(root_seed=3)
         pred = self._prediction(5.0)
         assert _MINIMUM_COUNTS > 5.0

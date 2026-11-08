@@ -73,9 +73,6 @@ class Citation:
         )
 
         if self.doi is not None and not (self.doi.startswith("10.") and "/" in self.doi):
-            # A URL stored here looks right in a repr and resolves to nothing through a
-            # DOI resolver, so the failure survives every review that reads rather than
-            # clicks. DOIs are registrant/suffix pairs under the "10." directory.
             raise ValueError(
                 f"doi {self.doi!r} is not a DOI. A DOI is '10.<registrant>/<suffix>'; "
                 "store the bare identifier, not a resolver URL."

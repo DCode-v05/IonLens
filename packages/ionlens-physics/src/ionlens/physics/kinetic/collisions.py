@@ -134,26 +134,12 @@ FloatArray: TypeAlias = NDArray[np.float64]
 _E: Final[float] = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _K_B: Final[float] = float(magnitude_in(BOLTZMANN, "J/K"))
 
-#: Sentinel in :attr:`CollisionOutcome.process_index` for a particle that did not undergo a
-#: real collision — either it was never a candidate, or its candidacy was a null collision.
-#: The two are deliberately indistinguishable downstream: a null collision *is* nothing
-#: happening, and a code that treated it as an event would collide at ``nu_max``.
 NO_COLLISION: Final[int] = -1
 
-#: How far the summed per-process frequency may exceed ``nu_max`` before the sampler
-#: refuses to continue. The bound is exact in exact arithmetic — ``nu_max`` is the maximum
-#: of the same piecewise-linear function that is evaluated per particle — so anything
-#: beyond round-off means the two disagree about the cross section and the rejection step
-#: would silently truncate.
 FREQUENCY_BOUND_TOLERANCE: Final[float] = 1e-9
 
-#: Where ``d/dE [(a + bE) sqrt(E)] = 0`` puts the stationary point: ``E* = -a / (3b)``.
 _STATIONARY_POINT_FACTOR: Final[float] = 3.0
 
-#: Relative slack on the energy ceiling. A particle launched at exactly the ceiling energy
-#: round-trips through ``v = sqrt(2E/m)`` and back with a relative error of order 1e-16, and
-#: refusing that would make the ceiling exclusive by accident. Orders tighter than any
-#: physical excess, so a particle genuinely off the end of the model is still caught.
 CEILING_TOLERANCE: Final[float] = 1e-9
 
 
@@ -176,15 +162,10 @@ class CollisionKind(StrEnum):
     doc 08 §1 principle 4.
     """
 
-    #: ``e + Ar -> e + Ar``. Isotropic, ``2 m/M`` energy loss.
     ELECTRON_ELASTIC = "electron_elastic"
-    #: ``e + Ar -> e + Ar*``. Threshold energy removed, direction randomised.
     ELECTRON_EXCITATION = "electron_excitation"
-    #: ``e + Ar -> 2e + Ar+``. Emits one electron and one ion.
     ELECTRON_IONISATION = "electron_ionisation"
-    #: ``Ar+ + Ar -> Ar+ + Ar``. Isotropic in the centre-of-mass frame.
     ION_ELASTIC = "ion_elastic"
-    #: ``Ar+ + Ar -> Ar + Ar+``. doc 03 §4.5's most consequential channel.
     ION_CHARGE_EXCHANGE = "ion_charge_exchange"
 
     @property
@@ -205,9 +186,6 @@ _ELECTRON_KINDS: Final[frozenset[CollisionKind]] = frozenset(
     }
 )
 
-#: Which LXCat blocks may back which kinematics. Checked, because the one genuinely
-#: dangerous confusion here — an ion elastic section driving electron kinematics — produces
-#: a run rather than an error.
 _COMPATIBLE_SECTIONS: Final[Mapping[CollisionKind, frozenset[ProcessType]]] = MappingProxyType(
     {
         CollisionKind.ELECTRON_ELASTIC: frozenset({ProcessType.ELASTIC, ProcessType.EFFECTIVE}),
@@ -403,7 +381,6 @@ class NullCollisionSampler:
         object.__setattr__(self, "is_electron_species", families.pop())
         object.__setattr__(self, "nu_max_per_s", self._maximum_frequency())
 
-    # ── the ceiling frequency ───────────────────────────────────────────────────
 
     def _maximum_frequency(self) -> float:
         """The exact maximum of ``n_gas sigma_tot(E) v(E)`` over ``[0, ceiling]``.
@@ -451,7 +428,6 @@ class NullCollisionSampler:
             pieces.append(energies[energies < self.energy_ceiling_ev])
             threshold = process.threshold_ev
             if threshold is not None and threshold < self.energy_ceiling_ev:
-                # The threshold is a kink in sigma even when it is not a tabulated point.
                 pieces.append(np.asarray([threshold], dtype=np.float64))
         return np.unique(np.concatenate(pieces))
 
@@ -459,7 +435,6 @@ class NullCollisionSampler:
         """``v = sqrt(2E/m)``, the speed that appears in ``nu = n sigma v``."""
         return np.sqrt(2.0 * energy_ev * _E / self.species.mass_kg)
 
-    # ── frequencies, for the sampler and for anyone verifying it ────────────────
 
     def frequencies_per_s(self, energy_ev: ArrayLike) -> FloatArray:
         """``nu_k(E) = n_gas sigma_k(E) v(E)`` for every channel, shape ``(n_proc, n)``.
@@ -494,7 +469,6 @@ class NullCollisionSampler:
             raise ValueError(f"timestep must be positive, got {dt_s}")
         return -math.expm1(-self.nu_max_per_s * dt_s)
 
-    # ── the step ────────────────────────────────────────────────────────────────
 
     def collide(
         self,
@@ -525,21 +499,12 @@ class NullCollisionSampler:
         self._check_shapes(positions, velocities)
         probability = self.null_probability(dt_s)
 
-        # Up front, on every particle, and not only on the ones the draw selects. A ceiling
-        # violation checked on candidates alone would surface after a random number of
-        # steps, or not at all in a short run, which is the difference between a bug report
-        # and a wrong paper.
         self._check_ceiling(self._energy_ev(velocities))
 
         n = positions.shape[0]
         process_index = np.full(n, NO_COLLISION, dtype=np.int64)
         targets = np.zeros((n, 3), dtype=np.float64)
 
-        # THE draw. One uniform per particle per step, doc 03 §4.5, and it does the
-        # process selection too: conditioned on r < P, the ratio r/P is uniform on [0, 1)
-        # exactly, so no second variate is needed and none is spent.
-        # The ``asarray`` is for the type checker, not the arithmetic: NumPy's stub for
-        # ``Generator.random`` collapses to the scalar overload under --strict.
         draw: FloatArray = np.asarray(rng.random(n), dtype=np.float64)
         candidates = np.flatnonzero(draw < probability)
 
@@ -602,10 +567,6 @@ class NullCollisionSampler:
                 scale=self.gas.thermal_speed_m_per_s, size=(candidates.size, 3)
             )
 
-        # The lookup energy is the *relative* one: the cross-section tables are quoted
-        # against the energy of the projectile in the target's rest frame, and for an ion
-        # near the Bohm speed the target's thermal motion is not a small correction to it.
-        # It can exceed the projectile's own energy, hence the second ceiling check.
         relative = velocities[candidates] - targets[candidates]
         relative_speed = np.linalg.norm(relative, axis=1)
         energy_ev = 0.5 * self.species.mass_kg * relative_speed**2 / _E
@@ -622,9 +583,6 @@ class NullCollisionSampler:
                 f"evaluation disagree about the cross section."
             )
 
-        # r/P is the uniform variate; the process is the first whose cumulative share it
-        # falls under. Landing past the last edge is a null collision — the whole point of
-        # the method — and leaves the particle exactly as it was.
         selector = draw[candidates] / probability
         chosen = (selector[None, :] >= edges).sum(axis=0)
         real = chosen < len(self.processes)
@@ -643,7 +601,6 @@ class NullCollisionSampler:
                 f"cover the full sheath potential drop."
             )
 
-    # ── kinematics ──────────────────────────────────────────────────────────────
 
     def _apply(
         self,

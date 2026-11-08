@@ -72,19 +72,8 @@ __all__ = [
     "transition_wavelength_nm",
 ]
 
-#: Where the transcribed tables live — kept as data so a reviewer can diff it against the
-#: cited NIST query and paper without reading Python, exactly as
-#: ``ionlens.validation.swarm``'s ``_DATA_FILE`` does.
 _DATA_FILE: Final[Path] = Path(__file__).with_name("data") / "argon-line-ratios.yaml"
 
-#: ``h c`` in eV nm, from CODATA via :mod:`ionlens.core.constants` rather than typed in — doc
-#: 09 §2.5 makes a hand-entered fundamental constant "a plausible, undetectable and
-#: catastrophic error". Duplicated from (rather than imported from)
-#: :mod:`ionlens.physics.atomic.nist`'s identical ``_HC_EV_NM``: that module lives in
-#: ionlens-physics, and this package depends on no solver package — see the module
-#: docstring. The duplication is one float, derived the same way in both places from the
-#: same CODATA release, so it cannot drift into a different *value*, only a different
-#: import path.
 HC_EV_NM: Final[float] = float(magnitude_in(PLANCK * SPEED_OF_LIGHT, "eV * nm"))
 
 

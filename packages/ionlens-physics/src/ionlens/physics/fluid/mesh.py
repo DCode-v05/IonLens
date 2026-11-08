@@ -57,30 +57,18 @@ __all__ = [
     "wall_facet_tags",
 ]
 
-#: A field sampled on a grid, in SI magnitudes.
 FloatArray: TypeAlias = NDArray[np.float64]
 
 _REGISTRY: Final = default_registry()
 
-#: Cells per Debye length required by doc 03 §3.4 (``dz <= lambda_D / 4``).
-#:
-#: Not read from the registry, because the registry's ``mesh.A.cells_per_debye`` (2) and
-#: ``mesh.B.cells_per_debye`` (3) are the doc 05 §7.1 *PIC* meshes, deliberately
-#: mismatched with each other to avoid an inverse crime, and both are coarser than doc 03
-#: §3.4 permits for L1. Silently reusing one of them would make L1 violate its own
-#: stated resolution requirement while appearing to obey the registry.
 MIN_CELLS_PER_DEBYE: Final[float] = 4.0
 
-#: Geometric cell-growth ratio away from the sheath — ``mesh.A.stretch``.
 DEFAULT_MESH_STRETCH: Final[float] = float(_REGISTRY.value_in("mesh.A.stretch", "dimensionless"))
 
-#: Domain length along the sheath normal — ``mesh.domain_length``, 20 mm.
 DEFAULT_DOMAIN_LENGTH: Final[Quantity] = _REGISTRY["mesh.domain_length"].quantity
 
-#: The facet tag :func:`wall_facet_tags` puts on ``z = 0``.
 WALL_FACET: Final[int] = 1
 
-#: The facet tag it puts on the bulk boundary.
 BULK_FACET: Final[int] = 2
 
 
@@ -169,9 +157,6 @@ def graded_sheath_grid(
 
     target = lambda_D / cells_per_debye
     if stretch == 1.0:
-        # The uniform reference mesh the grading is measured against. Built in one zone
-        # rather than two so that it is exactly uniform: a two-zone construction leaves a
-        # step at the join, and a "uniform" mesh with a step in it is a poor control.
         widths = _uniform_widths(span=span, target=target)
     else:
         inner = _uniform_widths(span=sheath, target=target)

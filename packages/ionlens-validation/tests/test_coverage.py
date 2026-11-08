@@ -89,10 +89,6 @@ def _singular_case() -> CoverageCase:
 class TestItMeasuresCalibrationOnAWellPosedEnsemble:
     @pytest.mark.physics
     def test_a_correctly_specified_ensemble_comes_out_calibrated(self) -> None:
-        # The end-to-end statement doc 11 §9 item 5 is making. Truth drawn from the prior,
-        # inverted with that same prior and the true noise model: the posterior is exactly
-        # correct here, so the intervals must be calibrated. If this fails, either the
-        # Laplace covariance or the PIT is wrong, and nothing downstream is meaningful.
         rng = np.random.default_rng(20260806)
         cases = [_well_posed_case(rng) for _ in range(400)]
 
@@ -106,16 +102,13 @@ class TestItMeasuresCalibrationOnAWellPosedEnsemble:
 
     @pytest.mark.physics
     def test_an_overconfident_ensemble_is_caught(self) -> None:
-        # The negative control. If the likelihood is told the noise is much smaller than it
-        # really is, the posterior is too narrow and coverage must fail. A coverage test
-        # that cannot fail is not a test.
         rng = np.random.default_rng(4)
         cases = []
         for _ in range(400):
             case = _well_posed_case(rng)
 
             def sharpened(u: np.ndarray, inner=case.log_likelihood) -> float:
-                return inner(u) * 9.0  # claims noise 3x smaller than it is
+                return inner(u) * 9.0
 
             cases.append(
                 CoverageCase(
@@ -134,9 +127,6 @@ class TestItMeasuresCalibrationOnAWellPosedEnsemble:
 
 class TestFailuresAreCountedRatherThanDiscarded:
     def test_a_singular_case_is_recorded_and_the_run_continues(self) -> None:
-        # ADR-012: a refused singular Hessian is a *result* — it identifies a null
-        # direction doc 05 §6 predicts — not a crash. The driver must record it and carry
-        # on, exactly as an ensemble driver over doc 11 WBS 3.1's thousands of cases must.
         rng = np.random.default_rng(9)
         cases = [_well_posed_case(rng) for _ in range(60)]
         cases.insert(30, _singular_case())
@@ -148,7 +138,6 @@ class TestFailuresAreCountedRatherThanDiscarded:
         assert result.n_used == 60
 
     def test_the_failure_count_is_reported_alongside_the_coverage(self) -> None:
-        # A coverage number whose denominator is not visible is not checkable.
         rng = np.random.default_rng(10)
         cases = [_well_posed_case(rng) for _ in range(40)]
         cases.append(_singular_case())
@@ -160,10 +149,6 @@ class TestFailuresAreCountedRatherThanDiscarded:
         assert "1" in text
 
     def test_a_heavily_depleted_ensemble_refuses_to_report_coverage(self) -> None:
-        # The survivorship bias this module exists to prevent. Cases that fail are the
-        # badly-conditioned ones, so coverage over the survivors is optimistic by
-        # construction. Past a threshold the survivors are not a sample of the intended
-        # ensemble at all, and a number computed from them would be worse than none.
         cases = [_singular_case() for _ in range(30)]
         cases.append(_well_posed_case(np.random.default_rng(2)))
 
@@ -180,10 +165,6 @@ class TestFailuresAreCountedRatherThanDiscarded:
 
 class TestTheTruthIsSealedUntilTheEstimateExists:
     def test_the_driver_does_not_read_the_truth_before_committing_an_estimate(self) -> None:
-        # doc 05 §7's inverse crime, at ensemble scale: the truth is in scope for every
-        # case, one attribute access away from the optimiser. Seeding MAP from it would
-        # make coverage look perfect. The driver must reach the truth only to compute the
-        # PIT, after the posterior exists.
         rng = np.random.default_rng(21)
         case = _well_posed_case(rng)
         touched: list[str] = []
@@ -205,5 +186,4 @@ class TestTheTruthIsSealedUntilTheEstimateExists:
 
         run_coverage_ensemble([watched] * 3, levels=(0.9,))
 
-        # Read once per case for the PIT, and not before — three cases, three reads.
         assert len(touched) == 3

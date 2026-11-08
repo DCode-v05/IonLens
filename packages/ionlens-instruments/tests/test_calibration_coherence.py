@@ -71,33 +71,15 @@ type FloatArray = NDArray[np.float64]
 
 ROOT_SEED = 20260806
 
-#: Registered one-sigma calibration uncertainties, written out here rather than read from
-#: the registry so that a test and the code it checks cannot agree by both reading the same
-#: drifted value. `test_the_registered_calibration_uncertainties_are_what_this_module_
-#: assumes` pins them against the registry.
 OES_RADIOMETRIC_UNCERTAINTY = 0.06
 LIF_SCALE_UNCERTAINTY = 0.05
 
-#: Photoelectrons per pixel in the synthetic OES pair. Comfortably above
-#: ``OES.poisson_gaussian_threshold`` (100 pe) so that every pixel is on the Gaussian side
-#: of the doc 05 §3.1 switch: the closed-form identity above is a statement about a
-#: Gaussian covariance, and a pixel that fell through to the Poisson branch would be
-#: compared against a log-pmf instead.
 OES_COUNTS_PER_PIXEL = 5.0e3
 
-#: Length of the synthetic LIF scan. 201 is doc 02 §10.1's budget for a full IVDF and the
-#: `configure` default, and it is the number in the finding: a coherent scale error across
-#: a 201-point scan was being scored as 201 independent errors.
 LIF_SCAN_POINTS = 201
 
-#: How far the synthetic profiles are allowed to vary across channels. Non-flat on purpose:
-#: a flat prediction makes the coherent direction proportional to `ones`, which is a special
-#: case several wrong implementations also get right.
 PROFILE_CONTRAST = 0.5
 
-#: Fractional step used for the central-difference curvature in the interval-width tests.
-#: 1e-3 sits well above float64 round-off on a quantity of order one and well below the
-#: scale on which these log-likelihoods depart from quadratic.
 CURVATURE_STEP = 1.0e-3
 
 
@@ -108,9 +90,6 @@ def _window() -> AcquisitionWindow:
 def _profile(n: int) -> FloatArray:
     """A positive, non-constant shape for the synthetic predictions."""
     return np.asarray(1.0 + PROFILE_CONTRAST * np.linspace(0.0, 1.0, n), dtype=np.float64)
-
-
-# ── OES fixtures ────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture(scope="module")
@@ -173,9 +152,6 @@ def _oes_measurement(
     )
 
 
-# ── LIF fixtures ────────────────────────────────────────────────────────────────
-
-
 @pytest.fixture(scope="module")
 def lif() -> LifInstrument:
     instrument = LifInstrument()
@@ -199,8 +175,6 @@ def _lif_measurement(
     calibration: CalibrationState = CalibrationState.ESTIMATED,
 ) -> Measurement:
     values = np.asarray(pred.values, dtype=np.float64) * scale
-    # A per-point uncertainty that is neither flat nor proportional to the signal, so the
-    # diagonal cannot be mistaken for a multiple of the coherent direction.
     reference = np.asarray(pred.values, dtype=np.float64)
     sigma = 0.02 * reference.max() * (1.0 + np.linspace(0.0, 1.0, reference.size)) ** 2
     return Measurement(
@@ -211,9 +185,6 @@ def _lif_measurement(
         window=pred.window,
         calibration=calibration,
     )
-
-
-# ── the scorers, one per instrument, with a common signature ────────────────────
 
 
 def _oes_scorer(instrument: OesInstrument):
@@ -249,9 +220,6 @@ def _chi_squared(score, *, scale: float, calibration_uncertainty: bool) -> float
     return -2.0 * (scaled - exact)
 
 
-# ── the finding ─────────────────────────────────────────────────────────────────
-
-
 class TestACoherentScaleErrorIsScoredAsOneError:
     """The defect, and the fix, on both instruments under one identity."""
 
@@ -272,9 +240,7 @@ class TestACoherentScaleErrorIsScoredAsOneError:
         diagonal = _chi_squared(score, scale=scale, calibration_uncertainty=False)
         coherent = _chi_squared(score, scale=scale, calibration_uncertainty=True)
 
-        # One error, not N: bounded above by 1 however long the scan is.
         assert 0.0 < coherent < 1.0
-        # And the diagonal treatment is not merely a bit tight — it is enormous.
         assert diagonal > 100.0
 
     @pytest.mark.parametrize(
@@ -321,8 +287,6 @@ class TestACoherentScaleErrorIsScoredAsOneError:
 
         coherent = _chi_squared(score, scale=1.0 + uncertainty, calibration_uncertainty=True)
 
-        # `a / (1 + a) -> 1` from below as `a` grows; it never exceeds it, which is the
-        # whole content of "one error".
         assert coherent < 1.0
 
 
@@ -400,8 +364,6 @@ class TestTheIntervalWidens:
 
         assert without > 0.0
         assert with_calibration > 0.0
-        # Wider interval == lower curvature. Reported as the width ratio because that is
-        # the number doc 00 §5.1 S4 is about.
         assert (1.0 / np.sqrt(with_calibration)) > (1.0 / np.sqrt(without))
 
 

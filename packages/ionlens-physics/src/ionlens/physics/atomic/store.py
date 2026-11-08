@@ -50,15 +50,10 @@ from ionlens.physics.atomic.nist import LineList, parse_nist_asd
 
 __all__ = ["AtomicDataStore"]
 
-#: The ion database of doc 09 §2.1 — the Ar+/Ar elastic and charge-exchange set doc 03
-#: §4.5 calls the most consequential atomic-data choice in the project.
 _ION_DATASET: Final[DatasetId] = DatasetId.LXCAT_PHELPS_ION
 
-#: The line data of doc 09 §2.2, feeding the CR model of doc 04 §2.
 _LINE_DATASET: Final[DatasetId] = DatasetId.NIST_ASD_ARGON
 
-#: Cached files are text in a documented encoding. Reading them as the locale's encoding
-#: would make a load succeed or fail depending on ``LANG``, which doc 00 E3 forbids.
 _ENCODING: Final[str] = "utf-8"
 
 
@@ -94,7 +89,6 @@ class AtomicDataStore:
         checked = checked_cache_root(root)
         return cls(checked, DatasetLock.read(checked / LOCK_FILENAME))
 
-    # ── where things are ────────────────────────────────────────────────────────
 
     @property
     def root(self) -> Path:
@@ -110,7 +104,6 @@ class AtomicDataStore:
         """Where a dataset would be cached. Does not read it, so does not touch it."""
         return self._root / DATASETS[dataset_id].filename
 
-    # ── reading, with verification ──────────────────────────────────────────────
 
     def read_bytes(self, dataset_id: DatasetId) -> bytes:
         """The cached bytes, verified against the lock — doc 09 §5.
@@ -138,7 +131,6 @@ class AtomicDataStore:
         """The cached bytes as UTF-8 text, verified against the lock."""
         return self.read_bytes(dataset_id).decode(_ENCODING)
 
-    # ── the typed loaders ───────────────────────────────────────────────────────
 
     def _cross_section_set(self, dataset_id: DatasetId) -> CrossSectionSet:
         """Parse once per store.
@@ -194,7 +186,6 @@ class AtomicDataStore:
         self._lines[_LINE_DATASET] = parsed
         return parsed
 
-    # ── the citation ledger ─────────────────────────────────────────────────────
 
     @property
     def touched(self) -> tuple[DatasetId, ...]:

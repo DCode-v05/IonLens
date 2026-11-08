@@ -86,8 +86,6 @@ def _rp1(**overrides: object) -> PlasmaParams:
     return PlasmaParams(**{**defaults, **overrides})  # type: ignore[arg-type]
 
 
-#: doc 01 R-ENV-4 tops the bias envelope at 1000 V, which is the highest bias at which
-#: V-03 can be asked anything about a *documented* operating point.
 ENVELOPE_TOP_BIAS = Q_(-1000.0, "V")
 
 
@@ -97,11 +95,6 @@ def _m(value: Quantity, units: str) -> float:
 
 def _relative(actual: float, reference: float) -> float:
     return abs(actual - reference) / abs(reference)
-
-
-# Module-scoped so the FEniCSx form compilation and the solves are paid once each. Plain
-# functions rather than class-scoped methods: pytest 9 deprecates the latter, and the
-# FEniCSx environment runs pytest 9 while the workspace runs pytest 8.
 
 
 @pytest.fixture(scope="module")
@@ -114,9 +107,6 @@ def rp1_solution() -> SheathSolution:
 def envelope_top_solution() -> SheathSolution:
     """doc 01 R-ENV-4's 1000 V, collisionless."""
     return FluidSheathSolver(mean_free_path=None).solve_detailed(_rp1(bias=ENVELOPE_TOP_BIAS))
-
-
-# ── an independent solution of the same equations ───────────────────────────────
 
 
 def _exact_sheath_thickness(params: PlasmaParams, *, edge_tolerance: float) -> float:
@@ -198,9 +188,6 @@ class TestAgreementWithAnIndependentSolution:
         assert errors[1] < errors[0]
 
 
-# ── V-03 ────────────────────────────────────────────────────────────────────────
-
-
 class TestV03ChildLangmuirRecovery:
     """doc 03 §7 V-03 / doc 11 G-1.2, in the collisionless high-bias limit."""
 
@@ -256,7 +243,6 @@ class TestV03ChildLangmuirRecovery:
                 f"s_L1/s_CL = {measured / child:.4f}   "
                 f"s_quadrature/s_CL = {exact / child:.4f}"
             )
-            # The solver agrees with the quadrature; both disagree with Child-Langmuir.
             assert _relative(measured, exact) < 0.02
             assert measured / child > 1.05
 
@@ -305,9 +291,6 @@ class TestV03ChildLangmuirRecovery:
         assert _relative(edge, bulk) == pytest.approx(0.2804, abs=1e-3)
 
 
-# ── V-04 ────────────────────────────────────────────────────────────────────────
-
-
 class TestV04MeshIndependence:
     """doc 03 §7 V-04: ``Gamma_E`` changes < 1 % on halving ``dz``."""
 
@@ -351,9 +334,6 @@ class TestV04MeshIndependence:
         change = _relative(thicknesses[1], thicknesses[0])
         print(f"\nV-04 sheath thickness change on halving dz: {100.0 * change:.3f} %")
         assert change < 0.01
-
-
-# ── the state contract ──────────────────────────────────────────────────────────
 
 
 class TestPlasmaStateContract:
@@ -518,9 +498,6 @@ class TestSecondaryElectronEmission:
         assert shift < 0.01
 
 
-# ── G-1.4 ───────────────────────────────────────────────────────────────────────
-
-
 class TestG14Throughput:
     """doc 11 G-1.4: **measured** L1 throughput recorded; doc 03 §4.4 estimates corrected."""
 
@@ -535,8 +512,6 @@ class TestG14Throughput:
         )
         assert cost.basis is CostBasis.MEASURED
         assert cost.device is Device.CPU
-        # A ceiling, not a claim. doc 03 §1 tables L1 at ~1 s; three orders above that
-        # would be a defect rather than a slow machine.
         assert cost.wall_clock_s < 60.0
 
     def test_the_declared_estimate_is_labelled_as_one(self) -> None:

@@ -25,17 +25,10 @@ from ionlens.core.units import Magnitude, Quantity, magnitude_in
 
 __all__ = ["DEFAULT_REGISTRY_DIR", "ParameterRegistry", "default_registry"]
 
-#: Where the registry files that ship with the package live.
 DEFAULT_REGISTRY_DIR = Path(__file__).parent / "data"
 
-#: Similarity threshold for the "did you mean" hint on an unknown parameter id.
-#:
-#: An ergonomic knob, not a physical quantity — but it is named because doc 08 §5's rule
-#: does not carve out exceptions for numbers whose author was confident they did not
-#: matter, and that is the point of the rule.
 _SUGGESTION_CUTOFF = 0.6
 
-#: How many suggestions to offer. More than a handful stops being a hint.
 _MAX_SUGGESTIONS = 3
 
 _REQUIRED_KEYS = frozenset({"id", "description", "value", "units", "class", "category"})
@@ -89,8 +82,6 @@ def _parse_entry(raw: Mapping[str, Any], *, path: Path) -> Parameter:
 
     unknown = set(raw) - _KNOWN_KEYS
     if unknown:
-        # A typo'd key that is silently ignored is a parameter that silently does not
-        # apply — the doc 00 §6 parameter-fog trap wearing a YAML costume.
         raise ValueError(
             f"{entry_id} in {path.name}: unrecognised key(s) {', '.join(sorted(unknown))}. "
             f"Known keys: {', '.join(sorted(_KNOWN_KEYS))}."
@@ -145,11 +136,6 @@ class ParameterRegistry:
         entries: dict[str, Parameter] = {}
         for path in paths:
             if path.name.startswith("."):
-                # A registry file is something a person wrote and committed. Names
-                # beginning with a dot are macOS AppleDouble sidecars, editor swap files
-                # and partial downloads — all of which a `*.yaml` glob happily matches.
-                # Found on the reference machine (doc 10 §1), where a stray `._physics.yaml`
-                # turned the single source of truth into a UnicodeDecodeError at import.
                 continue
             document = yaml.safe_load(_read_registry_file(path))
             if document is None:
@@ -171,7 +157,6 @@ class ParameterRegistry:
                 entries[entry.id] = entry
         return cls(entries)
 
-    # ── access ──────────────────────────────────────────────────────────────────
 
     @property
     def entries(self) -> Mapping[str, Parameter]:
@@ -216,7 +201,6 @@ class ParameterRegistry:
         """
         return magnitude_in(self[entry_id].quantity, units)
 
-    # ── the doc 00 C1 metric ────────────────────────────────────────────────────
 
     def count_by_class(self) -> Mapping[ProvenanceClass, int]:
         """Entry count per provenance class, including zeros.

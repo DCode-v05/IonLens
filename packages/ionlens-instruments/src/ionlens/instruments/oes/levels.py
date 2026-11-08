@@ -83,10 +83,6 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: How far a channel's declared threshold may sit from the level-energy difference it is
-#: supposed to equal. Tight, because the two come from the same NIST level table and a
-#: disagreement means one of them was transcribed from somewhere else — the exact failure
-#: doc 09 §2.2's ``h nu = E_k - E_i`` check catches for the radiative data.
 THRESHOLD_TOLERANCE_EV: float = 1.0e-6
 
 
@@ -182,7 +178,6 @@ class ElectronImpactChannel:
             if np.any(values < 0.0) or not np.all(np.isfinite(values)):
                 raise ValueError(f"{name} must be finite and non-negative")
 
-    # ── construction ────────────────────────────────────────────────────────────
 
     @classmethod
     def from_cross_section(
@@ -243,7 +238,6 @@ class ElectronImpactChannel:
             sigma_m2=sampler(grid.centres_ev),
         )
 
-    # ── the rate coefficients ───────────────────────────────────────────────────
 
     def excitation_rate_coefficient(self, grid: EnergyGrid, f0: ArrayLike) -> float:
         """``K_lu = gamma integral eps sigma(eps) f0(eps) deps``, in m^3/s.
@@ -421,7 +415,6 @@ class LevelSystem:
                     "level to lie above the lower one"
                 )
 
-    # ── access ──────────────────────────────────────────────────────────────────
 
     @property
     def ground(self) -> Level:

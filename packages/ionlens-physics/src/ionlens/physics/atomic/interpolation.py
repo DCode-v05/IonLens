@@ -90,26 +90,17 @@ class ExtrapolationPolicy(StrEnum):
     doc 07 can sweep it.
     """
 
-    #: Refuse. The default above the table; see the module docstring.
     RAISE = "raise"
 
-    #: The channel does not exist out there.
     ZERO = "zero"
 
-    #: Hold the nearest tabulated value. The default below the table.
     CONSTANT = "constant"
 
-    #: Continue the slope of the two nearest tabulated points in log-log.
     POWER_LAW = "power_law"
 
 
-#: Below the tabulated range, where no threshold applies. Charge exchange and momentum
-#: transfer are both finite and slowly varying as ``E -> 0``, so holding the first value
-#: is the mildest defensible statement; zero would delete a channel that is real there.
 DEFAULT_BELOW: Final[ExtrapolationPolicy] = ExtrapolationPolicy.CONSTANT
 
-#: Above the tabulated range. See the module docstring: every silent option is wrong in a
-#: different direction and none of them show up in the answer, so this one is loud.
 DEFAULT_ABOVE: Final[ExtrapolationPolicy] = ExtrapolationPolicy.RAISE
 
 _BELOW: Final[str] = "below"
@@ -226,10 +217,6 @@ def interpolate_cross_section(
 
     result = np.asarray(np.interp(flat, section.energy_ev, section.sigma_m2), dtype=np.float64)
 
-    # Physics before policy. The table normally *starts* at the threshold, so nearly
-    # every sub-threshold point is also below the tabulated range — and a caller asking
-    # for a grid from 0 eV should not have to opt out of an extrapolation policy to be
-    # told the exact answer.
     known_zero = (
         np.zeros(flat.shape, dtype=np.bool_)
         if section.threshold_ev is None

@@ -30,9 +30,6 @@ from ionlens.physics.atomic.nist import (
     parse_nist_asd,
 )
 
-#: h c in eV nm. Written out independently of the value the module under test computes
-#: from CODATA, so that the energy/wavelength consistency check is not tested against
-#: its own arithmetic.
 HC_EV_NM = 1239.841984
 
 _HEADER = (
@@ -40,8 +37,6 @@ _HEADER = (
     "conf_i\tterm_i\tJ_i\tconf_k\tterm_k\tJ_k\tg_i\tg_k\tType"
 )
 
-#: ``(spectrum, wavelength_nm, A_ul, grade, E_lower_eV)`` for the doc 02 §6.3 set.
-#: The upper level is derived so the row is exactly self-consistent; see the docstring.
 _ROWS = (
     (1, 751.4652, 4.02e7, "AA", 11.623587),
     (1, 811.5311, 3.31e7, "AA", 11.548357),
@@ -89,7 +84,6 @@ def _row(
 
 
 def _asd_table(extra: tuple[str, ...] = ()) -> str:
-    # The real Ar I 750.39 nm row: an air wavelength against vacuum level energies.
     real = _row(
         spectrum=1,
         wavelength_nm=750.3869,
@@ -127,9 +121,6 @@ def _transition(**overrides: object) -> Transition:
     return Transition(**{**defaults, **overrides})  # type: ignore[arg-type]
 
 
-# ── the accuracy grade, which doc 09 §2.2 makes mandatory ───────────────────────
-
-
 class TestAccuracyGrade:
     """doc 09 §2.2: "the framework ingests the grade and propagates it"."""
 
@@ -152,8 +143,6 @@ class TestAccuracyGrade:
         assert grade.relative_uncertainty == pytest.approx(relative)
 
     def test_grade_e_is_a_lower_bound_rather_than_a_value(self) -> None:
-        # doc 09 §2.2 gives grade E as "> 50 %", which has no upper end. Reporting 50 %
-        # for it would understate the uncertainty of the worst-known data in the set.
         assert AccuracyGrade.E.relative_uncertainty == pytest.approx(0.50)
         assert not AccuracyGrade.E.is_bounded
         assert AccuracyGrade.AAA.is_bounded
@@ -165,8 +154,6 @@ class TestAccuracyGrade:
         assert uncertainties == sorted(uncertainties)
 
     def test_a_grade_becomes_the_registry_uncertainty_type(self) -> None:
-        # ionlens.core.params.Uncertainty is the project's one-sigma type (doc 02 §12); a
-        # second spelling of the same idea in this package would be a fork of it.
         assert AccuracyGrade.AA.as_uncertainty() == Uncertainty(kind="relative", value=0.01)
 
     def test_the_manifest_spelling_round_trips(self) -> None:
@@ -175,9 +162,6 @@ class TestAccuracyGrade:
     def test_an_unknown_grade_is_rejected(self) -> None:
         with pytest.raises(ValueError, match="A\\+\\+"):
             AccuracyGrade("A++")
-
-
-# ── parsing ─────────────────────────────────────────────────────────────────────
 
 
 class TestParsingAnAsdTable:
@@ -219,9 +203,6 @@ class TestParsingAnAsdTable:
         assert len(parse_nist_asd(piped)) == len(_ROWS) + 1
 
     def test_spreadsheet_safe_quoting_is_stripped(self) -> None:
-        # ASD's "tab-delimited, with = prefix" mode writes ="750.3869" so that a
-        # spreadsheet does not reinterpret the cell. Left in place, float() fails and the
-        # whole table looks unparseable.
         quoted = "\n".join(
             "\t".join(f'="{cell}"' for cell in row.split("\t")) for row in _asd_table().splitlines()
         )
@@ -283,9 +264,6 @@ class TestRowsWithoutATransitionProbability:
         assert "1 without" in repr(parse_nist_asd(_asd_table(extra=(blank,))))
 
 
-# ── the doc 02 §6.3 line set ────────────────────────────────────────────────────
-
-
 class TestTheDoc02LineSet:
     def test_the_specification_lists_ten_lines(self) -> None:
         assert len(DOC_02_LINE_SET) == 10
@@ -295,7 +273,6 @@ class TestTheDoc02LineSet:
         assert sum(spec.species == "Ar II" for spec in DOC_02_LINE_SET) == 4
 
     def test_the_te_discriminator_pair_is_present(self) -> None:
-        # doc 02 §6.3: "The 750.39/811.53 ratio is the classical T_e discriminator."
         wavelengths = {spec.wavelength_nm for spec in DOC_02_LINE_SET}
 
         assert {750.39, 811.53} <= wavelengths
@@ -322,15 +299,11 @@ class TestTheDoc02LineSet:
 
 class TestMatching:
     def test_a_line_is_matched_within_the_calibration_tolerance(self) -> None:
-        # doc 02 §6.3 quotes wavelengths to 0.01 nm; ASD carries four decimals. The
-        # tolerance has to absorb that rounding without reaching a neighbouring line.
         lines = parse_nist_asd(_asd_table())
 
         assert lines.match(DOC_02_LINE_SET[0]).wavelength_nm == pytest.approx(750.3869)
 
     def test_the_tolerance_is_far_smaller_than_the_nearest_line_separation(self) -> None:
-        # 750.39 and 751.47 are 1.08 nm apart, the closest pair in the set. A tolerance
-        # anywhere near that would let one line match the other's specification.
         assert LINE_MATCH_TOLERANCE_NM < 0.1
 
     def test_an_unmatched_line_raises_rather_than_returning_nothing(self) -> None:
@@ -342,18 +315,12 @@ class TestMatching:
             parse_nist_asd(without_811).match(DOC_02_LINE_SET[2])
 
     def test_an_ambiguous_match_raises_rather_than_picking_one(self) -> None:
-        # Two ASD rows inside the tolerance means the line is blended at this resolution,
-        # which doc 02 §6.3 selected the set to avoid. Picking the first would silently
-        # halve or double the modelled emissivity.
         twin = _row(spectrum=1, wavelength_nm=750.4000, a_ul="1.00e+07", grade="B", e_lower=11.6)
 
         with pytest.raises(LookupError, match="ambiguous"):
             parse_nist_asd(_asd_table(extra=(twin,))).match(DOC_02_LINE_SET[0])
 
     def test_a_wavelength_match_in_the_wrong_ionisation_stage_is_not_a_match(self) -> None:
-        # Ar I and Ar II lines are different physics: doc 02 §6.3 uses the ion lines for
-        # n_i and the neutral lines for T_e. Matching on wavelength alone would let a
-        # mislabelled row cross the two.
         lines = parse_nist_asd(_asd_table())
         wrong_stage = LineSpec(
             species="Ar II", wavelength_nm=750.39, paschen_level=None, role="test"
@@ -374,9 +341,6 @@ class TestMatching:
         assert len(lines.of_species("Ar II")) == 4
 
 
-# ── propagating the grade ───────────────────────────────────────────────────────
-
-
 class TestUncertaintyPropagation:
     def test_a_transition_reports_its_one_sigma_uncertainty(self) -> None:
         line = _transition()
@@ -386,9 +350,6 @@ class TestUncertaintyPropagation:
 
     @pytest.mark.physics
     def test_a_better_graded_line_is_weighted_more_heavily(self) -> None:
-        # doc 09 §2.2: "Ar I 811.53 nm carries a much better grade than several Ar II
-        # lines, and weighting lines by their data quality is straightforward, correct,
-        # and almost never done." This is that weighting.
         lines = parse_nist_asd(_asd_table())
         weights = dict(zip([t.species_wavelength for t in lines], lines.weights(), strict=True))
 
@@ -411,8 +372,6 @@ class TestUncertaintyPropagation:
         assert weights[0] / weights[1] == pytest.approx((0.10 / 0.01) ** 2)
 
     def test_an_unbounded_grade_refuses_to_be_weighted_silently(self) -> None:
-        # Grade E means "> 50 %". Treating it as exactly 50 % would give the least
-        # trustworthy line in the set a finite, respectable weight.
         lines = LineList(transitions=(_transition(accuracy=AccuracyGrade.E),), rows_without_a_ul=0)
 
         with pytest.raises(ValueError, match="E"):
@@ -422,9 +381,6 @@ class TestUncertaintyPropagation:
         lines = LineList(transitions=(_transition(accuracy=AccuracyGrade.E),), rows_without_a_ul=0)
 
         assert lines.weights(unbounded_relative_uncertainty=2.0) == pytest.approx(np.array([1.0]))
-
-
-# ── validation ──────────────────────────────────────────────────────────────────
 
 
 class TestTransitionValidation:
@@ -446,17 +402,11 @@ class TestTransitionValidation:
 
     @pytest.mark.physics
     def test_rejects_energies_that_disagree_with_the_wavelength(self) -> None:
-        # h nu = E_k - E_i. A row where they disagree has had a column misread — an
-        # Angstrom wavelength, a cm^-1 level, or two rows spliced together — and the
-        # emissivity of doc 04 §2.1 would be wrong by whatever the mismatch is.
         with pytest.raises(ValueError, match="photon energy"):
             _transition(e_upper_ev=11.828071 + 2.0)
 
     @pytest.mark.physics
     def test_accepts_the_air_vacuum_offset_of_a_real_row(self) -> None:
-        # The real Ar I 750.39 nm row is 0.035 % inconsistent because ASD quotes an air
-        # wavelength against vacuum level energies. A check tight enough to reject that
-        # would reject every line in the doc 02 set.
         line = _transition()
 
         assert line.photon_energy_ev == pytest.approx(line.energy_gap_ev, rel=1e-3)
@@ -470,9 +420,6 @@ class TestTransitionValidation:
             _transition(spectrum=99)
 
     def test_a_row_failing_a_physics_check_names_the_row_it_came_from(self) -> None:
-        # The validation lives on the type, but a table is read row by row, and "the
-        # photon energy disagrees" with no row number is not actionable on a 400-line
-        # export.
         inconsistent = _row(
             spectrum=1,
             wavelength_nm=700.0,
@@ -513,7 +460,6 @@ class TestTheParserFailsLoudly:
             parse_nist_asd(without_g)
 
     def test_rejects_a_wavelength_column_in_the_wrong_units(self) -> None:
-        # ASD will export Angstroms just as happily as nanometres.
         angstroms = _asd_table().replace("obs_wl_air(nm)", "obs_wl_air(A)")
 
         with pytest.raises(NistParseError, match="wavelength"):
@@ -528,8 +474,6 @@ class TestTheParserFailsLoudly:
             parse_nist_asd(headerless)
 
     def test_an_export_without_the_optional_level_labels_still_parses(self) -> None:
-        # ASD's "Lines" query can be asked for transition data without level
-        # configurations. The label is documentation, so its absence is not an error.
         minimal = _asd_table().replace("conf_k", "spare_a").replace("term_k", "spare_b")
 
         assert parse_nist_asd(minimal)[0].upper_level == "1"

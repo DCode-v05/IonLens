@@ -86,9 +86,6 @@ class TestPlasmaStateConstruction:
     def test_field_lookup_names_what_is_present_when_asked_for_something_absent(
         self, grid: SpatialGrid, params: PlasmaParams
     ) -> None:
-        # A forward model asking for a field the solver did not emit is a wiring error,
-        # and "KeyError: 'n_metastable'" does not say whether the solver is wrong or the
-        # instrument is.
         state = PlasmaState(
             params=params,
             grid=grid,
@@ -120,8 +117,6 @@ class TestPlasmaStateConstruction:
     def test_rejects_a_field_whose_dimensionality_is_wrong(
         self, grid: SpatialGrid, params: PlasmaParams
     ) -> None:
-        # A potential in metres type-checks perfectly and is nonsense. Catching it here
-        # is the difference between a loud constructor and a silent 10^19 in a spectrum.
         wrong = _fields(grid)
         wrong["Phi"] = ScalarField(
             name="Phi", values=np.ones(grid.n_points), units="m", grid=grid, time=None
@@ -159,8 +154,6 @@ class TestPlasmaStateConstruction:
     def test_rejects_a_field_keyed_under_a_different_name(
         self, grid: SpatialGrid, params: PlasmaParams
     ) -> None:
-        # The mapping key and the field's own name must agree, or every error message
-        # and every artifact group name downstream refers to the wrong quantity.
         mislabelled = _fields(grid)
         mislabelled["n_e"] = ScalarField(
             name="n_i", values=np.ones(grid.n_points), units="m**-3", grid=grid, time=None
@@ -181,9 +174,6 @@ class TestPlasmaStateFidelityInvariants:
     def test_a_kinetic_state_must_carry_its_distribution(
         self, grid: SpatialGrid, params: PlasmaParams
     ) -> None:
-        # doc 03 §1 calls L2 "the only level that produces a correct IEDF"; producing an
-        # L2 state without one means the run cannot answer the question it was launched
-        # to answer, and finding that out at the likelihood is far too late.
         with pytest.raises(ValueError, match="distribution"):
             PlasmaState(
                 params=params,
@@ -197,9 +187,6 @@ class TestPlasmaStateFidelityInvariants:
     def test_a_fluid_state_may_omit_the_distribution(
         self, grid: SpatialGrid, params: PlasmaParams
     ) -> None:
-        # doc 03 §6: L1 reconstructs a drifting Maxwellian from its moments, and doc 03
-        # calls that a genuine weakness. The state records the absence honestly instead
-        # of manufacturing a distribution the solver never computed.
         state = PlasmaState(
             params=params,
             grid=grid,
@@ -331,9 +318,6 @@ class TestPlasmaStateImmutability:
     def test_field_names_are_reported_in_a_deterministic_order(
         self, grid: SpatialGrid, params: PlasmaParams
     ) -> None:
-        # doc 00 E3 promises bit-for-bit reproducibility. Anything that iterates fields
-        # and reduces over them — a hash, an artifact write, a diff — must see the same
-        # order in every process, not whatever order the solver happened to insert.
         state = PlasmaState(
             params=params,
             grid=grid,

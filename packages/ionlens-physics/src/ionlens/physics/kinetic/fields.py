@@ -38,12 +38,8 @@ from ionlens.physics.kinetic.grid import UniformGrid
 
 __all__ = ["deposit_cic", "gather_cic", "solve_poisson_dirichlet"]
 
-#: Vacuum permittivity in F/m, from CODATA via ionlens.core.constants.
 _EPS0: float = float(magnitude_in(VACUUM_PERMITTIVITY, "F/m"))
 
-#: Relative slack on the domain-bounds check. Purely a floating-point allowance — a particle
-#: pushed exactly onto the wall can land a few ulps outside it — and deliberately far tighter
-#: than a cell, so a genuinely escaped particle is still caught.
 _BOUNDS_TOLERANCE: float = 1e-9
 
 
@@ -181,8 +177,6 @@ def solve_poisson_dirichlet(
         return jnp.array([left_v, right_v], dtype=jnp.float64)
 
     dz2 = grid.dz_m**2
-    # -eps0 (phi[i-1] - 2 phi[i] + phi[i+1]) / dz^2 = rho[i], written as a positive-definite
-    # system in the interior unknowns with the boundary values folded into the right side.
     diagonal = jnp.full(n_interior, 2.0 * _EPS0 / dz2, dtype=jnp.float64)
     off = jnp.full(n_interior, -_EPS0 / dz2, dtype=jnp.float64)
     lower = off.at[0].set(0.0)

@@ -43,18 +43,8 @@ __all__ = [
     "weighted_l2_error",
 ]
 
-#: doc 07 §2.3: "Design order ± 0.1 is required." Not a parameter with a convenient
-#: default — the default *is* the specification. doc 03 §7 relaxes V-02 to ±0.15, which
-#: a caller asks for explicitly so that the looser gate is visible at its call site.
 DEFAULT_ORDER_TOLERANCE: Final[float] = 0.1
 
-#: A refinement step is treated as stalled when halving ``h`` fails to reduce the error
-#: by at least this factor.
-#:
-#: A genuinely converging first-order solver gains a factor of two per halving, so this
-#: threshold catches "barely moved" without accusing a legitimately slow method. It is
-#: intentionally generous: a false stall costs one wasted refinement level, while a
-#: missed stall costs a bug hunt in code that is correct.
 STALL_RATIO: Final[float] = 1.1
 
 
@@ -168,8 +158,6 @@ def observed_order(levels: list[RefinementLevel]) -> ConvergenceResult:
         float(np.log(a.error / b.error) / np.log(a.h / b.h)) for a, b in pairwise(ordered)
     )
 
-    # A step is stalled when halving h barely moved the error. Once stalled, the finer
-    # levels stay stalled: the floor does not lift on further refinement.
     stalled_index: int | None = None
     for index, (a, b) in enumerate(pairwise(ordered)):
         if a.error / b.error < STALL_RATIO:

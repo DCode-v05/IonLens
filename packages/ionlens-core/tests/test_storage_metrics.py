@@ -71,8 +71,6 @@ class TestMetricsRoundTrip:
     def test_values_survive_bit_for_bit(
         self, tmp_path: Path, metrics: tuple[MetricRecord, ...], provenance: Provenance
     ) -> None:
-        # A regression gate compares this run's number against a historical band. A
-        # storage layer that rounded would inject a spurious drift of its own.
         write_metrics(tmp_path / "m.parquet", metrics, provenance=provenance)
         recovered = read_metrics(tmp_path / "m.parquet").metrics
 
@@ -98,8 +96,6 @@ class TestMetricsRoundTrip:
     def test_a_run_that_produced_no_metrics_still_carries_its_provenance(
         self, tmp_path: Path, provenance: Provenance
     ) -> None:
-        # A zero-row table has no rows to carry the provenance columns, so the file-level
-        # metadata is what makes doc 08 §7's "every artifact embeds ..." true of it too.
         write_metrics(tmp_path / "m.parquet", (), provenance=provenance)
 
         archived = read_metrics(tmp_path / "m.parquet")
@@ -112,8 +108,6 @@ class TestTheRegressionStoreSchema:
     def test_every_row_names_the_commit_it_was_measured_at(
         self, tmp_path: Path, metrics: tuple[MetricRecord, ...], provenance: Provenance
     ) -> None:
-        # doc 07 §7: "every metric is stored per commit". As a column, so that a query
-        # across fifty runs does not have to open and parse fifty file headers.
         write_metrics(tmp_path / "m.parquet", metrics, provenance=provenance)
 
         table = pq.read_table(tmp_path / "m.parquet")
@@ -123,8 +117,6 @@ class TestTheRegressionStoreSchema:
     def test_every_row_carries_the_tier_and_the_manifest_digest(
         self, tmp_path: Path, metrics: tuple[MetricRecord, ...], provenance: Provenance
     ) -> None:
-        # doc 05 §7.2 makes comparing a T1 number against a T2 band a project defect, and
-        # a table that cannot distinguish them invites exactly that comparison.
         write_metrics(tmp_path / "m.parquet", metrics, provenance=provenance)
 
         table = pq.read_table(tmp_path / "m.parquet")
@@ -135,8 +127,6 @@ class TestTheRegressionStoreSchema:
     def test_metrics_from_two_commits_concatenate_into_one_queryable_table(
         self, tmp_path: Path, metrics: tuple[MetricRecord, ...], provenance: Provenance
     ) -> None:
-        # This is what "queryable across runs" means in practice, and it only works if
-        # every run writes the identical schema.
         later = _record(git_commit="ff" + "0" * 38)
         write_metrics(tmp_path / "a.parquet", metrics, provenance=provenance)
         write_metrics(tmp_path / "b.parquet", metrics, provenance=later)
@@ -152,8 +142,6 @@ class TestTheRegressionStoreSchema:
     def test_a_dirty_tree_is_recorded_as_a_boolean_column(
         self, tmp_path: Path, metrics: tuple[MetricRecord, ...]
     ) -> None:
-        # doc 13 §2 fails a release run on a dirty tree. Filtering the regression store to
-        # clean runs has to be a predicate, not a string comparison.
         write_metrics(tmp_path / "m.parquet", metrics, provenance=_record(git_dirty=True))
 
         table = pq.read_table(tmp_path / "m.parquet")
@@ -163,9 +151,6 @@ class TestTheRegressionStoreSchema:
 
 class TestMetricsRefuseWhatCannotBeGated:
     def test_a_non_finite_metric_is_refused_at_construction(self) -> None:
-        # nan compares false against every noise band, so it passes the doc 07 §7 gate
-        # without ever being inside it. That is the silent physics regression doc 07 §7
-        # exists to catch, arriving through the store meant to catch it.
         with pytest.raises(ValueError, match="finite"):
             MetricRecord(name="rel_error", value=math.nan, units="dimensionless")
 
@@ -180,8 +165,6 @@ class TestMetricsRefuseWhatCannotBeGated:
     def test_two_values_for_one_metric_name_are_refused(
         self, tmp_path: Path, provenance: Provenance
     ) -> None:
-        # A regression check that silently picks one of two values for the same metric is
-        # a build that passes or fails on row order.
         duplicated = (
             MetricRecord(name="rel_error", value=0.07, units="dimensionless"),
             MetricRecord(name="rel_error", value=0.09, units="dimensionless"),

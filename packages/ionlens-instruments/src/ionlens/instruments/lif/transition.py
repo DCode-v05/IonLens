@@ -43,8 +43,6 @@ from ionlens.core.units import Q_, Quantity, ScalarQuantity, magnitude_in
 
 __all__ = ["Level", "ProbeTransition"]
 
-#: CODATA constants unwrapped once, at import (doc 08 §5: quantities at boundaries, bare
-#: floats in the arithmetic). Doc 09 §2.5 forbids typing either of these by hand.
 _H_J_S: float = float(magnitude_in(PLANCK, "J*s"))
 _C_M_PER_S: float = float(magnitude_in(SPEED_OF_LIGHT, "m/s"))
 
@@ -81,9 +79,6 @@ class Level:
         low = abs(self.orbital - self.spin)
         high = self.orbital + self.spin
         if not (low <= self.j <= high) or not _is_integer(high - self.j):
-            # A term symbol mistyped in the registry produces a level that no vector
-            # addition of L and S can reach. It would still yield a finite Lande g and a
-            # finite Zeeman pattern, so nothing downstream would object.
             raise ValueError(
                 f"L = {self.orbital} and S = {self.spin} cannot couple to J = {self.j}; "
                 f"the reachable values are {low} to {high} in integer steps"
@@ -175,7 +170,6 @@ class ProbeTransition:
             pump_branching=float(entries.value_in("LIF.pump_branching_ratio", "dimensionless")),
         )
 
-    # ── derived quantities ──────────────────────────────────────────────────────
 
     @property
     def pump_frequency(self) -> ScalarQuantity:
@@ -235,7 +229,6 @@ class ProbeTransition:
             "W/m**2",
         )
 
-    # ── SI magnitudes for hot loops (doc 08 §5) ─────────────────────────────────
 
     @property
     def pump_wavelength_m(self) -> float:
@@ -257,7 +250,6 @@ class ProbeTransition:
     def saturation_intensity_w_per_m2(self) -> float:
         return float(magnitude_in(self.saturation_intensity, "W/m**2"))
 
-    # ── sweeps (doc 09 §1: a DESIGN parameter is a variable, not a constant) ─────
 
     def with_pump_wavelength(self, wavelength: Quantity) -> ProbeTransition:
         """The same transition at a different pump wavelength."""

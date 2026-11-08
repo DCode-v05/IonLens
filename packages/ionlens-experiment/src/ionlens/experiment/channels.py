@@ -256,55 +256,16 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: Channel names — the same strings the instruments stamp on their own observables, so an
-#: ablation table, a doc 08 §7 artifact group and a fusion exclusion list cannot end up
-#: calling one channel by two names.
-#:
-#: LIF exports its identifier publicly and it is imported. OES's equivalent is private
-#: (``ionlens.instruments.oes.instrument._DEFAULT_INSTRUMENT_ID``), so it is duplicated here
-#: and the duplicate is pinned by ``test_the_channel_names_match_what_the_instruments_stamp``
-#: — a checked copy rather than a reach into another package's privates.
 OES_CHANNEL: Final[str] = "oes"
 LIF_CHANNEL: Final[str] = LIF_INSTRUMENT_ID
 
-#: Frequency steps in the LIF scan. doc 02 §10.1 budgets "~200 for a full IVDF"; odd so
-#: that one sample sits exactly on line centre, which is where the drift is read off.
 _LIF_SCAN_POINTS: Final[int] = 201
 
-#: Half-widths of the assumed drifting Maxwellian that the velocity axis and the frequency
-#: scan are both sized to reach.
-#:
-#: Six. The Gaussian tail beyond 6 sigma is 2e-9 of the population, five orders of
-#: magnitude below :data:`~ionlens.instruments.lif.scan.TRUNCATION_TOLERANCE`, so a scan sized
-#: this way is not clipping any part of the distribution the instrument would have to
-#: report as truncated.
 _DISTRIBUTION_HALF_WIDTH_SIGMAS: Final[float] = 6.0
 
-#: Samples per line width on the reconstructed velocity axis.
-#:
-#: :data:`~ionlens.instruments.lif.scan.MIN_SAMPLES_PER_HOMOGENEOUS_WIDTH` is 1.0 and that
-#: module's own docstring calls one sample per full width "already marginal — the
-#: trapezoid error on a Lorentzian sampled that coarsely is tens of percent". Four is the
-#: smallest multiple of it that puts the quadrature error below the 5 % scale uncertainty
-#: the LIF likelihood divides by, and the axis length scales inversely with it: at RP-1's
-#: 35 km/s of drift range this is ~3500 velocity points per state, and every trial theta
-#: in a MAP search rebuilds them.
 _VELOCITY_SAMPLES_PER_WIDTH: Final[float] = 4.0
 
-#: Length of the LIF acquisition window, in upper-state radiative relaxation times.
-#:
-#: :mod:`ionlens.instruments.lif.scan` takes the upper level to have reached its steady state
-#: within the gate and states the failure directly: the relaxation time is 32 ns, "a 2 ns
-#: gate samples the transient, and the steady-state model over-predicts the signal there by
-#: up to ``1 - exp(-t/tau)``, a factor of 16". Ten relaxation times leaves that error at
-#: ``exp(-10)`` = 5e-5, which is four orders of magnitude below the doc 06 §4 systematics,
-#: so the steady-state model this channel is built on is actually valid at this gate.
-#: There is no registered LIF gate width to read instead; doc 02 LIF-D1 gives only a >= 2 ns
-#: minimum, which is the value that would be wrong.
 _LIF_GATE_RELAXATION_TIMES: Final[float] = 10.0
-
-
-# ── doc 03 §6's assumed distribution, made explicit ─────────────────────────────
 
 
 def _velocity_axis(*, drift: FloatArray, sigma: float, homogeneous_width: float) -> FloatArray:
@@ -417,9 +378,6 @@ def reconstruct_ivdf(
         ),
         fidelity=state.fidelity,
     )
-
-
-# ── the LIF channel, as something the closed loop can hand an L0 state ──────────
 
 
 class _LifOnReconstructedIvdf:
@@ -742,13 +700,6 @@ def _lif_acquisition_window(registry: ParameterRegistry) -> AcquisitionWindow:
     )
 
 
-# ── the assembled set ───────────────────────────────────────────────────────────
-
-
-#: Every channel this module assembles, in the fixed order a fusion detail and an ablation
-#: table both report them in. Named once so :meth:`ChannelSet.observe`, :meth:`ChannelSet.
-#: joint` and its missing-observation guard cannot drift into three different ideas of what
-#: "the channel set" is.
 CHANNEL_NAMES: Final[tuple[str, ...]] = (
     OES_CHANNEL,
     LIF_CHANNEL,
@@ -980,10 +931,6 @@ def build_channels(
             sheath-edge distribution to the wall through the reconstructed field, and doc
             06 §4 makes that propagation's error a budgeted term rather than a silent one.
     """
-    # Imported here, not at module scope: the closed loop is expected to import *this*
-    # module once the fusion is wired in, and a module-level import in both directions is
-    # a cycle. Deferring the direction that is only needed at call time keeps this module
-    # importable from there.
     from ionlens.experiment.closed_loop import (
         _acquisition_window,
         _calibration_set,
@@ -1046,10 +993,6 @@ def build_channels(
         imperfect_calibration=imperfect_calibration,
         z_index=thomson_z_index,
     )
-    # The two campaign-level switches Thomson's own builder does not own: doc 01 IF-6's
-    # positional half of the gate (see _ThomsonOutsideTheSheath) and whether this campaign
-    # scores calibration coherently. Both are properties of the run rather than of the
-    # channel, which is why they are bound here alongside every other channel's.
     thomson = replace(
         thomson,
         inversion=_ThomsonOutsideTheSheath(

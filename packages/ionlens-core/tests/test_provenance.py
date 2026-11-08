@@ -37,7 +37,6 @@ from ionlens.core.provenance import (
     manifest_sha256,
 )
 
-# Stand-in digests. Real ones come from `manifest_sha256`; these only need the shape.
 _MANIFEST_DIGEST = "4a7f2e91" + "0" * 56
 _LOCK_DIGEST = "e81c" + "f" * 60
 
@@ -93,8 +92,6 @@ def committed_repo(tmp_path: Path) -> Path:
 
 class TestTier:
     def test_the_labels_are_the_ones_reports_and_figures_carry(self) -> None:
-        # doc 05 §7.2 and doc 13 §3.2: the tier label is rendered onto every accuracy
-        # figure, so the enum's values are the label text, not an internal code.
         assert (Tier.T0.value, Tier.T1.value, Tier.T2.value) == ("T0", "T1", "T2")
 
     def test_a_tier_is_a_string_so_it_can_be_stored_as_an_hdf5_attribute(self) -> None:
@@ -102,17 +99,12 @@ class TestTier:
         assert str(Tier.T2) == "T2"
 
     def test_an_unrecognised_label_is_rejected(self) -> None:
-        # doc 05 §7.2 calls reporting T1 as if it were T2 a project defect. A tier that
-        # parses loosely is the first step towards exactly that.
         with pytest.raises(ValueError, match="T3"):
             Tier("T3")
 
 
 class TestManifestSha256:
     def test_key_order_does_not_change_the_hash(self) -> None:
-        # Two manifests that differ only in how a YAML loader happened to order the keys
-        # are the same experiment, and must be recognised as a rerun rather than a
-        # new run.
         assert manifest_sha256({"seed": 1, "tier": "T2"}) == manifest_sha256(
             {"tier": "T2", "seed": 1}
         )
@@ -126,28 +118,19 @@ class TestManifestSha256:
         assert manifest_sha256({"seed": 1}) != manifest_sha256({"seed": 2})
 
     def test_a_one_ulp_float_difference_changes_the_hash(self) -> None:
-        # doc 00 E3 promises bit-for-bit reproducibility. A hash that rounded before
-        # digesting would let two runs that genuinely diverged claim one identity.
         nudged = math.nextafter(1.0, math.inf)
 
         assert manifest_sha256({"Te": 1.0}) != manifest_sha256({"Te": nudged})
 
     def test_list_order_changes_the_hash(self) -> None:
-        # Unlike mapping keys, sequence order is meaningful: doc 08 §6 lists instruments
-        # in the order they are applied.
         assert manifest_sha256({"channels": ["oes", "lif"]}) != manifest_sha256(
             {"channels": ["lif", "oes"]}
         )
 
     def test_a_boolean_does_not_hash_like_its_integer_value(self) -> None:
-        # `seal_truth: true` and `seal_truth: 1` are not the same manifest, even though
-        # Python considers True == 1.
         assert manifest_sha256({"seal_truth": True}) != manifest_sha256({"seal_truth": 1})
 
     def test_the_digest_is_sha256_over_the_canonical_json_encoding(self) -> None:
-        # Pins the canonical form itself, not merely self-consistency: sorted keys, no
-        # whitespace, UTF-8. Without this, a later change of separators would silently
-        # renumber every archived run.
         payload: ManifestValue = {"b": 1, "a": {"d": [1, 2], "c": True}}
         canonical = b'{"a":{"c":true,"d":[1,2]},"b":1}'
 
@@ -160,16 +143,11 @@ class TestManifestSha256:
         assert digest == digest.lower()
 
     def test_a_non_finite_float_is_rejected(self) -> None:
-        # JSON has no spelling for nan, and the non-standard one Python emits by default
-        # cannot be re-read by another tool — so the archive would hold a hash nobody
-        # else could reproduce.
         with pytest.raises(ValueError, match=r"nan|inf|finite"):
             manifest_sha256({"Te": float("nan")})
 
     def test_a_value_json_cannot_represent_is_rejected_by_name(self) -> None:
         with pytest.raises(TypeError, match="datetime"):
-            # Deliberately invalid: the point is that the *runtime* check rejects it
-            # by name, which a caller reaching it through untyped YAML would need.
             manifest_sha256({"created": datetime(2026, 8, 4, tzinfo=UTC)})  # type: ignore[dict-item]
 
 
@@ -179,7 +157,7 @@ class TestGitState:
         commit, dirty = git_state(committed_repo)
 
         assert len(commit) == 40
-        assert int(commit, 16) >= 0  # a full hexadecimal object name
+        assert int(commit, 16) >= 0
         assert dirty is False
 
     @_NEEDS_GIT
@@ -192,8 +170,6 @@ class TestGitState:
 
     @_NEEDS_GIT
     def test_an_untracked_file_also_counts_as_dirty(self, committed_repo: Path) -> None:
-        # An untracked module can be imported by the run and will not exist for anyone
-        # else, so it is exactly as unreproducible as an uncommitted edit.
         (committed_repo / "stray_module.py").write_text("x = 1\n")
 
         _, dirty = git_state(committed_repo)
@@ -223,9 +199,6 @@ class TestGitState:
     def test_an_absent_git_binary_is_unknown_and_assumed_dirty(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # Claiming a clean tree that could not be verified is the failure mode that
-        # matters: doc 13 §2 makes `git_dirty: false` the thing that lets a run into the
-        # release archive.
         empty = tmp_path / "no-tools"
         empty.mkdir()
         monkeypatch.setenv("PATH", str(empty))
@@ -235,9 +208,6 @@ class TestGitState:
     def test_a_commit_whose_cleanliness_cannot_be_established_is_assumed_dirty(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # The half-failure: HEAD resolves but the status call does not. Reached only by
-        # stubbing, and worth pinning anyway — it is the branch that decides whether an
-        # unverified tree can reach the doc 13 §2 release gate.
         known = "9c1d8b3" + "0" * 33
         answers = iter([known, None])
         monkeypatch.setattr(provenance, "_git_output", lambda *_args: next(answers))
@@ -246,8 +216,6 @@ class TestGitState:
 
     @_NEEDS_GIT
     def test_discovers_the_surrounding_checkout_when_given_no_root(self) -> None:
-        # The production path: `Provenance.capture()` is normally called without a root,
-        # from a working directory that may be anywhere under the repository.
         if not (_REPO_ROOT / ".git").exists():
             pytest.skip("not running from a git checkout")
 
@@ -255,8 +223,6 @@ class TestGitState:
 
     @_NEEDS_GIT
     def test_the_real_repository_reports_a_full_commit_sha(self) -> None:
-        # The one test that exercises the real path. It asserts what this checkout
-        # guarantees about itself and nothing about whether it happens to be clean.
         if not (_REPO_ROOT / ".git").exists():
             pytest.skip("not running from a git checkout")
 
@@ -287,17 +253,12 @@ class TestEnvironmentLockHash:
         assert before != after
 
     def test_falls_back_to_the_installed_distributions_and_says_so(self, tmp_path: Path) -> None:
-        # A weaker guarantee than a resolved lock — it pins versions but not the
-        # resolution that produced them — so the record must let a reader tell which
-        # one they are holding.
         digest, source = environment_lock_hash(tmp_path)
 
         assert source is EnvironmentLockSource.INSTALLED_DISTRIBUTIONS
         assert len(digest) == 64
 
     def test_the_fallback_is_stable_within_one_environment(self, tmp_path: Path) -> None:
-        # Distribution scan order is filesystem-dependent; unsorted, the same
-        # environment would hash differently on consecutive runs.
         assert environment_lock_hash(tmp_path) == environment_lock_hash(tmp_path)
 
     def test_discovers_the_surrounding_checkout_when_given_no_root(self) -> None:
@@ -335,8 +296,6 @@ class TestCapture:
         assert before <= record.created_utc <= datetime.now(UTC)
 
     def test_created_utc_is_timezone_aware_and_in_utc(self, tmp_path: Path) -> None:
-        # A naive timestamp in an archive is unorderable against one written in another
-        # timezone, which is the whole point of recording it.
         record = Provenance.capture(
             manifest_sha256=_MANIFEST_DIGEST,
             seed=1,
@@ -387,8 +346,6 @@ class TestRecordIsImmutable:
             record.tier = Tier.T2  # type: ignore[misc]
 
     def test_carries_no_instance_dict(self) -> None:
-        # `slots=True`: a typo'd attribute must fail rather than attach itself to a
-        # record that is about to be written into an archive.
         assert not hasattr(_record(), "__dict__")
 
     def test_solver_versions_cannot_be_mutated_through_the_record(self) -> None:
@@ -404,7 +361,6 @@ class TestRecordIsImmutable:
         assert _record() != _record(solver_versions={"petsc": "3.21"})
 
     def test_is_hashable_despite_carrying_a_mapping(self) -> None:
-        # Provenance records are used as dictionary keys when grouping artifacts by run.
         assert len({_record(), _record()}) == 1
 
     def test_equal_records_hash_equally(self) -> None:
@@ -413,8 +369,6 @@ class TestRecordIsImmutable:
 
 class TestRecordValidation:
     def test_rejects_a_manifest_hash_that_is_not_a_sha256_digest(self) -> None:
-        # Catches the plausible mistake of storing the manifest's path or a truncated
-        # display hash, which would be indistinguishable from a real one in an archive.
         with pytest.raises(ValueError, match="manifest_sha256"):
             _record(manifest_sha256="experiments/b02.yaml")
 
@@ -435,8 +389,6 @@ class TestRecordValidation:
         assert record.created_utc.utcoffset() == timedelta(0)
 
     def test_rejects_a_negative_seed(self) -> None:
-        # A seed is an index into a generator's state, not a signed quantity; numpy
-        # rejects it far downstream, where the failure costs a whole run.
         with pytest.raises(ValueError, match="seed"):
             _record(seed=-1)
 
@@ -463,12 +415,9 @@ class TestRoundTrip:
         keys = set(_record().to_dict())
 
         assert documented <= keys
-        # The single deliberate addition to doc 08 §7: how strong the lock hash is.
         assert keys - documented == {"environment_lock_source"}
 
     def test_to_dict_yields_only_types_a_yaml_sidecar_can_hold(self) -> None:
-        # These land in HDF5 attributes and YAML sidecars (doc 08 §7), neither of which
-        # can store an enum member or a datetime object.
         for key, value in _record().to_dict().items():
             assert isinstance(value, str | bool | int | dict), key
             assert not isinstance(value, Tier | EnvironmentLockSource), key
@@ -499,9 +448,6 @@ class TestRoundTrip:
         ],
     )
     def test_from_dict_rejects_a_field_of_the_wrong_type(self, key: str, value: object) -> None:
-        # A record that has been through YAML may have been hand-edited on the way, and
-        # `git_dirty: "false"` is truthy — the one silent misreading that would let an
-        # unreproducible run past the doc 13 §2 gate.
         wrong = _record().to_dict() | {key: value}
 
         with pytest.raises(TypeError, match=key):

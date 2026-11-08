@@ -37,8 +37,6 @@ class TestTheUniformGrid:
         assert grid.dz_m == pytest.approx(2e-5)
 
     def test_there_is_one_more_node_than_cell(self) -> None:
-        # Fields live on nodes, charge is deposited to nodes, and the two Dirichlet
-        # boundaries are nodes. Off-by-one here is the classic PIC indexing bug.
         grid = _grid(n_cells=100)
 
         assert grid.n_nodes == 101
@@ -70,8 +68,6 @@ class TestChargeDeposition:
 
     @pytest.mark.physics
     def test_a_particle_midway_between_nodes_splits_evenly(self) -> None:
-        # The defining property of cloud-in-cell: linear weighting, so a particle halfway
-        # between two nodes contributes half to each.
         grid = _grid(n_cells=10)
 
         density = deposit_cic(grid, positions_m=jnp.array([0.35]), weights=jnp.array([1.0]))
@@ -90,9 +86,6 @@ class TestChargeDeposition:
 
     @pytest.mark.physics
     def test_total_charge_is_conserved_by_deposition(self) -> None:
-        # The integral of the deposited density over the domain must equal the summed
-        # particle weight, for any placement. A deposition that leaks charge silently
-        # rescales the whole Poisson solve.
         grid = _grid(length=0.02, n_cells=64)
         rng = np.random.default_rng(20260805)
         positions = jnp.asarray(rng.uniform(0.0, 0.02, size=5000))
@@ -100,23 +93,12 @@ class TestChargeDeposition:
 
         density = deposit_cic(grid, positions_m=positions, weights=weights)
 
-        # The exact CIC identity is sum(density) * dz, not the trapezoidal rule. CIC
-        # distributes each particle's weight between two nodes, so summing the nodes
-        # recovers the total exactly; the trapezoidal rule would half-weight the two end
-        # nodes and lose about a cell's worth. This holds to zero relative error, and
-        # asserting it exactly is what makes it a conservation test rather than a
-        # tolerance test.
         assert float(jnp.sum(density)) * grid.dz_m == pytest.approx(
             float(jnp.sum(weights)), rel=1e-14
         )
 
     @pytest.mark.physics
     def test_the_boundary_nodes_hold_half_the_interior_density(self) -> None:
-        # Not a defect: an end node owns half a cell, so a uniform plasma deposits half as
-        # much onto it. It is pinned here because it looks like a wall depletion layer to
-        # anyone plotting the density, and because it is the reason the Poisson solve reads
-        # only interior nodes — the boundary values are imposed Dirichlet potentials, so
-        # the artifact never enters the field.
         grid = _grid(length=0.02, n_cells=64)
         rng = np.random.default_rng(20260805)
         positions = jnp.asarray(rng.uniform(0.0, 0.02, size=200000))
@@ -128,9 +110,6 @@ class TestChargeDeposition:
         assert float(density[-1]) == pytest.approx(0.5 * interior_mean, rel=0.05)
 
     def test_particles_outside_the_domain_are_refused(self) -> None:
-        # Silently clamping an escaped particle would quietly create charge at the wall,
-        # which is exactly where this project measures. Boundary handling is the caller's
-        # job and must happen before deposition.
         grid = _grid()
 
         with pytest.raises(ValueError, match="outside"):
@@ -146,9 +125,6 @@ class TestChargeDeposition:
 class TestThePoissonSolve:
     @pytest.mark.physics
     def test_it_reproduces_a_quadratic_potential_from_a_uniform_charge_exactly(self) -> None:
-        # -eps0 d2Phi/dz2 = rho with constant rho has a parabolic solution. A second-order
-        # centred difference is EXACT on a parabola, so this must agree to machine
-        # precision, not merely to tolerance. Anything less means the stencil is wrong.
         from ionlens.core.constants import VACUUM_PERMITTIVITY
         from ionlens.core.units import magnitude_in
 
@@ -165,8 +141,6 @@ class TestThePoissonSolve:
 
     @pytest.mark.physics
     def test_it_honours_both_dirichlet_boundary_values(self) -> None:
-        # The wall bias enters here and nowhere else. If the boundary is not applied
-        # exactly, every sheath potential in the project is offset.
         grid = _grid(length=0.02, n_cells=50)
 
         phi = solve_poisson_dirichlet(grid, jnp.zeros(grid.n_nodes), left_v=-250.0, right_v=0.0)
@@ -185,8 +159,6 @@ class TestThePoissonSolve:
 
     @pytest.mark.physics
     def test_it_converges_at_second_order_on_a_non_polynomial_source(self) -> None:
-        # The parabola test above cannot detect a first-order stencil, because a parabola
-        # is in the space either way. A sinusoidal source can.
         from ionlens.core.constants import VACUUM_PERMITTIVITY
         from ionlens.core.units import magnitude_in
         from ionlens.validation.convergence import (
@@ -240,12 +212,6 @@ class TestFieldGather:
 
     @pytest.mark.physics
     def test_gather_is_the_transpose_of_deposit(self) -> None:
-        # This is the momentum-conservation requirement of doc 03 §4.2 step 3, stated as
-        # the linear-algebra identity it actually is: if S is the deposition matrix, the
-        # gather must be S^T. Then the self-force vanishes identically.
-        #
-        # Checked as <gather(F), w> == <F, deposit(w)> * dz for arbitrary F and w, which
-        # holds iff the two use the same weights.
         grid = _grid(length=0.02, n_cells=32)
         rng = np.random.default_rng(7)
         positions = jnp.asarray(rng.uniform(0.0, 0.02, size=200))

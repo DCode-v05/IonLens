@@ -50,10 +50,8 @@ __all__ = [
     "IonEnergyFlux",
 ]
 
-#: Units of ``Gamma_E``, doc 01 §1.1.
 _ENERGY_FLUX_UNITS = "W/m**2"
 
-#: Units of ``Gamma_i``, doc 01 §1.2.
 _PARTICLE_FLUX_UNITS = "1/(m**2*s)"
 
 
@@ -62,8 +60,6 @@ def _frozen_flux(values: NDArray[np.float64], *, name: str) -> NDArray[np.float6
     array = np.array(values, dtype=np.float64, copy=True)
 
     if not np.all(np.isfinite(array)):
-        # An infinite flux is an arithmetic failure, not a large one. Whatever produced
-        # it is wrong, and every aggregate taken afterwards inherits the error silently.
         raise ValueError(f"{name} must be finite; found nan or inf")
 
     array.flags.writeable = False
@@ -242,7 +238,6 @@ class IonEnergyFlux:
     time: TimeGrid | None = None
 
     def __post_init__(self) -> None:
-        # Dimensionality assertion only: any position in the domain is reachable.
         magnitude_in(self.position, "m")
 
         object.__setattr__(
@@ -260,9 +255,6 @@ class IonEnergyFlux:
             self.energy_flux_toward_wall_watt_per_m2.shape
             != self.particle_flux_toward_wall_per_m2_s.shape
         ):
-            # The two are moments of one distribution over one weight. Different shapes
-            # means they came from different states, and their ratio — <E_i>, the
-            # headline number — would be meaningless.
             raise ValueError(
                 f"Gamma_E and Gamma_i must have the same shape; got "
                 f"{self.energy_flux_toward_wall_watt_per_m2.shape} and "
@@ -276,7 +268,6 @@ class IonEnergyFlux:
                 f"{expected}: the position is fixed, so a flux is indexed by time alone"
             )
 
-    # ── the two factors of doc 01 §1.2 ──────────────────────────────────────────
 
     @property
     def energy_flux(self) -> Quantity:
@@ -301,8 +292,6 @@ class IonEnergyFlux:
         """
         numerator = self.energy_flux_toward_wall_watt_per_m2
         denominator = self.particle_flux_toward_wall_per_m2_s
-        # ``where=`` rather than a post-hoc mask: numpy would otherwise emit a divide
-        # warning, and the test configuration turns warnings into errors.
         return np.divide(
             numerator,
             denominator,
@@ -315,7 +304,6 @@ class IonEnergyFlux:
         """``<E_i>`` as a dimensional quantity."""
         return Q_(self.mean_impact_energy_joules, "J")
 
-    # ── views ───────────────────────────────────────────────────────────────────
 
     @property
     def is_toward_wall(self) -> bool:

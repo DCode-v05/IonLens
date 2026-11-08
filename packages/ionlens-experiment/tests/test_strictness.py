@@ -56,8 +56,6 @@ class TestTheBlockReader:
             parse.number("3.0", where="plasma.kappa")
 
     def test_a_string_list_given_a_bare_string_is_refused(self) -> None:
-        # A bare string is a sequence, and accepting one would silently read
-        # `enabled_sources: N1` as thirteen single-character source names.
         with pytest.raises(TypeError, match="list"):
             parse.strings("N1", where="noise.enabled_sources")
 
@@ -291,8 +289,6 @@ class TestTheRemainingRefusals:
     def test_a_t2_manifest_whose_forward_block_states_no_mesh_at_all_is_accepted(
         self, documented_document: dict[str, Any]
     ) -> None:
-        # Two absent meshes are not "the same mesh": neither run has stated one, so there
-        # is nothing yet for doc 05 §7.1 to require a mismatch between.
         del documented_document["forward"]["mesh"]
         del documented_document["inverse"]["mesh"]
         assert manifest_from_document(documented_document).experiment.tier is Tier.T2
@@ -341,10 +337,6 @@ class TestTheRemainingRefusals:
     def test_a_binary_parquet_column_is_read_as_text_rather_than_as_a_repr(
         self, tmp_path: Path
     ) -> None:
-        # pyarrow hands back `bytes` for a binary column while h5py decodes its own byte
-        # attributes to `str`. Without normalisation the same value stored in the two
-        # backends would digest apart, which is what doc 08 §7's one-format-per-artifact
-        # table would otherwise cost the comparison.
         import pyarrow as pa
         import pyarrow.parquet as pq
 

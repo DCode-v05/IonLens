@@ -35,7 +35,6 @@ class TestADiagonalMatrixWithKnownEntries:
     standard basis. Chosen so every one of doc 00 S5's three verdicts appears once."""
 
     def _classify(self):
-        # Relative curvatures against the largest (1e6): 1e-8, 1e-3, 1.
         fisher = np.diag([1.0e-2, 1.0e3, 1.0e6])
         return classify_identifiability(fisher, ["a", "b", "c"])
 
@@ -81,10 +80,6 @@ class TestADiagonalMatrixWithKnownEntries:
         assert [d.eigenvalue for d in result.identifiable] == pytest.approx([1.0e6])
 
     def test_cramer_rao_bound_matches_the_diagonal_by_hand(self) -> None:
-        # 1e-2's relative curvature (1e-8) is below WEAK_IDENTIFIABILITY_FLOOR, so its
-        # bound is reported as infinite rather than as the finite-but-meaningless
-        # 1/sqrt(1e-2) numpy's inverse would silently produce — the same discipline
-        # laplace.py applies to the posterior covariance itself.
         fisher = np.diag([1.0e-2, 1.0e3, 1.0e6])
 
         bound = cramer_rao_bound(fisher)
@@ -125,9 +120,6 @@ class TestARankDeficientMatrixWithAnExactlyKnownNullVector:
         assert abs(float(np.dot(weakest.eigenvector, null))) == pytest.approx(1.0, abs=1e-6)
 
     def test_the_cramer_rao_bound_is_infinite_in_both_coordinates(self) -> None:
-        # The null direction has a nonzero component along *both* axes here (the null
-        # vector is (-0.8, 0.6)), so the singular direction contaminates the bound for
-        # every coordinate that touches it, not just one.
         fisher, _measured, _null = self._fisher_and_directions()
 
         bound = cramer_rao_bound(fisher)
@@ -143,8 +135,8 @@ class TestTheDoc05Section62AnchorDegeneracy:
     to have exactly that structure."""
 
     def _classify(self):
-        well_constrained = _unit([1.0, 0.5])  # log n_0 + 0.5 log T_e
-        orthogonal = _unit([0.5, -1.0])  # the complementary, poorly constrained combination
+        well_constrained = _unit([1.0, 0.5])
+        orthogonal = _unit([0.5, -1.0])
         fisher = 1.0e6 * np.outer(well_constrained, well_constrained) + 10.0 * np.outer(
             orthogonal, orthogonal
         )
@@ -187,12 +179,7 @@ class TestPriorCurvatureDoesNotMasqueradeAsIdentifiability:
     def _matrices(self) -> tuple[np.ndarray, np.ndarray]:
         measured_combination = _unit([1.0, 1.0])
         unmeasured_combination = _unit([1.0, -1.0])
-        # The data constrain only one combination; the orthogonal one has exactly zero
-        # data curvature.
         fisher_data = 1.0e6 * np.outer(measured_combination, measured_combination)
-        # The prior is informative *only* along the direction the data cannot see —
-        # e.g. doc 05 §2.1's 1 % wall-bias prior sitting on an otherwise-flat likelihood
-        # direction.
         prior_hessian = 1.0e4 * np.outer(unmeasured_combination, unmeasured_combination)
         return fisher_data, prior_hessian
 
@@ -200,9 +187,6 @@ class TestPriorCurvatureDoesNotMasqueradeAsIdentifiability:
         fisher_data, prior_hessian = self._matrices()
         posterior_hessian = fisher_data + prior_hessian
 
-        # This is the mistake the task warns against, demonstrated: taken naively, both
-        # directions clear the identifiable floor because the prior supplied the
-        # missing curvature, not the data.
         result = classify_identifiability(posterior_hessian, ["x", "y"])
 
         assert all(d.verdict is IdentifiabilityVerdict.IDENTIFIABLE for d in result.directions)
@@ -234,7 +218,6 @@ class TestPriorCurvatureDoesNotMasqueradeAsIdentifiability:
 
 class TestCramerRaoComparison:
     def test_an_efficient_estimator_has_efficiency_one(self) -> None:
-        # achieved_std built to equal the bound exactly, by construction.
         fisher = np.diag([100.0, 400.0])
         achieved_std = 1.0 / np.sqrt(np.diag(fisher))
 
@@ -245,7 +228,7 @@ class TestCramerRaoComparison:
     def test_a_wider_than_necessary_posterior_has_efficiency_below_one(self) -> None:
         fisher = np.diag([100.0, 400.0])
         bound = 1.0 / np.sqrt(np.diag(fisher))
-        achieved_std = 2.0 * bound  # twice as wide as the data alone would demand
+        achieved_std = 2.0 * bound
 
         comparison = compare_to_cramer_rao_bound(fisher, achieved_std, ["a", "b"])
 
@@ -280,6 +263,4 @@ class TestInputValidation:
 
 class TestTheThresholdsAreNamedAndOrdered:
     def test_the_strong_floor_is_stricter_than_the_weak_floor(self) -> None:
-        # Structural: doc 00 S5's three-way partition requires this ordering to make
-        # sense as a partition at all.
         assert WEAK_IDENTIFIABILITY_FLOOR < STRONG_IDENTIFIABILITY_FLOOR

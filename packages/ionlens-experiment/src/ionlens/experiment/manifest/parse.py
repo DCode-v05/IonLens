@@ -55,15 +55,10 @@ __all__ = [
     "text",
 ]
 
-#: Similarity threshold for the "did you mean" hint. Matches the registry loader's, so a
-#: user who has learned what a near-miss suggestion looks like in one place recognises it
-#: in the other.
 _SUGGESTION_CUTOFF: Final[float] = 0.6
 
-#: More than a handful of suggestions stops being a hint.
 _MAX_SUGGESTIONS: Final[int] = 3
 
-#: The two keys doc 08 §6 writes a dimensional quantity with.
 VALUE_KEY: Final[str] = "value"
 UNITS_KEY: Final[str] = "units"
 

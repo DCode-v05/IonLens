@@ -36,8 +36,6 @@ class TestSpatialGridConstruction:
         np.testing.assert_allclose(magnitude_in(grid.z, "mm"), [0.0, 5.0, 10.0, 15.0, 20.0])
 
     def test_geometric_refines_toward_the_wall(self) -> None:
-        # doc 03 §3.4: lambda_D at the wall is the controlling scale, so a uniform mesh
-        # wastes ~90% of its cells. The first cell must be the smallest.
         grid = SpatialGrid.geometric(length=Q_(20.0, "mm"), n_points=64, stretch=1.05)
 
         dz = grid.dz_m
@@ -51,7 +49,6 @@ class TestSpatialGridConstruction:
         assert magnitude_in(grid.z, "mm")[-1] == pytest.approx(20.0)
 
     def test_geometric_with_unit_stretch_is_uniform(self) -> None:
-        # The degenerate case must not divide by zero.
         graded = SpatialGrid.geometric(length=Q_(10.0, "mm"), n_points=11, stretch=1.0)
         uniform = SpatialGrid.uniform(length=Q_(10.0, "mm"), n_points=11)
 
@@ -72,8 +69,6 @@ class TestSpatialGridInvariants:
             SpatialGrid.from_quantity(Q_(np.array([0.0]), "mm"))
 
     def test_rejects_coordinates_behind_the_wall(self) -> None:
-        # doc 02 §2: the wall is at z = 0 and z is positive into the plasma. A negative
-        # coordinate is inside the electrode.
         with pytest.raises(ValueError, match="behind the wall"):
             SpatialGrid.from_quantity(Q_(np.array([-1.0, 0.0, 1.0]), "mm"))
 
@@ -88,9 +83,6 @@ class TestSpatialGridInvariants:
 
 class TestSpatialGridImmutability:
     def test_the_underlying_array_cannot_be_written(self) -> None:
-        # A frozen dataclass stops attribute rebinding, not array mutation. Without the
-        # write lock a caller could silently move the mesh under a solver that had
-        # already cached its spacings.
         grid = SpatialGrid.uniform(length=Q_(1.0, "mm"), n_points=4)
 
         with pytest.raises(ValueError, match="read-only"):
@@ -129,8 +121,6 @@ class TestSpatialGridDerivedQuantities:
         assert magnitude_in(grid.length, "mm") == pytest.approx(20.0)
 
     def test_reports_the_smallest_cell(self) -> None:
-        # The stability constraints of doc 03 §4.3 are checked against the *smallest*
-        # cell, not the mean; a mean-based check passes a mesh that is locally illegal.
         grid = SpatialGrid.geometric(length=Q_(20.0, "mm"), n_points=64, stretch=1.05)
 
         assert magnitude_in(grid.min_dz, "m") == pytest.approx(grid.dz_m.min())
@@ -165,8 +155,6 @@ class TestTimeGrid:
             TimeGrid.from_quantity(Q_(np.array([0.0, 2.0, 1.0]), "ns"))
 
     def test_allows_negative_times(self) -> None:
-        # Unlike z, t = 0 carries no privileged meaning: a pre-trigger baseline window
-        # is a legitimate acquisition (doc 02 §10.2).
         grid = TimeGrid.from_quantity(Q_(np.array([-5.0, 0.0, 5.0]), "ns"))
 
         np.testing.assert_allclose(magnitude_in(grid.t, "ns"), [-5.0, 0.0, 5.0])
@@ -180,7 +168,6 @@ class TestTimeGrid:
 
 class TestPhaseGrid:
     def test_divides_the_rf_period_into_bins(self) -> None:
-        # doc 02 §10.3: N_phi = 16 bins of 4.6 ns each over the 73.7 ns RF period.
         grid = PhaseGrid(n_bins=16, period=Q_(73.7, "ns"))
 
         assert grid.n_bins == 16
@@ -196,9 +183,6 @@ class TestPhaseGrid:
 
         assert grid.bin_index(0.0) == 0
         assert grid.bin_index(2 * np.pi - 1e-12) == 3
-        # Cyclo-stationarity (doc 02 §10.3) means phase is periodic: a phase one full
-        # cycle on lands in the same bin, and an accumulation that got this wrong would
-        # smear the phase-resolved result it exists to produce.
         assert grid.bin_index(2 * np.pi + 0.1) == grid.bin_index(0.1)
         assert grid.bin_index(-0.1) == 3
 

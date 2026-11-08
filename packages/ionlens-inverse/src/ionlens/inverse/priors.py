@@ -97,18 +97,9 @@ __all__ = [
 
 _REGISTRY: Final = default_registry()
 
-#: Relative tolerance for comparing a prior's support with its parameter's.
-#:
-#: Both come from the same registry entry by different routes, so they agree exactly
-#: unless one of them was recomputed — but `2 * pi` reached by two paths need not be the
-#: same float, and rejecting a prior for that would be absurd. A few ulp, no more.
 _SUPPORT_RTOL: Final[float] = 1e-12
 
-#: ``log(2π)``, the Gaussian normalisation. Structure, not measurement.
 _LOG_TWO_PI: Final[float] = math.log(TWO_PI)
-
-
-# ─── the prior interface ─────────────────────────────────────────────────────────
 
 
 @runtime_checkable
@@ -276,9 +267,6 @@ class LogNormalPrior:
         _check_positive("median", self.median)
         _check_positive("log_sigma", self.log_sigma)
 
-    # `median` is a field rather than a property here — it is the parameterisation, so
-    # there is nothing to derive. That satisfies the `Prior` protocol's read-only
-    # `median` member directly, which is the point of parameterising by the median.
 
     @property
     def support(self) -> tuple[float, float]:
@@ -337,9 +325,6 @@ class TruncatedNormalPrior:
         """``log(Φ(β) - Φ(alpha))`` — how much of the parent normal survives truncation."""
         alpha = (self.low - self.mean) / self.sigma
         beta = (self.high - self.mean) / self.sigma
-        # Work from the tail that is *smaller*, so the `log1p(-exp(delta))` below is a
-        # correction rather than a catastrophic cancellation. Mirroring for alpha > 0 uses
-        # the symmetry Phi(b) - Phi(a) = Phi(-a) - Phi(-b).
         if alpha > 0.0:
             large, small = float(log_ndtr(-alpha)), float(log_ndtr(-beta))
         else:
@@ -352,9 +337,6 @@ class TruncatedNormalPrior:
         z = (value - self.mean) / self.sigma
         parent = -0.5 * z * z - math.log(self.sigma) - 0.5 * _LOG_TWO_PI
         return parent - self.log_retained_mass
-
-
-# ─── the joint prior on theta_c ──────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -456,9 +438,6 @@ class ControlPrior:
         for spec, prior, value in zip(CONTROL_PARAMETERS, self.marginals, vector, strict=True):
             total += prior.log_prob(spec.transform.to_constrained(float(value)))
             if total == -math.inf:
-                # Short-circuit before the Jacobian: at |u| = inf the Jacobian is also
-                # -inf, and -inf + -inf is fine, but -inf + (+inf) is nan and a nan
-                # objective silently poisons an L-BFGS-B line search.
                 return -math.inf
 
         return total + log_abs_det_jacobian(vector)
@@ -551,9 +530,6 @@ def _relative_uncertainty(entry_id: str) -> float:
             f"'informative — supply-measured, sigma = 1 %' to be well posed"
         )
     return uncertainty.value
-
-
-# ─── doc 05 §4.2 — the explicit physics priors ───────────────────────────────────
 
 
 def _paired(

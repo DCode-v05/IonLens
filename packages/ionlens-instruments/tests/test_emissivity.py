@@ -78,9 +78,6 @@ def test_emissivity_rejects_a_negative_population() -> None:
         line_emissivity(upper_density_per_m3=-1.0, a_ul_per_s=1e7, wavelength_nm=500.0)
 
 
-# ── the spectrum ────────────────────────────────────────────────────────────────
-
-
 @pytest.mark.physics
 def test_the_spectrum_carries_one_entry_per_radiative_channel(
     grid: EnergyGrid, system: LevelSystem
@@ -139,9 +136,6 @@ def test_photon_and_energy_emissivity_differ_by_the_photon_energy(
         assert line.photon_emissivity_per_m3_s_sr == pytest.approx(
             line.emissivity_w_per_m3_sr / photon_energy_j
         )
-
-
-# ── the chord ───────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.physics

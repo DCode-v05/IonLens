@@ -59,35 +59,14 @@ __all__ = [
     "SamplerDiagnostics",
 ]
 
-#: Largest permitted potential-scale-reduction factor — gate G-V3, doc 07 §6.
-#:
-#: The comparison is strict, because doc 07 §6 and test V-44 both write "R-hat < 1.01".
 GATE_MAX_R_HAT: Final[float] = 1.01
 
-#: Smallest permitted effective sample size, *per parameter* — gate G-V3, doc 07 §6.
-#:
-#: Also strict: doc 07 §6 and V-44 write "ESS > 400". ADR-005 writes ">= 400" for the
-#: same quantity; the acceptance gate is authoritative and the strict reading is the
-#: one that cannot let a marginal run through.
 GATE_MIN_ESS: Final[float] = 400.0
 
-#: Permitted divergent transitions — gate G-V3, doc 07 §6, which requires zero.
-#:
-#: A divergence means the sampler failed to explore a region of the posterior, so the
-#: samples are biased in a direction nobody can bound. There is no "acceptable few".
 GATE_MAX_DIVERGENCES: Final[int] = 0
 
-#: The credible level every gate and report is stated at.
-#:
-#: doc 00 S4 makes "the empirical coverage of the 95 % credible interval" a pass/fail
-#: criterion, gate G-V4 requires it in [0.93, 0.97], and doc 06 §8's reporting standard
-#: prints it. One named constant, so the default interval and the gate that checks it
-#: cannot drift apart.
 DEFAULT_CREDIBLE_LEVEL: Final[float] = 0.95
 
-#: Quantities that are functions of the samples rather than samples themselves, keyed by
-#: name. Doc 05 §10 requires ``Gamma_E(z, t)``, ``Gamma_i``, ``<E_i>`` and the wall IEDF
-#: in every emitted posterior. Each array's first two axes are ``(chain, draw)``.
 DerivedQuantities: TypeAlias = Mapping[str, NDArray[np.float64]]
 
 
@@ -156,9 +135,6 @@ def _frozen_array(values: NDArray[np.float64], *, name: str) -> NDArray[np.float
     array = np.array(values, dtype=np.float64, copy=True)
 
     if not np.all(np.isfinite(array)):
-        # A non-finite sample is a sampler bug, not a wide posterior: the stored
-        # position of a chain is always finite, and a nan here would silently poison
-        # every mean and quantile computed from it.
         raise ValueError(f"{name} must be finite; found nan or inf")
 
     array.flags.writeable = False
@@ -199,9 +175,6 @@ class SamplerDiagnostics:
             module does not invent an acceptance threshold the specification omits.
     """
 
-    # Excluded from the hash, not from equality. ``MappingProxyType`` is unhashable, and
-    # dropping the mappings from equality too would make two diagnostics that disagree
-    # about every parameter compare equal — which is worse than a weak hash.
     r_hat: Mapping[str, float] = field(hash=False)
     ess: Mapping[str, float] = field(hash=False)
     divergences: int
@@ -211,8 +184,6 @@ class SamplerDiagnostics:
         if set(self.r_hat) != set(self.ess):
             missing_ess = sorted(set(self.r_hat) - set(self.ess))
             missing_r_hat = sorted(set(self.ess) - set(self.r_hat))
-            # G-V3 is stated *per parameter*. A parameter with only half its diagnostics
-            # would be gated on the half that happened to be present.
             raise ValueError(
                 "every parameter needs both an r_hat and an ess; "
                 f"missing ess for {missing_ess}, missing r_hat for {missing_r_hat}"
@@ -397,9 +368,6 @@ class Posterior:
 
         named = set(self.names)
         if set(self.levels) != named:
-            # Doc 05 §10 requires the theta_c / theta_n / theta_f split in the emitted
-            # artifact, so a parameter with no level is a parameter that cannot be
-            # written out correctly.
             raise ValueError(
                 f"levels must name exactly the sampled parameters; "
                 f"missing {sorted(named - set(self.levels))}, "
@@ -426,9 +394,6 @@ class Posterior:
 
         for name, values in self.derived.items():
             if name in self.names:
-                # A derived quantity is a function of the samples, not one of them.
-                # Sharing a name would make every lookup ambiguous and would let a
-                # reader mistake a computed profile for something the sampler visited.
                 raise ValueError(f"derived quantity {name!r} would shadow a sampled parameter")
 
             array = _frozen_array(values, name=f"derived[{name!r}]")
@@ -441,7 +406,6 @@ class Posterior:
 
         return MappingProxyType(frozen)
 
-    # ── shape ───────────────────────────────────────────────────────────────────
 
     @property
     def n_chains(self) -> int:
@@ -465,7 +429,6 @@ class Posterior:
     def derived_names(self) -> tuple[str, ...]:
         return tuple(sorted(self.derived))
 
-    # ── named access ────────────────────────────────────────────────────────────
 
     def level_of(self, name: str) -> ParameterLevel:
         """Which doc 05 §2 level ``name`` belongs to."""
@@ -503,7 +466,6 @@ class Posterior:
             f"quantity {self.derived_names}"
         )
 
-    # ── summaries ───────────────────────────────────────────────────────────────
 
     def mean(self, name: str) -> NDArray[np.float64]:
         """Posterior mean of a sampled parameter or derived quantity.
@@ -550,7 +512,6 @@ class Posterior:
             level=level,
         )
 
-    # ── ESS-aware thinning (ADR-005) ────────────────────────────────────────────
 
     def _retained(self, stride: int) -> int:
         """Total draws left after keeping every ``stride``-th draw of every chain."""
@@ -577,7 +538,6 @@ class Posterior:
         """
         self._require_headroom(min_ess)
 
-        # ``_retained`` is non-increasing in the stride, so a bisection is exact.
         required = math.floor(min_ess) + 1
         low, high, best = 1, self.n_draws, 1
         while low <= high:
@@ -646,7 +606,6 @@ class Posterior:
                 f"(doc 07 §6, gate G-V3) rather than thinning."
             )
 
-    # ── derivation ──────────────────────────────────────────────────────────────
 
     def with_diagnostics(self, diagnostics: SamplerDiagnostics) -> Self:
         """Replace the diagnostics, keeping the samples.

@@ -56,33 +56,18 @@ from ionlens.validation.sealed import Tier
 
 _SEED = 0
 
-#: Whether ``dolfinx`` (FEniCSx) is importable here. The L1 inversion needs it; see
-#: ``test_closed_loop.py``'s ``_DOLFINX_AVAILABLE`` for the same gate and the same reason.
 _DOLFINX_AVAILABLE = importlib.util.find_spec("dolfinx") is not None
 
-#: Whether JAX is importable here. The L2 truth solver needs it — ``ionlens.physics.kinetic.
-#: precision`` turns x64 on at import and calls float32 a correctness bug, not a slower
-#: answer — and the FEniCSx machine does not have it. The two gates are deliberately
-#: symmetric: no environment on this project has both, which is the fact the whole
-#: file-based split exists to accommodate.
 _JAX_AVAILABLE = importlib.util.find_spec("jax") is not None
 
 _NEEDS_JAX = pytest.mark.skipif(not _JAX_AVAILABLE, reason="requires JAX (the L2 solver)")
 
-#: Scalars carried by the stand-in truth. Arbitrary, and never asserted against anything
-#: physical: what they exercise is that a float survives the trip through the npz.
 _STUB_GAMMA_E_W_PER_M2 = 9331.69
 _STUB_MEAN_ENERGY_EV = 250.0
 _STUB_THICKNESS_M = 1.0e-3
 _STUB_ENERGY_DRIFT = 1.0e-6
 _STUB_WALL_CLOCK_S = 3600.0
 
-#: The verification-scale settings this experiment is required to reuse, copied from
-#: ``packages/ionlens-physics/tests/test_kinetic_solver.py``'s ``_sheath_solver``. Duplicated
-#: rather than imported because that file is a test module in another package and is not
-#: importable from here — which is exactly why it needs pinning: a silent drift between the
-#: configuration doc 03 §7's gates were measured at and the configuration this experiment's
-#: truth was solved at would make the truth's error budget unattributable.
 _VERIFICATION_SCALE = {
     "n_ppc": 400.0,
     "cells_per_debye": 1.0,
@@ -115,8 +100,6 @@ class TestTheL2Configuration:
         assert solver.capacity_factor == _VERIFICATION_SCALE["capacity_factor"]
 
     def test_the_named_constants_are_the_verification_scale_ones(self) -> None:
-        # The module must not merely happen to construct a solver with these numbers; the
-        # constants are what a reader checks against doc 03 §7's own suite.
         assert _VERIFICATION_SCALE["n_ppc"] == L2_N_PPC
         assert _VERIFICATION_SCALE["cells_per_debye"] == L2_CELLS_PER_DEBYE
         assert _VERIFICATION_SCALE["transits"] == L2_TRANSITS
@@ -124,9 +107,6 @@ class TestTheL2Configuration:
         assert _VERIFICATION_SCALE["capacity_factor"] == L2_CAPACITY_FACTOR
 
     def test_the_domain_is_the_one_setting_that_differs_from_the_verification_suite(self) -> None:
-        # doc 03 §7's own gates run at 1.2 sheaths, which is a *shorter* domain than the
-        # closed loop's fixed observation grid. This is the single deliberate departure and
-        # it is required by the next test, not chosen for taste.
         assert L2_DOMAIN_SHEATHS > 1.2
         assert l2_truth_solver().domain_sheaths == L2_DOMAIN_SHEATHS
 
@@ -139,8 +119,6 @@ class TestTheL2Configuration:
     def test_the_domain_length_is_the_child_langmuir_thickness_times_the_sheath_count(
         self,
     ) -> None:
-        # Pinned against the analytic thickness the PIC's own planner uses to size its
-        # grid, so this module cannot drift into a second idea of "one sheath".
         params = _truth_params()
         thickness = float(magnitude_in(AnalyticSheathSolver().thickness(params), "m"))
 
@@ -165,9 +143,6 @@ class TestTheVelocityAxisResolvesTheLifLine:
         assert self._spacing_m_per_s() <= width * MIN_SAMPLES_PER_HOMOGENEOUS_WIDTH
 
     def test_the_spacing_carries_the_declared_factor_of_two_of_margin(self) -> None:
-        # Two samples per homogeneous width, not one: the module docstring states this as
-        # the compromise between the guard and the PIC histogram's shot noise, and a
-        # constant that drifted back to the bare guard would leave that claim false.
         width = _homogeneous_width_m_per_s(default_registry())
 
         assert self._spacing_m_per_s() <= 0.5 * width
@@ -188,7 +163,6 @@ class TestTheDomainGuardFiresBeforeAnHourOfPic:
     def test_a_domain_shorter_than_the_observation_grid_is_refused(self) -> None:
         params = _truth_params()
         grid = observation_grid()
-        # One sheath thickness is ~0.95 mm against the grid's 2.28 mm: genuinely short.
         short = l2_truth_solver(domain_sheaths=1.0)
 
         with pytest.raises(DomainTooShortError, match="observation grid"):
@@ -228,7 +202,6 @@ def _synthetic_truth() -> L2Truth:
             grid=grid,
             time=None,
             fields=fields,
-            # An L2 state must carry a distribution — PlasmaState enforces it.
             ion_distribution=state.ion_distribution,
             fidelity=Fidelity.L2,
         ),
@@ -275,9 +248,6 @@ class TestTheTruthArtefactRoundTrip:
         }
 
     def test_the_observable_fields_are_the_only_physics_that_travels(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        # Everything under `field_values` must be a field an instrument reads off a state.
-        # A control parameter smuggled in as a "field" would reach the inversion machine
-        # wearing an observable's clothes.
         path = save_l2_truth(self._synthetic(), tmp_path / "truth.npz")
 
         with np.load(path, allow_pickle=False) as handle:
@@ -311,9 +281,6 @@ class TestTheTruthArtefactRoundTrip:
         )
 
     def test_loading_refuses_a_grid_that_is_not_the_fixed_observation_grid(self, tmp_path) -> None:  # type: ignore[no-untyped-def]
-        # The whole discipline of closed_loop's fixed grid is that every state is read at
-        # the same physical positions. A truth file carrying a different z array would
-        # silently reintroduce the aliasing that module's docstring documents at length.
         truth = self._synthetic()
         path = tmp_path / "truth.npz"
         save_l2_truth(truth, path)
@@ -329,8 +296,6 @@ class TestTheTruthArtefactRoundTrip:
 
 class TestTheTierIsCertifiedRatherThanLabelled:
     def test_the_experiments_tier_comes_from_tier_of_configuration(self) -> None:
-        # doc 05 §7.1: mismatched physics level, noise, and the *estimated* calibration.
-        # This module must not hand-label T2; `tier_of_configuration` decides.
         assert L2_TO_L1_TIER is Tier.T2
 
 

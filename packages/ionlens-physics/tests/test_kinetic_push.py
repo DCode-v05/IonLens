@@ -47,19 +47,14 @@ class TestTheStabilityConstraints:
     error rather than a warning'. Implemented exactly that way."""
 
     def test_the_debye_length_matches_the_closed_form(self) -> None:
-        # doc 01 §2.1's RP-1: n_e = 1e17 m^-3, T_e = 3 eV -> lambda_D = 40.7 um, and
-        # doc 03 §4.3 sets dz = lambda_D/2 = 20 um from it.
         lambda_d = debye_length_m(density_m3=1e17, electron_temperature_ev=3.0)
 
         assert lambda_d == pytest.approx(4.07e-5, rel=2e-2)
 
     @pytest.mark.physics
     def test_a_cell_wider_than_a_debye_length_is_a_runtime_error(self) -> None:
-        # The constraint whose violation causes numerical grid heating: the plasma warms
-        # with no physics doing it, until the Debye length grows to match the cell. It is
-        # a runtime error because the run that violates it still produces output.
         lambda_d = debye_length_m(density_m3=1e17, electron_temperature_ev=3.0)
-        grid = UniformGrid(length_m=0.02, n_cells=100)  # dz = 200 um >> lambda_D
+        grid = UniformGrid(length_m=0.02, n_cells=100)
 
         with pytest.raises(StabilityViolationError, match="Debye"):
             check_stability(
@@ -74,7 +69,6 @@ class TestTheStabilityConstraints:
 
     @pytest.mark.physics
     def test_a_timestep_that_underresolves_the_plasma_frequency_is_refused(self) -> None:
-        # dt <= 0.2 / omega_pe. At RP-1 omega_pe = 1.78e10 /s, so dt <= 11.2 ps.
         grid = UniformGrid(length_m=0.02, n_cells=1000)
 
         with pytest.raises(StabilityViolationError, match="plasma frequency"):
@@ -89,8 +83,6 @@ class TestTheStabilityConstraints:
 
     @pytest.mark.physics
     def test_a_timestep_violating_the_cfl_condition_is_refused(self) -> None:
-        # dt <= dz / v_max: no particle may cross more than one cell in a step, or the
-        # deposition skips cells and the field it feels is not the field it moved through.
         grid = UniformGrid(length_m=0.02, n_cells=1000)
 
         with pytest.raises(StabilityViolationError, match="CFL"):
@@ -117,9 +109,6 @@ class TestTheStabilityConstraints:
             )
 
     def test_the_rp1_configuration_of_doc_03_section_4_4_passes(self) -> None:
-        # The configuration the document specifies must satisfy the constraints the same
-        # document sets. If it does not, one of the two is wrong and it is worth knowing
-        # before a 65 800-step run.
         grid = UniformGrid(length_m=0.02, n_cells=1000)
 
         check_stability(
@@ -144,9 +133,6 @@ class TestTheStabilityConstraints:
                 v_max_m_per_s=1e6,
             )
 
-        # Content, not formatting: the reader of a failed ensemble point is usually not the
-        # person who configured it, so the message has to carry the offending value, the
-        # bound it broke, the consequence, and the fix.
         message = str(excinfo.value)
         assert "2.000e-04" in message, "the offending cell width"
         assert "4.072e-05" in message, "the Debye length it exceeded"
@@ -157,10 +143,8 @@ class TestTheStabilityConstraints:
 class TestTheLeapfrogPushInAFrozenField:
     @pytest.mark.physics
     def test_a_constant_field_produces_exact_uniform_acceleration(self) -> None:
-        # Leapfrog is exact for constant acceleration in velocity, and exact in position
-        # too when the half-step offset is honoured. Any deviation here is a wrong q/m.
         species = _electrons(1)
-        field = -1000.0  # V/m
+        field = -1000.0
         dt = 1e-12
         z = jnp.array([0.01])
         v = jnp.zeros((1, 3))
@@ -178,9 +162,6 @@ class TestTheLeapfrogPushInAFrozenField:
 
     @pytest.mark.physics
     def test_an_electron_accelerates_towards_positive_potential(self) -> None:
-        # Sign discipline, checked explicitly. E = -dPhi/dz, and a negative charge in a
-        # field pointing in -z moves in +z. Getting this backwards inverts the sheath and
-        # every flux the project reports, while still looking like a plasma.
         species = _electrons(1)
         _, v1 = push_leapfrog(
             species,
@@ -194,9 +175,6 @@ class TestTheLeapfrogPushInAFrozenField:
 
     @pytest.mark.physics
     def test_the_transverse_velocities_are_untouched_by_the_field(self) -> None:
-        # 1D3V electrostatic: the field has only a z component, so v_x and v_y change only
-        # through collisions. They are carried because LIF measures a projected velocity
-        # and Thomson the full electron distribution (doc 03 §4.1).
         species = _electrons(1)
         v = jnp.array([[1e5, -2e5, 0.0]])
 

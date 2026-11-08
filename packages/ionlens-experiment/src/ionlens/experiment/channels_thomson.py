@@ -92,10 +92,6 @@ __all__ = [
     "thomson_calibration_set",
 ]
 
-#: Channel name — bound to the identifier the instrument itself stamps on its output
-#: (`ThomsonInstrument.instrument_id` defaults to this), so an ablation table, a doc 08 §7
-#: artifact group and a fusion exclusion list cannot end up calling this channel by two
-#: different names. Mirrors `LIF_CHANNEL`'s binding to `LIF_INSTRUMENT_ID` in `channels.py`.
 THOMSON_CHANNEL: Final[str] = THOMSON_INSTRUMENT_ID
 
 

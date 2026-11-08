@@ -563,8 +563,6 @@ class TestTheBiasFindingIsRobustButItsMagnitudeIsNot:
 
     @pytest.mark.physics
     def test_the_druyvesteyn_bias_exceeds_the_maxwellian_one_in_every_window(self) -> None:
-        # The defensible claim, and the only one the comparative figure may make
-        # unqualified.
         for window in self._WINDOWS:
             maxwellian = self._error(MAXWELLIAN_KAPPA, window)
             druyvesteyn = self._error(DRUYVESTEYN_KAPPA, window)
@@ -572,8 +570,6 @@ class TestTheBiasFindingIsRobustButItsMagnitudeIsNot:
 
     @pytest.mark.physics
     def test_the_magnitude_swings_by_several_fold_across_defensible_windows(self) -> None:
-        # Deliberately asserts that the number is NOT stable, so that anyone tempted to
-        # quote a single probe error has to come here and read why they must not.
         errors = [self._error(DRUYVESTEYN_KAPPA, window) for window in self._WINDOWS]
 
         assert max(errors) / min(errors) > 3.0, (

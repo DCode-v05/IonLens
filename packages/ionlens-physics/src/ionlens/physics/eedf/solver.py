@@ -139,12 +139,6 @@ __all__ = [
 
 FloatArray: TypeAlias = NDArray[np.float64]
 
-# ── constants ───────────────────────────────────────────────────────────────────
-#
-# Unwrapped from ionlens.core.constants exactly once, here. doc 00 C1 forbids a numeric
-# literal with physical meaning anywhere in physics code; doc 08 §5 puts bare arrays in
-# hot loops and quantities at module boundaries. Both hold if the unwrapping happens at
-# import and nowhere else.
 
 _REGISTRY: Final = default_registry()
 
@@ -152,68 +146,32 @@ _E_C: Final[float] = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _M_E_KG: Final[float] = float(magnitude_in(ELECTRON_MASS, "kg"))
 _K_B_J_PER_K: Final[float] = float(magnitude_in(BOLTZMANN, "J/K"))
 
-#: ``gamma = sqrt(2 e / m_e)``, in m s^-1 eV^-1/2 — the speed of a 1 eV electron divided by
-#: ``sqrt(1 eV)``. Every integral in this module carries it, because energies are in eV and
-#: speeds in m/s and this is the conversion between them.
 GAMMA: Final[float] = float(np.sqrt(2.0 * _E_C / _M_E_KG))
 
-#: One townsend in SI, from the unit :mod:`ionlens.core.units` defines for exactly this
-#: purpose. Read from the registry rather than written as ``1e-21`` so that the definition
-#: lives in one place.
 TOWNSEND_V_M2: Final[float] = float(magnitude_in(Q_(1.0, "Td"), "V * m**2"))
 
-#: The neutral temperature of reference point RP-1 (doc 01 §2.1), as an energy. The gas
-#: temperature is what the EEDF relaxes to at vanishing field, so a default of zero would
-#: make the ``E/N -> 0`` limit unphysical rather than merely approximate.
 ROOM_TEMPERATURE_EV: Final[float] = _K_B_J_PER_K * float(_REGISTRY.value_in("RP1.T_g", "K")) / _E_C
 
-#: Convergence criterion: the change in ``f0`` between successive iterations, measured in
-#: the same ``integral . sqrt(eps) deps`` norm the distribution is normalised in. Both
-#: iterates are normalised, so this is a fraction of the population that moved.
 DEFAULT_RELATIVE_TOLERANCE: Final[float] = 1e-10
 
-#: Iteration budget. Generous: a solve that needs many is a solve whose grid or operating
-#: point is unusual, and failing it early would hide that behind a convergence error.
 DEFAULT_MAX_ITERATIONS: Final[int] = 400
 
-#: Population fraction allowed in the top tenth of the energy grid before
-#: :attr:`EedfSolution.is_grid_long_enough` reports the grid as too short. The upper
-#: boundary condition is zero flux at ``eps_max``; if an appreciable population is still
-#: there, that condition is fiction and every moment inherits the error.
 GRID_TRUNCATION_TOLERANCE: Final[float] = 1e-6
 
-#: Fraction of the grid, measured from the top, that the truncation check looks at.
 _TRUNCATION_WINDOW: Final[float] = 0.1
 
-#: Initial shift for the inverse iteration, in units of the inverse of the fastest
-#: collisional rate in the problem. Purely algorithmic: it changes how many iterations are
-#: needed and never the converged answer, which is the fixed point of an equation the shift
-#: does not appear in. Measured over 1 to 1e10 on the elastic, ionising and thermalised
-#: cases, the converged mean energy is identical to every digit printed and only the
-#: iteration count moves; 1e4 is near the middle of the flat region for all three.
 _INITIAL_SHIFT: Final[float] = 1e4
 
-#: Factor the shift grows by each accepted iteration. Larger shifts separate the dominant
-#: eigenvector faster; the growth stops when the linear system starts losing positivity.
 _SHIFT_GROWTH: Final[float] = 4.0
 
-#: Factor the shift shrinks by when an iterate comes back non-positive, which is how an
-#: over-large shift announces that the linear system has become too ill-conditioned.
 _SHIFT_REDUCTION: Final[float] = 8.0
 
-#: Largest total growth of the shift, relative to its initial value.
 _MAX_SHIFT_GROWTH: Final[float] = 1e14
 
-#: Negative values below this fraction of the peak are round-off in the far tail of a
-#: distribution spanning hundreds of decades, and are clipped. Anything larger is a real
-#: loss of positivity and reduces the shift instead.
 _NEGATIVITY_TOLERANCE: Final[float] = 1e-10
 
-#: Mean energy of the default initial guess, in eV. Only a starting point; the converged
-#: answer does not depend on it, and :meth:`TwoTermSolver.solve` takes an explicit one.
 _INITIAL_MEAN_ENERGY_EV: Final[float] = 1.5
 
-#: Electrons produced per ionisation event, counting the scattered one.
 _ELECTRONS_PER_IONISATION: Final[int] = 2
 
 
@@ -236,17 +194,9 @@ class IonisationSharing(StrEnum):
     than inheriting whatever the default was.
     """
 
-    #: The scattered electron keeps all of ``eps - u``; the ejected electron appears at
-    #: zero energy. The usual default, and exact in the limit of a strongly forward-peaked
-    #: ionisation differential cross section near threshold.
     ONE_TAKES_ALL = "one_takes_all"
 
-    #: Both electrons leave with ``(eps - u)/2``. The opposite extreme, and the one that
-    #: brackets the first: any real sharing distribution lies between them.
     EQUAL_SHARING = "equal_sharing"
-
-
-# ── the assembled operator ──────────────────────────────────────────────────────
 
 
 def _flux_coefficients(
@@ -264,8 +214,6 @@ def _flux_coefficients(
     z = np.clip(z, None, np.log(np.finfo(np.float64).max))
 
     negligible = np.abs(z) < np.sqrt(np.finfo(np.float64).eps)
-    # Where z is negligible the scheme degenerates to a centred difference, F = D (f_(j-1)
-    # - f_j)/h. The 1.0 keeps the division defined at the points that branch takes.
     lower = np.where(negligible, 1.0, -np.expm1(-z))
     upper = np.where(negligible, 1.0, -np.expm1(z))
     centred = diffusion / spacing
@@ -345,7 +293,6 @@ class EedfSolution:
             self, "rate_coefficients", MappingProxyType(dict(self.rate_coefficients))
         )
 
-    # ── derived transport quantities ────────────────────────────────────────────
 
     @property
     def effective_temperature_ev(self) -> float:
@@ -390,7 +337,6 @@ class EedfSolution:
             }
         )
 
-    # ── the distribution itself ─────────────────────────────────────────────────
 
     @property
     def energy_distribution(self) -> FloatArray:
@@ -483,7 +429,6 @@ class TwoTermSolver:
     def grid(self) -> EnergyGrid:
         return self.kinetics.grid
 
-    # ── operator assembly ───────────────────────────────────────────────────────
 
     def _elastic_operator(self, reduced_field_si: float) -> FloatArray:
         """The tridiagonal part: elastic drag, field heating and thermal diffusion.
@@ -523,9 +468,6 @@ class TwoTermSolver:
         n_cells = grid.n_cells
         operator = np.zeros((n_cells, n_cells), dtype=np.float64)
         index = np.arange(n_cells - 1)
-        # dP_j/dt = -(F_(j+1) - F_j): the flux at an interior boundary leaves the cell
-        # below it and enters the cell above it, with equal and opposite sign. That is
-        # what makes the column sums vanish and the operator conserve particles.
         operator[index, index] -= a0
         operator[index, index + 1] -= a1
         operator[index + 1, index] += a0
@@ -564,12 +506,10 @@ class TwoTermSolver:
             weights = _redistribution(grid, lower_ev=shifted_lower, upper_ev=shifted_upper)
             operator += weights * loss
             if channel.is_ionisation:
-                # One-takes-all: the ejected electron appears at zero energy.
                 operator[0, :] += loss
 
         return operator
 
-    # ── the solve ───────────────────────────────────────────────────────────────
 
     def _initial_guess(self, initial: ArrayLike | None) -> FloatArray:
         if initial is None:
@@ -577,8 +517,6 @@ class TwoTermSolver:
             guess = maxwellian_eedf(
                 self.grid.centres_ev, electron_temperature_ev=(2.0 / 3.0) * mean
             )
-            # A grid far colder or hotter than the guess can underflow it entirely; a
-            # uniform distribution is a poor but non-degenerate fallback.
             if not np.any(guess > 0.0):
                 guess = np.ones(self.grid.n_cells, dtype=np.float64)
             return self.grid.normalise(guess)
@@ -659,7 +597,6 @@ class TwoTermSolver:
             residual=residual,
         )
 
-    # ── moments ─────────────────────────────────────────────────────────────────
 
     def _assemble(
         self,
@@ -684,9 +621,6 @@ class TwoTermSolver:
             reduced_mobility=self._reduced_mobility(f0),
             reduced_diffusion=self._reduced_diffusion(f0),
             rate_coefficients=rates,
-            # Summing every row of the operator leaves only the net particle creation,
-            # which is the ionisation rate integral. Computed this way rather than from
-            # the rates so that the identity the tests check is not a tautology.
             net_ionisation_frequency=float(np.sum(operator @ f0)),
             momentum_transfer_frequency=float(
                 GAMMA

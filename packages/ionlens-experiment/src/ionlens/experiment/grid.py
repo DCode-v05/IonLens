@@ -129,62 +129,10 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: Watt per square metre — the unit ``Gamma_E`` is reported in throughout the project.
 _FLUX_UNIT: Final[str] = "W/m**2"
 
-#: Posterior draws pushed through the inversion's ``Gamma_E`` functional when that
-#: functional is **closed form** (L0). ``closed_loop``'s own value, reused rather than
-#: rechosen so an L0-inversion row here and a ``closed_loop`` row describe intervals built
-#: the same way.
 _L0_POSTERIOR_SAMPLES: Final[int] = 20000
 
-#: ``run_cell``'s default for :func:`~ionlens.inverse.map.maximum_a_posteriori`'s ``n_starts``.
-#: **One**, and the reason it is one is a measurement rather than a preference.
-#:
-#: ## Why multi-start looked right
-#:
-#: On the OES-alone, matched-physics (L0 truth = L0 inversion) 15-seed cell, single-start
-#: landed near truth on 11/14 completed seeds and put a *confident, positive-definite*
-#: interval on the wrong mode for 3/14 (n0/T_e ratios 0.221/9.61, 0.728/2.08, 0.227/8.90).
-#: Five bounded starts rescued all three — 15/15 near truth, 0 non-positive-definite, 0
-#: confidently wrong — and cut OES's measured overconfidence factor from 51.8x/305.5x
-#: (n0/T_e) to 16.4x/11.1x. That measurement stands and is still the basis for OES's
-#: likelihood weight.
-#:
-#: ## Why it is nevertheless wrong as a default here
-#:
-#: Setting this to 5 and re-running the **actual system** — L1 truth, L0 inversion, three
-#: channels, ``ablate="oes"``, the configuration the headline number comes from — broke it:
-#:
-#: * seed 0: ``Gamma_E`` error **10 491 %**, n0 **+1 142 %**, T_e **+7 071 %**
-#: * seed 3: ``Gamma_E`` error **3 365 %**, n0 **+323 %**, T_e **+6 502 %**
-#: * seed 8: raised ``CoherentScatteringRegimeError`` (alpha=0.144, Thomson's incoherent
-#:   regime requires alpha << 1) — a start outside the physics' validity, not merely
-#:   outside the fit's basin
-#:
-#: The same seeds at ``n_starts=1`` give 1.28 % and 11.33 %.
-#:
-#: Two distinct causes, and neither is fixed by drawing starts more carefully:
-#:
-#: 1. **A misspecified likelihood has better optima than the truth.** At T2 the inversion
-#:    model is *deliberately* wrong, so far from the truth the likelihood surface is not a
-#:    noisy version of the right one — it has genuinely higher-scoring modes at absurd
-#:    parameter values. Single-start never found them because it started near the reference
-#:    and stayed local. Multi-start went looking and succeeded. It optimised the wrong
-#:    objective more thoroughly, which is worse than optimising it badly.
-#: 2. **Prior-valid is not physics-valid.** ``_bounded_perturbation`` rejects starts outside
-#:    the prior's support, which is the only check a dimension-agnostic module can make. It
-#:    cannot know that Thomson's spectrum model stops being defined at alpha ~ 0.1.
-#:
-#: So ``n_starts > 1`` is sound for a single channel against its own generative model, and
-#: unsound as a system default at T2. It stays available per-call for diagnostics. Making it
-#: safe here needs validity bounds owned by the physics, not by the optimiser — which is
-#: real work, not a parameter change.
-#:
-#: The failure is also a caution about component benchmarks: a 15-seed single-channel test
-#: reported "every failure mode eliminated" for a change that is catastrophic on 25 % of
-#: system seeds, and it fails *silently* — those runs return ``converged=True`` with no
-#: interval, so a mean taken over them would be meaningless rather than obviously wrong.
 _DEFAULT_N_STARTS: Final[int] = 1
 
 
@@ -249,14 +197,6 @@ class Cell:
     imperfect_calibration: bool
     calibration_uncertainty: bool
     truth_eedf: EedfShape
-    #: Whether the inversion-side likelihoods carry a doc 05 §4 model-discrepancy term.
-    #:
-    #: Orthogonal to the tier, like ``calibration_uncertainty``: it changes how wide the
-    #: interval is, not what the run may be called. Defaults ``False`` so every cell that
-    #: existed before this field keeps its exact meaning and its measured numbers.
-    #:
-    #: Requires a saved basis (:mod:`ionlens.experiment.discrepancy_basis`), because estimating
-    #: one needs L1 and L1 needs dolfinx.
     model_discrepancy: bool = False
 
     @property
@@ -336,41 +276,16 @@ class CellReport:
     map_iterations: int
     inversion_solves: int
     wall_clock_s: float
-    #: The Laplace posterior in unconstrained coordinates, or ``None`` alongside a ``None``
-    #: interval. Carried rather than discarded because it is what an identifiability or
-    #: sensitivity question needs afterwards, and re-deriving it means re-running the cell.
     posterior: LaplacePosterior | None
-    #: Channels that actually carried a discrepancy term. Empty when the cell did not ask
-    #: for one. Carried because "discrepancy applied" is a claim about *which* channels, and
-    #: Thomson is excluded at RP-1 (see `_DISCREPANCY_INELIGIBLE_CHANNELS`) — a row that
-    #: reported only a boolean would hide that a quarter of the correction is missing.
     discrepancy_channels: tuple[str, ...] = ()
-    #: The channel dropped from the likelihood, or ``None`` for the full set.
     ablated: str | None = None
-    #: The likelihood weight actually applied to each contributing channel, positionally
-    #: aligned with :attr:`contributing`. All ``1.0`` for an unweighted run. Carried for the
-    #: same reason :attr:`ablated` is: a down-weighted run and an unweighted one differ by
-    #: nothing visible in the numbers themselves, so without this a weighted result and a
-    #: baseline result are indistinguishable after the fact — and the whole point of the
-    #: weighting is to be auditable rather than trusted.
     channel_weights: tuple[float, ...] = ()
-    #: How many starts :func:`~ionlens.inverse.map.maximum_a_posteriori` actually ran from.
-    #: ``1`` for every row produced before ``run_cell(n_starts=...)`` existed, so an old row
-    #: and a new single-start row remain indistinguishable in every other field, per
-    #: :class:`~ionlens.inverse.map.MapResult`'s own guarantee.
     map_n_starts: int = 1
-    #: How many of those starts converged to a distinct mode — see
-    #: :attr:`~ionlens.inverse.map.MapResult.n_distinct_modes`. A value ``> 1`` is a per-row,
-    #: checkable instance of "this cell's likelihood surface is multimodal", not merely a
-    #: claim carried over from a separate audit.
     map_n_distinct_modes: int = 1
 
     @property
     def label(self) -> str:
         return cell_label(self.cell)
-
-
-# ── the forward maps ────────────────────────────────────────────────────────────
 
 
 class _Forward(Protocol):
@@ -439,10 +354,6 @@ def _build_forward(
             solver=AnalyticSheathSolver(), species=species, registry=registry, grid=grid
         )
     if fidelity is Fidelity.L1:
-        # Imported at call time for the reason `l2_truth._l1_solver` gives: dolfinx is
-        # absent from the machine L2 runs on, and a module-level import would make this
-        # file unimportable there — which would take the L2->L0 rows down with it, and
-        # those are exactly the rows that machine can produce.
         try:
             from ionlens.physics.fluid.sheath import FluidSheathSolver
         except ImportError as exc:
@@ -469,9 +380,6 @@ def _posterior_samples(fidelity: Fidelity) -> int:
     docstring for the Monte-Carlo error that buys.
     """
     return _L0_POSTERIOR_SAMPLES if fidelity is Fidelity.L0 else L2_POSTERIOR_SAMPLES
-
-
-# ── the truth side ──────────────────────────────────────────────────────────────
 
 
 def _truth_state(
@@ -507,11 +415,6 @@ def _truth_state(
                 "an L1 truth needs dolfinx (FEniCSx), which is not importable here."
             ) from exc
         fluid = FluidSheathSolver()
-        # Solved unconstrained on L1's own graded mesh and resampled afterwards, for the
-        # reason `l2_truth._L1Forward.state` gives: handing the fixed grid to `solve` would
-        # relocate the theta-dependent-grid problem into L1's mesh generator. The truth and
-        # the inversion are treated identically here, so the two sides differ in physics
-        # rather than in numerics-by-accident.
         native = fluid.solve(true_params)
         return _resample_onto_grid(native, grid), _gamma_e_at_wall(fluid.flux(native)), true_theta
 
@@ -535,19 +438,6 @@ def _truth_state(
     return truth.state, truth.gamma_e_w_per_m2, true_theta
 
 
-#: Channels that cannot carry a discrepancy term at this operating point.
-#:
-#: Thomson only. :meth:`~ionlens.instruments.thomson.instrument.ThomsonInstrument.likelihood`
-#: switches to a Gaussian when a coherent discrepancy is supplied and refuses below 20
-#: expected photoelectrons per channel, because a Poisson has no separate variance slot to
-#: inflate and the normal approximation is poor in the tail. Measured on the RP-1 reference:
-#: per-channel expected counts run 4.7e-8 to 303, with **13 of 20 channels below the
-#: floor**. The 1111-count total is healthy; the line shape concentrates it and starves the
-#: wings.
-#:
-#: So a four-channel discrepancy run corrects three channels. That is a real gap — Thomson's
-#: model error goes unmodelled and the interval is correspondingly optimistic — and it is
-#: named here and reported on every row rather than discovered later from a raised exception.
 _DISCREPANCY_INELIGIBLE_CHANNELS: Final[frozenset[str]] = frozenset({"thomson"})
 
 
@@ -589,9 +479,6 @@ def _resolve_discrepancy(
 
 def _truth_eedf_factory(shape: EedfShape) -> object:
     return _maxwellian_eedf_factory if shape is EedfShape.MAXWELLIAN else _t2_truth_eedf_factory
-
-
-# ── the driver ──────────────────────────────────────────────────────────────────
 
 
 def run_cell(
@@ -664,14 +551,7 @@ def run_cell(
         TruthArtefactRequiredError: For an L2 cell without a matching saved solve.
     """
     started = time.perf_counter()
-    # Evaluated first and deliberately: `tier_of_configuration` refuses mismatched-model
-    # runs that skip noise or skip the estimated response, and discovering that after an
-    # L1 truth solve would be an avoidable minute — or, on the L2 path, an avoidable load.
     tier = cell.tier
-    # Resolved here, beside the tier check and for the same reason: a missing or unusable
-    # discrepancy basis is a configuration error, and discovering it *after* an L1 truth
-    # solve or an L2 artefact load would be an avoidable wait for an answer that was never
-    # going to come.
     discrepancy, corrected_channels = _resolve_discrepancy(cell, discrepancy_path)
 
     resolved = registry if registry is not None else default_registry()
@@ -679,7 +559,6 @@ def run_cell(
     reference = _reference_theta()
     grid = observation_grid(resolved)
 
-    # ── step 1: draw and generate the sealed truth ─────────────────────────────
     truth_state, gamma_e_true, true_theta = _truth_state(
         cell,
         seed=seed,
@@ -689,16 +568,10 @@ def run_cell(
         l2_truth_path=l2_truth_path,
     )
 
-    # The reference state that sizes the LIF scan, pins Thomson's measurement volume and
-    # anchors the interferometer's chords: L0 at the RP-1 *reference* parameters, never the
-    # truth and never a trial. A real instrument's field of view is fixed before the plasma
-    # is characterised, and letting any of it follow the truth would be the theta-dependent
-    # observation the project has already been bitten by once.
     reference_state = AnalyticSheathSolver().solve(
         _to_plasma_params(reference, species=species, registry=resolved), grid=grid
     )
 
-    # ── step 2: the forward chain -> one synthetic measurement per channel ─────
     channel_set: ChannelSet = build_channels(
         reference_state=reference_state,
         seed=seed,
@@ -715,10 +588,8 @@ def run_cell(
     if channel_weights:
         joint = joint.with_weights(channel_weights)
 
-    # ── step 3: seal the truth ────────────────────────────────────────────────
     sealed = SealedTruth(value=gamma_e_true, name="Gamma_E")
 
-    # ── step 4: invert ────────────────────────────────────────────────────────
     forward = _build_forward(cell.inversion, species=species, registry=resolved, grid=grid)
     prior = _reduced_prior()
 
@@ -727,21 +598,11 @@ def run_cell(
         try:
             _, observed = forward.state(theta)
         except (RuntimeError, ValueError):
-            # A Newton solve that did not converge, or a mesh that could not be sized, at
-            # this trial point: out of support, not a crash. Same treatment
-            # `ionlens.inverse.map.negative_log_posterior` already gives a non-finite value.
             return -math.inf
         try:
-            # `errstate` narrowly, around this one call, and paired with the finiteness
-            # check below rather than used to look away. Far out in the tails the OES
-            # prediction underflows to zero expected counts and the Gaussian branch divides
-            # by it; under this project's `-W error` configuration that ends the run,
-            # turning "the optimiser tried an absurd theta" into a crash. What is *not* done
-            # is trusting a number that came out of the overflow.
             with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
                 value = joint.log_prob(observed)
         except BlindChannelError:
-            # doc 01 IF-6: nothing is above its detection floor at this theta.
             return -math.inf
         return value if math.isfinite(value) else -math.inf
 
@@ -751,7 +612,6 @@ def run_cell(
     theta_hat = _theta_from_unconstrained(result.unconstrained, reference=reference)
     estimate = forward.gamma_e(theta_hat)
 
-    # ── step 4b: the interval, by pushing posterior draws through Gamma_E ──────
     posterior, interval = _gamma_e_interval(
         result,
         log_likelihood=log_likelihood,
@@ -764,10 +624,8 @@ def run_cell(
         verbose=verbose,
     )
 
-    # ── step 5: unseal, by committing the estimate at its tier ────────────────
     sealed.commit_estimate(estimate, tier=tier)
 
-    # ── step 6: emit the row ──────────────────────────────────────────────────
     detail = joint.detail(truth_state)
     half_width = None if interval is None else 0.5 * (interval[1] - interval[0])
     return CellReport(
@@ -838,8 +696,6 @@ def _gamma_e_interval(
     except PosteriorNotPositiveDefiniteError:
         return None, None
 
-    # Stream.SAMPLER (doc 10 §5) so these draws stay put when anything else in the run
-    # consumes a different number of randoms — doc 00 E3's bit-for-bit requirement.
     draws = posterior.sample(generator(seed, Stream.SAMPLER), samples)
     if verbose:
         print(f"pushing {samples} posterior draws through the inversion", flush=True)
@@ -850,9 +706,6 @@ def _gamma_e_interval(
     tail = 0.5 * (1.0 - credible_level)
     low, high = np.quantile(fluxes, [tail, 1.0 - tail])
     return posterior, (float(low), float(high))
-
-
-# ── the standard grid ───────────────────────────────────────────────────────────
 
 
 def _same_model(truth: Fidelity, *, noise: bool) -> Cell:
@@ -884,13 +737,6 @@ def _mismatched(truth: Fidelity, inversion: Fidelity, *, calibration_uncertainty
     )
 
 
-#: Every cell the project can currently produce, in reporting order.
-#:
-#: The three mismatched pairs each appear twice — once with the inversion asserting its
-#: radiometric scale is exactly 1.0, once with it scoring that scale as the coherent 6 %
-#: systematic doc 06 §4.1 says it is. The pair is the point: doc 00 §5.1's criterion S4
-#: ("an uncalibrated posterior is worse than no posterior") is about the second, and the
-#: first is the control that shows what the second cost or bought.
 STANDARD_CELLS: Final[tuple[Cell, ...]] = (
     _same_model(Fidelity.L0, noise=False),
     _same_model(Fidelity.L0, noise=True),
@@ -935,14 +781,8 @@ def run_grid(
                 discrepancy_path=discrepancy_path,
                 registry=registry,
                 credible_level=credible_level,
-                # Forwarded rather than left at its default: `run_cell`'s own flag drives
-                # the within-cell progress line, and an L1 inversion spends minutes pushing
-                # posterior draws with nothing printed. A silent sweep is indistinguishable
-                # from a hung one.
                 verbose=verbose,
             )
-        # Recorded, not swallowed — see this function's docstring for why a sweep must not
-        # stop at, nor silently drop, a cell it cannot run.
         except Exception as exc:
             if verbose:
                 print(f"[grid] {label} -> {type(exc).__name__}: {exc}", flush=True)

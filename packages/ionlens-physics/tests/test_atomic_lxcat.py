@@ -26,7 +26,6 @@ from ionlens.physics.atomic.lxcat import (
     parse_lxcat,
 )
 
-# ── fixtures in the documented export format ────────────────────────────────────
 
 ELECTRON_EXPORT = """\
 LXCat, www.lxcat.net
@@ -156,9 +155,6 @@ def _minimal_block(
     return "\n".join(parts)
 
 
-# ── the electron set ────────────────────────────────────────────────────────────
-
-
 class TestParsingAnElectronSet:
     def test_the_database_name_comes_from_the_export_header(self) -> None:
         assert parse_lxcat(ELECTRON_EXPORT).database == "Phelps"
@@ -174,8 +170,6 @@ class TestParsingAnElectronSet:
         )
 
     def test_the_reactants_are_split_without_breaking_a_charged_product(self) -> None:
-        # "E + E + Ar+" naively split on "+" yields ['E', 'E', 'Ar', ''] and loses the
-        # ion. The separator is a plus *surrounded by whitespace*, not any plus.
         ionization = parse_lxcat(ELECTRON_EXPORT).require(ProcessType.IONIZATION)
 
         assert ionization.products == ("E", "E", "Ar+")
@@ -192,9 +186,6 @@ class TestParsingAnElectronSet:
         assert excitation.threshold_ev == pytest.approx(11.5, rel=1e-12)
 
     def test_an_elastic_block_carries_a_mass_ratio_and_no_threshold(self) -> None:
-        # The bare number under the reaction means different things per process type:
-        # m/M for momentum transfer, a threshold energy for an inelastic process. Reading
-        # one as the other would put a 1.4e-5 eV threshold on the elastic channel.
         effective = parse_lxcat(ELECTRON_EXPORT).require(ProcessType.EFFECTIVE)
 
         assert effective.threshold_ev is None
@@ -213,9 +204,6 @@ class TestParsingAnElectronSet:
         assert excitation.parameters["UPDATED"] == "2011-06-06 11:19:52"
 
     def test_the_how_to_reference_line_is_retained(self) -> None:
-        # doc 09 §2.1: LXCat is free but "citation of the specific database is required",
-        # and the required wording is in the export itself. Dropping it would leave the
-        # citation ledger of doc 09 §6 to be reconstructed from memory.
         assert "Phelps database" in parse_lxcat(ELECTRON_EXPORT).reference
 
     def test_the_reaction_reads_back_as_the_published_equation(self) -> None:
@@ -229,8 +217,6 @@ class TestParsingAnElectronSet:
         assert ionization.energy_range_ev == pytest.approx((15.8, 1000.0))
 
     def test_a_carriage_return_line_ending_parses_identically(self) -> None:
-        # Files fetched on one machine and read on another. A stray '\r' left on the
-        # last column would make every cross section unparseable, or worse, parseable.
         crlf = parse_lxcat(ELECTRON_EXPORT.replace("\n", "\r\n"))
 
         assert len(crlf) == 3
@@ -240,14 +226,8 @@ class TestParsingAnElectronSet:
         )
 
 
-# ── the ion set, which doc 03 §4.5 singles out ──────────────────────────────────
-
-
 class TestParsingAnIonSet:
     def test_charge_exchange_is_recognised_as_a_two_word_keyword(self) -> None:
-        # doc 03 §4.5: "Getting the CX cross section and its energy dependence right
-        # matters more than any other atomic-data choice." A parser that did not know
-        # the keyword would drop the block and leave a set that looked complete.
         assert parse_lxcat(ION_EXPORT).charge_exchange().process is ProcessType.CHARGE_EXCHANGE
 
     def test_the_ion_is_the_projectile_and_the_neutral_is_the_target(self) -> None:
@@ -257,9 +237,6 @@ class TestParsingAnIonSet:
         assert cx.target == "Ar"
 
     def test_charge_exchange_has_no_threshold(self) -> None:
-        # Symmetric resonant transfer is exothermic to zeroth order; a threshold read in
-        # here would zero the cross section over exactly the low-energy range that
-        # produces the IEDF structure of doc 03 §4.5.
         assert parse_lxcat(ION_EXPORT).charge_exchange().threshold_ev is None
 
     def test_a_block_without_a_bare_parameter_line_still_parses(self) -> None:
@@ -280,9 +257,6 @@ class TestParsingAnIonSet:
         )
 
 
-# ── selection ───────────────────────────────────────────────────────────────────
-
-
 class TestSelectingSections:
     def test_of_type_returns_every_matching_section(self) -> None:
         assert len(parse_lxcat(ELECTRON_EXPORT).of_type(ProcessType.EXCITATION)) == 1
@@ -295,8 +269,6 @@ class TestSelectingSections:
             parse_lxcat(ELECTRON_EXPORT).require(ProcessType.ATTACHMENT)
 
     def test_require_raises_when_the_process_is_ambiguous(self) -> None:
-        # An argon set has one ionisation channel but many excitation channels. Silently
-        # returning the first would make the rate coefficient depend on file ordering.
         doubled = _minimal_block() + _minimal_block()
 
         with pytest.raises(LookupError, match="2"):
@@ -316,14 +288,8 @@ class TestSelectingSections:
         assert [s.process for s in electron][-1] is ProcessType.IONIZATION
 
     def test_momentum_transfer_accepts_either_spelling(self) -> None:
-        # LXCat's Phelps argon set publishes EFFECTIVE (momentum transfer); Biagi
-        # publishes ELASTIC. Doc 03 §4.5 asks for "electron elastic" and means whichever
-        # of the two the database supplies.
         assert parse_lxcat(ELECTRON_EXPORT).momentum_transfer().process is ProcessType.EFFECTIVE
         assert parse_lxcat(ION_EXPORT).momentum_transfer().process is ProcessType.ELASTIC
-
-
-# ── failing loudly ──────────────────────────────────────────────────────────────
 
 
 class TestTheParserFailsLoudly:
@@ -366,9 +332,6 @@ class TestTheParserFailsLoudly:
             parse_lxcat(_minimal_block(rows=" 1.580000e+1\t0.0"))
 
     def test_rejects_a_cross_section_column_in_the_wrong_units(self) -> None:
-        # An Angstrom-squared table read as m^2 is wrong by 20 orders of magnitude, and
-        # nothing downstream would look obviously wrong — the rate coefficient would just
-        # be zero.
         with pytest.raises(LxcatParseError, match="COLUMNS"):
             parse_lxcat(_minimal_block(columns="COLUMNS: Energy (eV) | Cross section (A2)"))
 
@@ -385,8 +348,6 @@ class TestTheParserFailsLoudly:
             parse_lxcat(_minimal_block(parameter="", param_line="COMMENT: none"))
 
     def test_rejects_a_threshold_that_disagrees_with_the_param_line(self) -> None:
-        # LXCat states the threshold twice. When the two disagree the file has been
-        # hand-edited, and picking either silently is a coin flip on the rate coefficient.
         with pytest.raises(LxcatParseError, match="threshold"):
             parse_lxcat(_minimal_block(parameter=" 1.100000e+1"))
 
@@ -411,8 +372,6 @@ class TestFormatTolerances:
     """Shapes of the export that are legal but easy to mishandle."""
 
     def test_a_wrapped_header_field_is_joined_to_the_line_it_continues(self) -> None:
-        # LXCat wraps long COMMENT fields. A continuation dropped on the floor loses
-        # whatever caveat the compiler thought worth writing down.
         text = _minimal_block(param_line="COMMENT: first part\n  second part")
 
         section = parse_lxcat(text).require(ProcessType.IONIZATION)
@@ -420,8 +379,6 @@ class TestFormatTolerances:
         assert section.parameters["COMMENT"] == "first part second part"
 
     def test_an_export_without_a_species_line_falls_back_to_the_reaction(self) -> None:
-        # Older exports omit SPECIES:. The PROCESS line says the same thing less
-        # directly, and refusing the file would make an archived download unloadable.
         section = parse_lxcat(_minimal_block(species="COMMENT: no species line")).require(
             ProcessType.IONIZATION
         )
@@ -511,9 +468,6 @@ class TestCrossSectionValidation:
 
     @pytest.mark.physics
     def test_rejects_a_non_zero_cross_section_below_the_threshold(self) -> None:
-        # An inelastic process cannot occur below its threshold. A table that says
-        # otherwise has had its threshold misread, and the resulting rate coefficient
-        # would be finite where it must be exactly zero.
         with pytest.raises(ValueError, match="below"):
             self._section(threshold_ev=30.0)
 

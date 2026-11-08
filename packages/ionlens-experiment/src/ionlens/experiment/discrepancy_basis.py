@@ -116,9 +116,6 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: A per-channel rank-``k`` basis, keyed by the channel names
-#: :data:`~ionlens.experiment.channels.CHANNEL_NAMES` uses. Each value has shape ``(k, n)`` where
-#: ``n`` is that channel's flattened observable length, and ``Sigma_disc = basis.T @ basis``.
 type ChannelDiscrepancy = dict[str, FloatArray]
 
 
@@ -138,47 +135,16 @@ class _UnconstrainedSolver(Protocol):
     def solve(self, params: PlasmaParams) -> PlasmaState: ...
 
 
-#: Multiplicative span around the reference ``(n_0, T_e)`` the sweep covers.
-#:
-#: ``closed_loop._DISCREPANCY_SPAN``'s range, reused rather than rechosen so that an OES
-#: basis from that function and an OES basis from this one describe the same region. It is
-#: wide enough to contain the reduced prior's bulk without reaching parameters at which L1's
-#: Newton solve is known to struggle — the sweep is only useful if every point in it
-#: converges, and a failed corner would silently shorten the basis.
 DISCREPANCY_SPAN: Final[tuple[float, float]] = (0.8, 1.2)
 
-#: Points per axis. The basis has rank ``DISCREPANCY_GRID ** 2``, so this is quadratic in
-#: cost and in rank; 5 gives rank 25, which spans the observed error directions while
-#: staying at or below every channel's observable length after :func:`_compress_to_rank`
-#: re-expresses it. Channel dimensions measured at the reference: OES 11 x 1024, LIF 201,
-#: Thomson 20, interferometry **1** — that last one is a single scalar phase, not the 8
-#: chords doc 02 §8.2's ladder describes, and it is why the compression rule is min(k, n)
-#: rather than anything that subtracts.
 DISCREPANCY_GRID: Final[int] = 5
 
-#: Bounded retries a grid point gets before it is counted as a non-convergence — recovery
-#: plan Block G's "continuation: step in from a converged neighbour". The high-fidelity
-#: solver has no cross-``theta`` warm-start of its own (each solve seeds its *bias*
-#: continuation fresh from the L0 profile at its own ``theta``, per
-#: :func:`~ionlens.physics.fluid.system._continue_to`), so "stepping in from a neighbour" is
-#: applied one level up: a point that fails is retried at a location fractionally closer
-#: to the reference ``theta``, which is the point every other part of this module already
-#: trusts to be inside the solver's basin (:func:`estimate_channel_discrepancy` builds
-#: ``reference_state`` from it directly). Retrying at the *nominal* ``theta`` again would
-#: reproduce the same failure; retrying somewhere else entirely would estimate a basis at
-#: a point nobody asked for.
 _MAX_NONCONVERGENCE_RETRIES: Final[int] = 3
 
-#: Fraction of the remaining distance to the reference ``theta`` each retry closes. ``0.5``
-#: halves the gap every attempt, so three retries reach 1/8, giving up before the point has
-#: drifted far enough from its grid position to no longer represent it.
 _RETRY_STEP_TOWARD_REFERENCE: Final[float] = 0.5
 
-#: npz key prefix for a channel's basis.
 _BASIS_KEY: Final[str] = "basis__"
 
-#: npz key holding the channel names, so a loaded file cannot disagree about which channels
-#: it describes.
 _NAMES_KEY: Final[str] = "channel_names"
 
 _NPZ_SUFFIX: Final[str] = ".npz"
@@ -236,8 +202,6 @@ def _compress_to_rank(basis: FloatArray) -> FloatArray:
     keep = min(k, n)
     if keep >= k:
         return basis
-    # full_matrices=False: only the first min(k, n) singular directions exist anyway, and
-    # asking for the full V would allocate an n x n array — 1024 x 1024 on OES, for nothing.
     _, singular_values, vt = np.linalg.svd(basis, full_matrices=False)
     return np.asarray(singular_values[:keep, None] * vt[:keep, :], dtype=np.float64)
 
@@ -339,7 +303,7 @@ def _solve_with_bounded_retry(
             )
             continue
         return _RetryOutcome(low_state=low, high_state=high, solved_theta=current, retries=attempt)
-    assert last_error is not None  # the loop always runs at least once
+    assert last_error is not None
     raise RuntimeError(
         f"did not converge at theta={theta} even after {max_retries} bounded retries "
         f"toward the reference theta; last attempt at "
@@ -520,16 +484,9 @@ def estimate_channel_discrepancy(
             ) from exc
         high_solver = FluidSheathSolver()
 
-    # The reference state that sizes the LIF scan, pins Thomson's measurement volume and
-    # anchors the interferometer's chords: L0 at the *reference* parameters, exactly as
-    # every other driver builds it. It must not follow the sweep, or each sweep point would
-    # be observed by a differently configured instrument and the differences would carry the
-    # instrument's motion as well as the models'.
     reference_state = low_solver.solve(
         _to_plasma_params(reference, species=species, registry=resolved), grid=grid
     )
-    # Clean configuration — see the module docstring's last section for why both switches
-    # are off rather than matching the run being corrected.
     channels = build_channels(
         reference_state=reference_state,
         seed=seed,
@@ -637,8 +594,6 @@ def save_channel_discrepancy(basis: Mapping[str, FloatArray], path: Path | str) 
     payload: dict[str, NDArray[np.generic]] = {_NAMES_KEY: np.asarray(CHANNEL_NAMES, dtype=np.str_)}
     for name in CHANNEL_NAMES:
         payload[f"{_BASIS_KEY}{name}"] = np.asarray(basis[name], dtype=np.float64)
-    # numpy's stubs type `savez_compressed`'s second positional as the `compress` flag, so
-    # the keyword splat trips them; the call itself is the documented `**kwds` form.
     np.savez_compressed(destination, **payload)  # type: ignore[arg-type]
     return destination
 

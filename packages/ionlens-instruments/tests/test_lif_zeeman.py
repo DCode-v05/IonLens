@@ -50,7 +50,6 @@ class TestLandeGFactor:
         assert lande_g_factor(Level(j=1.0, orbital=1.0, spin=0.0)) == pytest.approx(1.0, rel=1e-15)
 
     def test_the_doc_02_lower_level_gives_the_quartet_f_value(self) -> None:
-        # 3d 4F_7/2: 1 + 7.5/31.5.
         level = Level(j=3.5, orbital=3.0, spin=1.5)
 
         assert lande_g_factor(level) == pytest.approx(
@@ -59,7 +58,6 @@ class TestLandeGFactor:
         assert lande_g_factor(level) == pytest.approx(1.238095, rel=1e-6)
 
     def test_the_doc_02_upper_level_gives_the_quartet_d_value(self) -> None:
-        # 4p 4D_5/2: 1 + 6.5/17.5.
         assert lande_g_factor(Level(j=2.5, orbital=2.0, spin=1.5)) == pytest.approx(
             1.371429, rel=1e-6
         )
@@ -69,8 +67,6 @@ class TestDipoleStrengths:
     """The relative strengths, checked where symmetry fixes the answer."""
 
     def test_a_j_zero_to_j_one_transition_has_three_equal_components(self) -> None:
-        # With no lower-level structure the three polarisations cannot be distinguished,
-        # so any correct strength table must return them equal.
         components = zeeman_pattern(
             lower=Level(j=0.0, orbital=0.0, spin=0.0),
             upper=Level(j=1.0, orbital=1.0, spin=0.0),
@@ -135,7 +131,6 @@ class TestDipoleStrengths:
         )
 
         assert all(component.weight > 0.0 for component in components)
-        # 6 pi + 6 sigma+ + 6 sigma- for J = 7/2 -> 5/2.
         assert len(components) == 18
 
 
@@ -227,7 +222,6 @@ class TestTheZeemanShifts:
         g_lower = _expected_lande(j=3.5, orbital=3.0, spin=1.5)
         g_upper = _expected_lande(j=2.5, orbital=2.0, spin=1.5)
 
-        # mu_B / h = e / (4 pi m_e) = 13.996 GHz/T, at 5 mT.
         scale_mhz = 13.99624 * 1.0e3 * 5.0e-3
         expected = scale_mhz * abs(g_upper * -2.5 - g_lower * -1.5)
 

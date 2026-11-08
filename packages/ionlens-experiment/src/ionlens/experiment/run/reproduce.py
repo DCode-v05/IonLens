@@ -38,8 +38,6 @@ from ionlens.experiment.run.store import ARTIFACTS_DIRNAME, RunStore
 
 __all__ = ["ReproductionResult", "reproduce"]
 
-#: Characters of a digest shown in a summary line. Enough to distinguish two runs at a
-#: glance, short enough to fit beside the artifact name.
 _DIGEST_PREVIEW_CHARS: Final[int] = 12
 
 
@@ -134,8 +132,6 @@ def reproduce(store: RunStore, run_id: str) -> ReproductionResult:
 
     scratch = store.reproductions_path / record.id
     if scratch.exists():
-        # Cleared rather than reused: a stale artifact from a previous reproduction would
-        # be compared as though this run had produced it.
         shutil.rmtree(scratch)
 
     reproduced = execute(

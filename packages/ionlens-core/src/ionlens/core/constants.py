@@ -42,30 +42,20 @@ def _codata_release() -> str:
     return str(release) if release else f"unknown release (SciPy {scipy.__version__})"
 
 
-#: Which evaluated constant set these values come from, for the provenance record.
 CODATA_SOURCE: str = f"{_codata_release()} via scipy.constants (SciPy {scipy.__version__})"
 
-#: Elementary charge ``e``.
 ELEMENTARY_CHARGE: Quantity = Q_(sc.elementary_charge, "C")
 
-#: Boltzmann constant ``k_B``.
 BOLTZMANN: Quantity = Q_(sc.Boltzmann, "J / K")
 
-#: Electron rest mass ``m_e``.
 ELECTRON_MASS: Quantity = Q_(sc.electron_mass, "kg")
 
-#: Unified atomic mass unit ``u`` — the scale every ion mass in doc 09 is quoted on.
 ATOMIC_MASS: Quantity = Q_(sc.atomic_mass, "kg")
 
-#: Vacuum permittivity ``epsilon_0``. Doc 01 §3 makes Poisson's equation the load-bearing
-#: physics constraint of the whole framework, and this is its coefficient.
 VACUUM_PERMITTIVITY: Quantity = Q_(sc.epsilon_0, "F / m")
 
-#: Speed of light in vacuum ``c``.
 SPEED_OF_LIGHT: Quantity = Q_(sc.speed_of_light, "m / s")
 
-#: Planck constant ``h``.
 PLANCK: Quantity = Q_(sc.Planck, "J * s")
 
-#: Classical electron radius ``r_e`` — the interferometric phase constant of doc 01 §5.4.
 CLASSICAL_ELECTRON_RADIUS: Quantity = Q_(sc.physical_constants["classical electron radius"][0], "m")

@@ -54,22 +54,13 @@ __all__ = [
     "run_content_digest",
 ]
 
-#: Fields that record *when* a run happened rather than *what* it produced — doc 13 §2.
-#:
-#: Exactly one. Every other field of doc 08 §7's block is part of the result's identity:
-#: a reproduction at a different commit, from a different manifest or with a different
-#: seed has not reproduced the run, it has performed a different one.
 EXECUTION_ONLY_FIELDS: Final[frozenset[str]] = frozenset({"created_utc"})
 
-#: The whole doc 08 §7 provenance block, set aside when comparing two different runs.
 PROVENANCE_ONLY_FIELDS: Final[frozenset[str]] = frozenset(PROVENANCE_FIELDS)
 
-#: File suffix to the reader that understands it — doc 08 §7's format table.
 _HDF5_SUFFIXES: Final[frozenset[str]] = frozenset({".h5", ".hdf5"})
 _PARQUET_SUFFIXES: Final[frozenset[str]] = frozenset({".parquet"})
 
-#: Separator between hashed items. A byte that cannot appear in an HDF5 name or a column
-#: name, so that ``["ab", "c"]`` and ``["a", "bc"]`` cannot hash alike.
 _SEPARATOR: Final[bytes] = b"\x00"
 
 
@@ -166,8 +157,6 @@ def _add_hdf5_group(accumulator: _Accumulator, group: h5py.Group, excluded: froz
         values = np.asarray(member[()])
         accumulator.add_text(values.dtype.str)
         accumulator.add_text(str(values.shape))
-        # ``ascontiguousarray`` so that a view's strides cannot change the bytes of an
-        # otherwise identical array.
         accumulator.add(np.ascontiguousarray(values).tobytes())
 
 

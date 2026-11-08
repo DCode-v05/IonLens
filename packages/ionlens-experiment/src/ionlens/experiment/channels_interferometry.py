@@ -309,27 +309,12 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: Channel name — bound to the instrument's own stamped identifier rather than duplicated as
-#: a second string literal, so an ablation table, a doc 08 §7 artifact group and a fusion
-#: exclusion list cannot end up calling this channel two different things.
 INTERFEROMETRY_CHANNEL: Final[str] = INTERFEROMETRY_INSTRUMENT_ID
 
-#: Units of what :meth:`_BulkInterferometer.forward` and :meth:`observe` return. This
-#: channel reports a signed phase (doc 02 §8.1's heterodyne detection recovers the sign),
-#: never a density — see the module docstring's "honesty point" in
-#: :mod:`ionlens.instruments.interferometry.phase`.
 PHASE_UNITS: Final[str] = "rad"
 
-#: One observable per acquisition — the reframing's structural signature. The old 8-chord
-#: ladder returned :data:`~ionlens.instruments.interferometry.phase.N_CHORDS` samples per call;
-#: a bulk-density line integral has exactly one number to report, because there is exactly
-#: one boundary-condition density to report it about.
 _N_SAMPLES: Final[int] = 1
 
-#: One-sigma relative uncertainty of the interferometer's phase-scale calibration — the
-#: AOM frequency reference and path-length metrology chain of doc 02 §8.1. Read from the
-#: registry (``IF.phase_scale_uncertainty``, ASSUMED, 0.03) rather than restated as a
-#: literal, so this module and the registry cannot silently disagree about the figure.
 _PHASE_SCALE_UNCERTAINTY_ID: Final[str] = "IF.phase_scale_uncertainty"
 
 
@@ -423,24 +408,15 @@ class _BulkInterferometer:
     ) -> None:
         self.instrument_id = instrument_id
         self._registry = registry
-        # doc 02 §8.2 IF-P2: the chord length is the chamber diameter, fixed machine
-        # geometry — see the module docstring. Not configurable here: unlike the old
-        # chord-ladder anchor, there is no sensitivity study this module's caller needs to
-        # run against a different chord length, and doc 08 §5's escape hatch for a named,
-        # doc-cited `Final` constant is exactly what `CHAMBER_DIAMETER_M` already is.
         self._chord_length_m = CHAMBER_DIAMETER_M
         self._wavelength_m = CO2_WAVELENGTH_M
         self._noise_enabled = noise
         self._fringe_jump_rate = if_noise.DEFAULT_FRINGE_JUMP_RATE
         self._calibration: Calibration | None = None
         self._applied_state = CalibrationState.ESTIMATED
-        # Vibration and fringe-jump noise are mechanical/electronic, not photon statistics
-        # — the same convention
-        # :class:`~ionlens.instruments.interferometry.instrument.InterferometryInstrument` uses.
         self._rng = generator(root_seed, Stream.DETECTOR_NOISE)
         self._calibration_rng = generator(root_seed, Stream.CALIBRATION)
 
-    # ── geometry, read-only ─────────────────────────────────────────────────────
 
     @property
     def chord_length_m(self) -> float:
@@ -455,7 +431,6 @@ class _BulkInterferometer:
     def wavelength_m(self) -> float:
         return self._wavelength_m
 
-    # ── calibration ─────────────────────────────────────────────────────────────
 
     def calibrate(self, refs: CalibrationSet) -> Calibration:
         """Derive the phase-measurement scale from a reference standard — doc 04 §7.3."""
@@ -480,7 +455,6 @@ class _BulkInterferometer:
         """
         self._applied_state = CalibrationState.TRUE
 
-    # ── the shared code path — doc 04 §9 ────────────────────────────────────────
 
     def forward(self, state: PlasmaState, w: AcquisitionWindow) -> Observable:
         """The noiseless phase the likelihood compares against — doc 04 §9.
@@ -632,7 +606,6 @@ class _BulkInterferometer:
             )
 
         if self._applied_state is CalibrationState.TRUE:
-            # doc 04 §7.3's deliberate inverse crime: the unit scale, not a draw.
             scale = 1.0
         else:
             if self._calibration is None:
@@ -658,7 +631,6 @@ class _BulkInterferometer:
             calibration=self._applied_state,
         )
 
-    # ── the likelihood and the gate ─────────────────────────────────────────────
 
     def likelihood(
         self,
@@ -721,9 +693,6 @@ class _BulkInterferometer:
         d = np.full(n, sigma_independent**2, dtype=np.float64)
         v = np.full(n, sigma_common, dtype=np.float64)
 
-        # `rows` starts at `[v]` (the mandatory vibration term) whether or not either
-        # optional term is requested, so the no-extra-term call below is bit for bit
-        # unchanged from what this method computed before either argument existed.
         rows: list[FloatArray] = [v]
         apply_calibration = calibration_uncertainty and obs.calibration is not CalibrationState.TRUE
         if apply_calibration:
@@ -977,9 +946,6 @@ def build_interferometry_channel(
         truth.use_true_calibration()
 
     inversion = _BulkInterferometer(root_seed=seed, registry=registry, noise=False)
-    # calibrate() first, so the phase-scale standard's registered relative_uncertainty is on
-    # record for likelihood(calibration_uncertainty=True) to read; use_true_calibration()
-    # second, so forward()'s predictions still go through the unit scale exactly as before.
     inversion.calibrate(interferometry_calibration_set(registry))
     inversion.use_true_calibration()
 

@@ -122,31 +122,18 @@ _M_E: Final[float] = float(magnitude_in(ELECTRON_MASS, "kg"))
 
 _REGISTRY = default_registry()
 
-#: doc 03 §3.3's yield for Ar+ on tungsten at ~250 eV, from the registry. doc 03 §3.3:
-#: "Secondary electron emission is not optional." The registry owns the number so the
-#: uncertainty on it (+/- 0.03, PUBLISHED) propagates rather than being retyped here.
 DEFAULT_SECONDARY_YIELD: Final[float] = float(
     _REGISTRY.value_in("sheath.gamma_se_W", "dimensionless")
 )
 
-#: doc 03 §8 A10's ion reflection coefficient. Zero by default and swept over ``[0, 0.2]``,
-#: which is the difference between an assumption and a stated one.
 DEFAULT_ION_REFLECTION: Final[float] = float(
     _REGISTRY.value_in("sheath.ion_reflection", "dimensionless")
 )
 
-#: Emission energy of a secondary electron. Zero — emitted at rest, then accelerated
-#: through the sheath, which is where doc 03 §3.3 says its energy comes from. See
-#: simplification 1 of the module docstring for the bound this carries.
 SECONDARY_EMISSION_ENERGY_EV: Final[float] = 0.0
 
-#: Where an absorbed particle is parked. The wall node itself: it is inside the domain, so
-#: the deposition guard is satisfied, and it is where the particle physically went.
 PARKED_POSITION_M: Final[float] = 0.0
 
-#: Rejection loops are bounded so a mis-specified envelope cannot hang a 5 000-case
-#: ensemble. The envelope's acceptance rate exceeds 1/2 for every ``u/sigma``, so thirty
-#: passes leaves a failure probability below 1e-9 per particle.
 _MAX_REJECTION_PASSES: Final[int] = 30
 
 
@@ -157,15 +144,8 @@ class WallModel(StrEnum):
     round-trips into a checked member and back out for the provenance record.
     """
 
-    #: doc 03 §3.3's physical wall: absorb, emit secondaries, reflect a fraction ``R_i``.
-    #: Particles reaching ``z = L`` leave to the bulk reservoir.
     ABSORBING = "absorbing"
 
-    #: Specular reflection at **both** ends: nothing enters and nothing leaves. Not a
-    #: physical sheath boundary — it exists because verification gate V-07 asks for energy
-    #: conservation, and a wall that absorbs particles removes energy from the system by
-    #: design. The closed configuration is the only one in which "total energy drift" is a
-    #: statement about the integrator rather than about the boundary.
     REFLECTING = "reflecting"
 
 
@@ -288,9 +268,6 @@ class BoundaryOutcome:
     n_left_bulk: int
 
 
-# ── the step ────────────────────────────────────────────────────────────────────
-
-
 def apply_boundaries(
     rng: np.random.Generator,
     *,
@@ -358,18 +335,12 @@ def apply_boundaries(
     reflected = arrived[rng.random(arrived.size) < surface.ion_reflection]
     absorbed = np.setdiff1d(arrived, reflected, assume_unique=True)
 
-    # Specular: mirror the position back across the wall and reverse the normal velocity.
-    # The tangential components are untouched, which is what makes the reflection an
-    # isometry and therefore energy-neutral.
     positions[reflected] = -positions[reflected]
     velocities[reflected, 2] = -velocities[reflected, 2]
 
     absorbed_velocities = velocities[absorbed].copy()
     absorbed_energies = 0.5 * mass_kg * np.sum(absorbed_velocities**2, axis=1) / _E
 
-    # Park, do not delete. See the module docstring: at rest and inside the domain the
-    # slot is inert to deposition, to the gather and to the collision test, and is
-    # available for the next injected particle without any array ever changing shape.
     parked = np.concatenate([absorbed, left_bulk])
     living[absorbed] = False
     positions[parked] = PARKED_POSITION_M
@@ -429,9 +400,6 @@ def _reflect_into_domain(
     velocities[indices, 2] = -velocities[indices, 2]
 
 
-# ── secondary electron emission ─────────────────────────────────────────────────
-
-
 def sample_secondary_velocities(
     rng: np.random.Generator, *, n_absorbed: int, surface: SurfaceModel
 ) -> FloatArray:
@@ -467,8 +435,6 @@ def sample_secondary_velocities(
 
     speed = math.sqrt(2.0 * surface.secondary_energy_ev * _E / _M_E)
     if speed == 0.0:
-        # Emitted at rest — simplification 1. The direction is then meaningless and
-        # inventing one would suggest the model resolves something it does not.
         return np.zeros((emitted, 3), dtype=np.float64)
 
     direction = _isotropic_into_plasma(rng, emitted)
@@ -487,9 +453,6 @@ def _isotropic_into_plasma(rng: np.random.Generator, n: int) -> FloatArray:
     sin_theta = np.sqrt(np.maximum(1.0 - cos_theta**2, 0.0))
     phi = 2.0 * np.pi * rng.random(n)
     return np.stack([sin_theta * np.cos(phi), sin_theta * np.sin(phi), cos_theta], axis=1)
-
-
-# ── injection at the bulk boundary ──────────────────────────────────────────────
 
 
 def sample_inflow_velocities(
@@ -522,8 +485,6 @@ def sample_inflow_velocities(
     sigma = source.thermal_speed_m_per_s
     u = source.drift_speed_m_per_s
     if sigma == 0.0:
-        # The cold limit. Every particle enters at the drift speed, which is the
-        # zero-temperature limit of the flux-weighted density above.
         velocities = np.zeros((n, 3), dtype=np.float64)
         velocities[:, 2] = -u
         return velocities
@@ -572,8 +533,6 @@ def _sample_flux_weighted_speed(
 def _sample_envelope(rng: np.random.Generator, n: int, *, drift: float, sigma: float) -> FloatArray:
     """Draw ``s = w - u`` from the envelope of :func:`_sample_flux_weighted_speed`."""
     cutoff = math.exp(-(drift**2) / (2.0 * sigma**2))
-    # Component masses, as integrals over s > -u. The normal component vanishes at u = 0,
-    # which is what makes the algorithm exact there rather than merely accurate.
     normal_mass = drift * sigma * math.sqrt(2.0 * math.pi) * _standard_normal_cdf(drift / sigma)
     rayleigh_mass = sigma**2 * (2.0 - cutoff)
 
@@ -586,8 +545,6 @@ def _sample_envelope(rng: np.random.Generator, n: int, *, drift: float, sigma: f
 
     remaining = int(n - count)
     if remaining:
-        # The two-sided Rayleigh. The inward side is truncated at s = -u, so its inverse
-        # carries the truncation through the same logarithm.
         negative_mass = 1.0 - cutoff
         inward = rng.random(remaining) * (negative_mass + 1.0) < negative_mass
         draw = rng.random(remaining)
@@ -624,9 +581,6 @@ def _truncated_normal(
 def _standard_normal_cdf(x: float) -> float:
     """``Phi(x)``, from ``erf``. One place, so the factor of ``sqrt2`` cannot drift."""
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
-
-
-# ── the particle store the parking scheme implies ───────────────────────────────
 
 
 class CapacityExceededError(RuntimeError):

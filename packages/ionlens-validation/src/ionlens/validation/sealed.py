@@ -75,9 +75,6 @@ __all__ = [
 
 type Value = float | NDArray[np.float64]
 
-#: Below this magnitude a truth is treated as zero and the error reported as absolute.
-#: A relative error against a vanishing denominator is unbounded and uninformative, and the
-#: quantities this seals — a drift, a residual — legitimately pass through zero.
 _ZERO_THRESHOLD: Final[float] = 1e-300
 
 

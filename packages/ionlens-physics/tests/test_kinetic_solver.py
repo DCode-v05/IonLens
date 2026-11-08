@@ -58,32 +58,16 @@ _REGISTRY = default_registry()
 _E = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _M_AR = float(_REGISTRY.value_in("species.Ar.mass", "kg"))
 
-#: doc 03 §7's own pass criteria. Named, so a threshold cannot be relaxed in one test
-#: while the docstring goes on quoting the specification.
 V05_TIMESTEP_TOLERANCE = 0.01
 V06_KS_TOLERANCE = 0.02
 
-#: ADR-010's independent quadrature of doc 03 §3.1's collisionless first integral gives
-#: ``s / s_CL = 1.5029`` at RP-1 with Boltzmann electrons. It is the *upper* bound for a
-#: kinetic sheath, not a target: a PIC has no Boltzmann-electron assumption, and a kinetic
-#: electron population is depleted near a strongly negative wall relative to Boltzmann,
-#: which thins the sheath. See ADR-010's consequences section, which predicted this before
-#: L2 existed.
 ADR_010_QUADRATURE_RATIO = 1.5029
 
-#: A kinetic sheath must exceed Child-Langmuir by more than noise. Child-Langmuir drops
-#: electron space charge entirely, so ``s / s_CL = 1`` would mean the electrons were not
-#: being solved at all — which is the failure this lower bound exists to catch.
 ADR_010_MINIMUM_EXCESS = 0.05
 
-#: ``Gamma_E = Gamma_i * <E_i>``, and both factors are gated at 5 % in this class. Their
-#: product is therefore knowable to about 10 %, and the 5 % gate the original test applied
-#: to the product could only have been met by the two errors cancelling. Derived, not
-#: chosen: ``1.05 * 1.05 - 1``.
 GAMMA_E_COMPOUNDED_TOLERANCE = 1.05 * 1.05 - 1.0
 V07_ENERGY_DRIFT_TOLERANCE = 1.0e-3
 
-#: The seed for every run in this file. doc 00 E3: bit-for-bit reproduction.
 _SEED = 20260805
 
 
@@ -167,37 +151,22 @@ def _gate_run(
     ).run(_params(bias_v=bias_v), None)
 
 
-#: The equilibration these gates were calibrated at. The plasma is loaded uniformly at the
-#: reservoir density, which over-fills the sheath — a Child-Langmuir sheath holds
-#: ``n_s c_s / u(z)``, far less — so the excess has to drain before anything is recorded.
-#: Measured on the reference machine at V_w = 50 V: with the window opening after 1.2 ion
-#: transits ``Gamma_i`` overshoots the Bohm flux by 26 %, after 2 transits by 5.6 %, and
-#: after 3 transits by 0.8 %. Three is therefore what the gates use, and this note is here
-#: because the failure is a *quiet* one: the run converges, the IEDF looks right, and the
-#: flux is high by a quarter.
 _GATE_BIAS_V = -50.0
-
-
-# ── contract ────────────────────────────────────────────────────────────────────
 
 
 class TestContract:
     def test_the_solver_satisfies_the_forward_solver_protocol(self) -> None:
-        # doc 08 §4. The runtime check is structural and verifies the six method names
-        # are present, which turns a broken solver into a loud failure at load time.
         assert isinstance(Pic1D3VSolver(), ForwardSolver)
 
     def test_the_fidelity_is_l2(self) -> None:
         assert Pic1D3VSolver().fidelity() is Fidelity.L2
 
     def test_the_metadata_carries_a_citation(self) -> None:
-        # doc 00 C2: every algorithm has one, enforced at construction by SolverMetadata.
         metadata = Pic1D3VSolver().metadata()
         assert metadata.name == "ionlens.physics.kinetic.pic1d3v"
         assert metadata.citations
 
     def test_configure_applies_a_manifest_block(self) -> None:
-        # doc 08 §6's `forward:` block. Configuration is data, not code.
         solver = Pic1D3VSolver()
         solver.configure(SolverConfig(values={"n_ppc": 250, "n_cells": 17, "seed": 7}))
         assert solver.n_ppc == 250.0
@@ -205,13 +174,10 @@ class TestContract:
         assert solver.seed == 7
 
     def test_configure_refuses_a_key_it_does_not_know(self) -> None:
-        # A silently ignored manifest key is the failure ionlens.core.protocols.config warns
-        # about: the run finishes, reproducibly, and does not do what the file said.
         with pytest.raises(ValueError, match="n_ppcc"):
             Pic1D3VSolver().configure(SolverConfig(values={"n_ppcc": 250}))
 
     def test_the_cost_estimate_is_labelled_as_an_estimate(self) -> None:
-        # doc 10 §3.2 / gate G-1.4: a predicted cost must say that it is one.
         cost = Pic1D3VSolver().cost_estimate(SolverConfig(values={}))
         assert not cost.is_measured
         assert cost.wall_clock_s > 0.0
@@ -219,9 +185,6 @@ class TestContract:
 
 class TestStabilityIsChecked:
     def test_a_cell_wider_than_the_debye_length_is_a_runtime_error(self) -> None:
-        # doc 03 §4.3: "checked at runtime, and violating them is a runtime error rather
-        # than a warning". The violation produces output, which is why a warning is not a
-        # control for it.
         params = _params()
         solver = _sheath_solver(n_cells=4, n_steps=2)
         with pytest.raises(StabilityViolationError, match="Debye"):
@@ -234,8 +197,6 @@ class TestStabilityIsChecked:
             solver.solve(params, None)
 
     def test_the_chosen_timestep_satisfies_every_doc_03_4_3_constraint(self) -> None:
-        # The timestep is derived, not configured: dt = min(0.2/omega_pe, dz/v_max). The
-        # CFL branch is the one that bites when secondary electrons re-cross the sheath.
         params = _params(gamma_se=0.1)
         solver = _sheath_solver(n_steps=2)
         run = solver.run(params, None)
@@ -247,8 +208,6 @@ class TestStabilityIsChecked:
 
 class TestEmittedState:
     def test_the_state_is_an_l2_state_carrying_its_ion_distribution(self) -> None:
-        # doc 03 §1 calls L2 "the only level that produces a correct IEDF"; PlasmaState
-        # refuses to construct an L2 state without one.
         run = _sheath_solver(n_steps=400).run(_params(), None)
         state = run.state
 
@@ -258,13 +217,11 @@ class TestEmittedState:
         assert state.is_steady
 
     def test_the_wall_potential_is_the_applied_bias(self) -> None:
-        # doc 03 §3.3's wall row, and the only place doc 01 §2.1's -250 V enters.
         run = _sheath_solver(n_steps=400).run(_params(bias_v=-120.0), None)
         assert float(run.state.field("Phi").values[0]) == pytest.approx(-120.0)
         assert float(run.state.field("Phi").values[-1]) == pytest.approx(0.0, abs=1e-9)
 
     def test_a_time_grid_produces_time_resolved_fields(self) -> None:
-        # doc 08 §4's `solve(params, t)`. The instants are honoured rather than discarded.
         solver = _sheath_solver(n_steps=400)
         dt = solver.run(_params(), None).diagnostics.dt_s
         times = TimeGrid(t_s=np.linspace(200 * dt, 399 * dt, 5))
@@ -274,7 +231,6 @@ class TestEmittedState:
         assert state.field("Phi").values.shape == (5, state.grid.n_points)
 
     def test_the_run_is_reproducible_from_its_seed(self) -> None:
-        # doc 00 E3. Two solvers, same seed, identical deliverable to the bit.
         first = _sheath_solver(n_steps=600).run(_params(), None)
         second = _sheath_solver(n_steps=600).run(_params(), None)
 
@@ -293,8 +249,6 @@ class TestEmittedState:
 
 class TestFluxConvention:
     def test_energy_arrives_at_the_wall_with_a_positive_sign(self) -> None:
-        # doc 02 §2: flux toward the wall is positive. Getting this backwards flips the
-        # sign of the only number the project reports.
         run = _sheath_solver(n_steps=800).run(_params(bias_v=-50.0), None)
         assert run.flux.is_toward_wall
         assert float(run.flux.particle_flux_toward_wall_per_m2_s) > 0.0
@@ -307,9 +261,6 @@ class TestFluxConvention:
         assert float(recovered.energy_flux_toward_wall_watt_per_m2) > 0.0
 
     def test_a_state_from_another_run_is_refused(self) -> None:
-        # The wall flux is accumulated from every absorbed particle during the run; it
-        # cannot be recovered from a state alone. Answering anyway would be a plausible
-        # wrong number, which is the failure mode ADR-011 records.
         solver = _sheath_solver(n_steps=400)
         state = solver.solve(_params(), None)
         other = _sheath_solver(n_steps=400)
@@ -320,10 +271,6 @@ class TestFluxConvention:
 
 class TestParticleBookkeeping:
     def test_nothing_is_created_or_destroyed_between_the_boundaries(self) -> None:
-        # The conservation statement the whole loop rests on: every macroparticle that
-        # left the simulation did so through a named boundary, and every one that appeared
-        # came from a named source. A leak here would move Gamma_E without moving anything
-        # a reader would think to look at.
         run = _sheath_solver(n_steps=800).run(_params(gamma_se=0.2), None)
         ledger = run.diagnostics
 
@@ -337,9 +284,6 @@ class TestParticleBookkeeping:
         )
 
     def test_secondary_emission_scales_with_the_yield(self) -> None:
-        # doc 03 §3.3: "Secondary electron emission is not optional." A run with
-        # gamma_se = 0 must emit none, and one at 0.2 must emit about a fifth of the
-        # absorbed ion count.
         without = _sheath_solver(n_steps=800).run(_params(gamma_se=0.0), None)
         with_see = _sheath_solver(n_steps=800).run(_params(gamma_se=0.2), None)
 
@@ -349,18 +293,10 @@ class TestParticleBookkeeping:
         assert ratio == pytest.approx(0.2, rel=0.2)
 
 
-# ── doc 03 §7 verification gates ────────────────────────────────────────────────
-
-
 class TestV07EnergyConservation:
     @pytest.mark.physics
     @pytest.mark.slow
     def test_total_energy_drift_is_below_a_tenth_of_a_percent(self) -> None:
-        # doc 03 §7 V-07. A closed box — specular reflection at both ends, no bias, no
-        # collisions — so total energy is a conserved quantity of the equations and the
-        # leapfrog either conserves it or it does not. Absorption at a wall removes
-        # energy by design, which is why the gate cannot be stated in the sheath
-        # configuration.
         params = _params(bias_v=0.0, T_i_ev=3.0)
         lambda_d = debye_length_m(density_m3=params.n_0_per_m3, electron_temperature_ev=3.0)
         solver = Pic1D3VSolver(
@@ -383,10 +319,6 @@ class TestV07EnergyConservation:
     @pytest.mark.physics
     @pytest.mark.slow
     def test_a_cell_far_wider_than_the_debye_length_would_heat(self) -> None:
-        # Proof the gate has teeth. doc 03 §4.3's dz <= lambda_D constraint exists because
-        # a coarser grid transfers energy from the field to the particles with no physics
-        # doing it. The constraint check is bypassed here on purpose, to show that the
-        # thing it forbids is the thing that breaks V-07.
         params = _params(bias_v=0.0, T_i_ev=3.0)
         lambda_d = debye_length_m(density_m3=params.n_0_per_m3, electron_temperature_ev=3.0)
         solver = Pic1D3VSolver(
@@ -408,13 +340,9 @@ class TestV05TimestepIndependence:
     @pytest.mark.physics
     @pytest.mark.slow
     def test_gamma_e_changes_by_less_than_one_percent_on_halving_dt(self) -> None:
-        # doc 03 §7 V-05. Neither run is a recorded expectation; they are each other's
-        # reference, and a scheme whose answer depended on dt would separate them.
         coarse = _gate_run(bias_v=_GATE_BIAS_V, n_ppc=800.0)
         fine = _gate_run(bias_v=_GATE_BIAS_V, n_ppc=800.0, timestep_refinement=2.0)
 
-        # The same physical duration either way: the run length is derived from an ion
-        # transit time, so halving dt doubles the step count rather than shortening the run.
         assert fine.diagnostics.dt_s == pytest.approx(0.5 * coarse.diagnostics.dt_s)
         assert fine.diagnostics.window_duration_s == pytest.approx(
             coarse.diagnostics.window_duration_s, rel=1e-3
@@ -435,18 +363,12 @@ class TestV06ParticleCountConvergence:
     @pytest.mark.physics
     @pytest.mark.slow
     def test_the_iedf_shape_converges_on_doubling_n_ppc(self) -> None:
-        # doc 03 §7 V-06, and doc 03 §4.3's warning: converging the mean while the tail is
-        # still noise is a classic and silent PIC failure, so the statistic is the KS
-        # distance between the two *distributions*.
         coarse = _gate_run(bias_v=_GATE_BIAS_V, n_ppc=1200.0)
         fine = _gate_run(bias_v=_GATE_BIAS_V, n_ppc=2400.0)
 
         distance = float(
             stats.ks_2samp(coarse.iedf.sample_energies_ev, fine.iedf.sample_energies_ev).statistic
         )
-        # The sampling floor: two finite samples of the *same* distribution separate by
-        # about this much. Reported beside the statistic so a pass cannot be mistaken for
-        # convergence when it is really just a small sample.
         floor = 1.36 * math.sqrt(1.0 / coarse.iedf.n_samples + 1.0 / fine.iedf.n_samples)
 
         assert distance < V06_KS_TOLERANCE, (
@@ -458,9 +380,6 @@ class TestV06ParticleCountConvergence:
     @pytest.mark.physics
     @pytest.mark.slow
     def test_the_mean_impact_energy_also_converges(self) -> None:
-        # The moment, reported alongside the shape rather than instead of it. If this
-        # passed while the KS test failed, that would be exactly the silent failure
-        # doc 03 §4.3 describes — so both are recorded.
         coarse = _gate_run(bias_v=_GATE_BIAS_V, n_ppc=1200.0)
         fine = _gate_run(bias_v=_GATE_BIAS_V, n_ppc=2400.0)
 
@@ -468,9 +387,6 @@ class TestV06ParticleCountConvergence:
             coarse.iedf.mean_energy_ev
         )
         assert change < V05_TIMESTEP_TOLERANCE
-
-
-# ── the cross-model check ───────────────────────────────────────────────────────
 
 
 class TestAgainstAnalyticSheath:
@@ -482,10 +398,6 @@ class TestAgainstAnalyticSheath:
     the 4/3 power law appear nowhere in ``fields.py``, ``push.py`` or ``solver.py``.
     """
 
-    #: -250 V at T_e = 3 eV is V_w / T_e = 83, which is the collisionless high-bias limit
-    #: doc 03 §2.3 states its Child-Langmuir result in. A wider domain and a longer run
-    #: than the other gates use, because both the sheath and the ion transit scale with the
-    #: bias: at 83 the sheath spans 28 Debye lengths against 8 at V_w / T_e = 17.
     _BIAS_V = -250.0
     _DOMAIN_SHEATHS = 1.4
     _TRANSITS = 5.0
@@ -504,9 +416,6 @@ class TestAgainstAnalyticSheath:
     @pytest.mark.physics
     @pytest.mark.slow
     def test_the_ion_flux_at_the_wall_is_the_bohm_flux(self) -> None:
-        # A conservation statement about the loop rather than a prediction: doc 03 §3.3's
-        # bulk boundary injects at n_s c_s, so anything other than n_s c_s arriving means
-        # the loop created or destroyed ions. Labelled as such in the module docstring.
         params, run = self._run()
         expected = float(
             magnitude_in(ion_flux(params, h_l=DEFAULT_EDGE_TO_CENTRE_RATIO), "1/(m**2*s)")
@@ -520,9 +429,6 @@ class TestAgainstAnalyticSheath:
     @pytest.mark.physics
     @pytest.mark.slow
     def test_the_mean_impact_energy_is_the_sheath_drop(self) -> None:
-        # A prediction. The ion gains e V_w falling through the sheath the *field solve*
-        # produced, plus the entry energy L0 drops. So the PIC must land at or a little
-        # above e V_w, and a PIC with a broken push or a mis-scaled Poisson would not.
         params, run = self._run()
         drop_ev = float(magnitude_in(params.bias_magnitude, "V"))
         measured = run.iedf.mean_energy_ev
@@ -629,9 +535,6 @@ class TestAgainstAnalyticSheath:
     @pytest.mark.physics
     @pytest.mark.slow
     def test_the_potential_profile_follows_the_four_thirds_power_law(self) -> None:
-        # doc 03 §2.3's profile, Phi = -V_w (1 - z/s)^(4/3). Compared as a shape over the
-        # sheath, normalised by V_w so the statement is about the profile rather than
-        # about the boundary value the Dirichlet condition already fixes.
         params, run = self._run()
         state = run.state
         thickness = child_langmuir_thickness(params, h_l=0.61)
@@ -650,23 +553,12 @@ class TestAgainstAnalyticSheath:
 
 class TestSurfaceModelIsWired:
     def test_the_solver_takes_the_yield_from_the_plasma_parameters(self) -> None:
-        # doc 08 §1 principle 4: gamma_se is a manifest quantity (PlasmaParams.gamma_se),
-        # not a constant the solver keeps. Reading it from the registry instead would make
-        # a swept yield silently inert.
         solver = _sheath_solver()
         surface = solver.surface_model(_params(gamma_se=0.17))
         assert isinstance(surface, SurfaceModel)
         assert surface.secondary_yield == 0.17
 
     def test_reflection_applies_to_ions_and_not_to_electrons(self) -> None:
-        # doc 03 §3.3's wall row absorbs the electron flux outright; R_i is doc 03 §8 A10's
-        # *ion* reflection coefficient, quoted for Ar+ on tungsten. One SurfaceModel is
-        # applied to both species by the boundary step, so a coefficient meant for the ions
-        # will silently reflect electrons too — and the default R_i = 0 hides it. It only
-        # activates over the registry's own [0, 0.2] sweep range, where it would suppress
-        # the electron wall flux, warm the sheath and shift Gamma_E, with nothing in the
-        # ledger looking wrong. Stated at R_i = 1 so the failure is unambiguous rather than
-        # a fifth of an effect buried in shot noise.
         run = _sheath_solver(n_steps=800, ion_reflection=1.0).run(_params(), None)
 
         assert run.diagnostics.ions_absorbed == 0, "R_i = 1 must reflect every arriving ion"

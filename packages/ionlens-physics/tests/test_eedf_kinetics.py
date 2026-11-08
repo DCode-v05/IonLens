@@ -26,7 +26,6 @@ from ionlens.physics.eedf.kinetics import (
     kinetics_from_set,
 )
 
-# ── synthetic fixtures (doc 09 §5: no downloaded data in tests) ──────────────────
 
 ARGON_MASS_RATIO = 1.36e-5
 
@@ -84,9 +83,6 @@ def _grid() -> EnergyGrid:
     return EnergyGrid.linear(max_ev=80.0, n_cells=200)
 
 
-# ── the join ────────────────────────────────────────────────────────────────────
-
-
 class TestAssembly:
     def test_the_momentum_transfer_channel_is_found_as_effective(self) -> None:
         kinetics = kinetics_from_set(_set(_effective(), _ionisation()), _grid())
@@ -95,8 +91,6 @@ class TestAssembly:
         assert np.all(kinetics.momentum_transfer_m2 > 0.0)
 
     def test_the_momentum_transfer_channel_is_found_as_elastic(self) -> None:
-        # Phelps publishes argon momentum transfer as EFFECTIVE, Biagi as ELASTIC.
-        # doc 09 §2.1 keeps both, so neither spelling may be the one that works.
         kinetics = kinetics_from_set(_set(_elastic(), _ionisation()), _grid())
 
         assert np.all(kinetics.momentum_transfer_m2 > 0.0)
@@ -112,7 +106,7 @@ class TestAssembly:
         assert kinetics.mass_ratio == pytest.approx(2.0e-5)
 
     def test_a_set_without_a_published_mass_ratio_demands_one(self) -> None:
-        bare = _section(ProcessType.ELASTIC)  # mass_ratio is None
+        bare = _section(ProcessType.ELASTIC)
 
         with pytest.raises(ValueError, match="mass ratio"):
             kinetics_from_set(_set(bare, _ionisation()), _grid())
@@ -148,15 +142,11 @@ class TestAssembly:
             kinetics_from_set(_set(_ionisation()), _grid())
 
     def test_an_elastic_only_set_is_allowed(self) -> None:
-        # The Maxwellian and Druyvesteyn limits are elastic-only by construction, so a
-        # set with no inelastic channel is a legitimate verification case, not an error.
         kinetics = kinetics_from_set(_set(_effective()), _grid())
 
         assert kinetics.channels == ()
 
     def test_a_zero_momentum_transfer_cross_section_is_refused(self) -> None:
-        # sigma_m appears in a denominator in every transport integral. A zero would
-        # return inf, which propagates into a rate table looking like a number.
         zeroed = _section(
             ProcessType.EFFECTIVE,
             mass_ratio=ARGON_MASS_RATIO,
@@ -211,9 +201,6 @@ class TestTheExtrapolationDecision:
 class TestChannelsAboveTheGrid:
     @pytest.mark.physics
     def test_a_threshold_above_the_grid_top_makes_the_channel_identically_zero(self) -> None:
-        # Not an error: a manifest may legitimately sweep a grid shorter than some
-        # channel's threshold. The rate coefficient must then be exactly zero rather
-        # than a small number produced by an off-grid extrapolation.
         kinetics = kinetics_from_set(
             _set(_effective(), _ionisation(threshold_ev=15.76)),
             EnergyGrid.linear(max_ev=10.0, n_cells=50),
@@ -416,9 +403,6 @@ class TestTheEffectiveMomentumTransferCrossSection:
         )
 
     def test_it_does_the_same_at_the_cell_boundaries(self) -> None:
-        # The flux terms and the mobility sum are evaluated at boundaries, so an
-        # effective cross section that existed only at cell centres would fix the
-        # energy balance and leave the transport coefficients wrong.
         grid = _grid()
         kinetics = ElectronKinetics(
             grid=grid,
@@ -456,9 +440,6 @@ class TestTheEffectiveMomentumTransferCrossSection:
         )
 
     def test_the_elastic_cross_section_is_still_available_separately(self) -> None:
-        # Reid's eq. (5a) keeps sigma_m,e in the elastic energy-loss term and uses the
-        # total only in the field-heating and transport terms. Collapsing the two would
-        # make the exact form unreachable.
         grid = _grid()
         kinetics = ElectronKinetics(
             grid=grid,
@@ -500,8 +481,6 @@ class TestTheEffectiveMomentumTransferCrossSection:
             )
 
     def test_kinetics_from_set_samples_channels_at_the_boundaries_too(self) -> None:
-        # The loader has to supply both, or every real gas silently falls back to an
-        # elastic-only momentum transfer and the defect returns through the front door.
         grid = _grid()
         kinetics = kinetics_from_set(_set(_effective(), _ionisation()), grid)
 

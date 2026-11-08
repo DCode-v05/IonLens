@@ -42,23 +42,15 @@ class TestVibrationPhaseStd:
         assert vibration_phase_std_rad(1.0e-3) > 0.0
 
     def test_is_below_the_full_phase_resolution_budget(self) -> None:
-        # The vibration term is only part of the doc 02 IF-P1 noise budget - see
-        # TestIndependentPhaseStd for the rest of it.
         assert vibration_phase_std_rad(1.0e-3) < PHASE_RESOLUTION_RAD
 
     def test_a_longer_window_sees_more_of_the_1_over_f_tail(self) -> None:
-        # A longer acquisition resolves lower frequencies (f_min = 1/duration), which is
-        # exactly the slow-drift content a 1/f spectrum concentrates its power in. Doc 02
-        # IF-G2 calls mechanical drift "the dominant systematic" for the reason that a
-        # longer measurement accrues more of it, not less.
         short = vibration_phase_std_rad(1.0e-4)
         long = vibration_phase_std_rad(1.0e-1)
 
         assert long > short
 
     def test_returns_zero_when_the_window_is_too_short_to_resolve_any_vibration(self) -> None:
-        # A gate far shorter than one period of the fastest modelled vibration frequency
-        # cannot see it at all; the model must not extrapolate noise power from nothing.
         assert vibration_phase_std_rad(1.0e-9) == 0.0
 
     def test_refuses_a_nonpositive_duration(self) -> None:
@@ -71,8 +63,6 @@ class TestIndependentPhaseStd:
         assert independent_phase_std_rad() > 0.0
 
     def test_combines_with_the_vibration_term_to_the_calibrated_phase_resolution(self) -> None:
-        # By construction (see the module docstring): at the reference window the two
-        # variances sum to doc 02 IF-P1's quoted 0.1 mrad.
         reference_window_s = 1.0e-3
         total_variance = (
             vibration_phase_std_rad(reference_window_s) ** 2 + independent_phase_std_rad() ** 2
@@ -138,8 +128,6 @@ class TestVibrationModelParametersAreRegistered:
         assert entry.value == pytest.approx(expected)
 
     def test_the_common_mode_fraction_is_read_from_the_registry_not_hardcoded(self) -> None:
-        # A fraction of 0.0 must push all of IF-P1's variance onto the independent term,
-        # leaving no correlated vibration term at all — the opposite of the shipped 0.9.
         no_vibration_registry = _registry_with({"IF.vibration_common_mode_fraction": 0.0})
 
         vibration = vibration_phase_std_rad(1.0e-3, registry=no_vibration_registry)
@@ -157,10 +145,6 @@ class TestVibrationModelParametersAreRegistered:
         assert moved_result != pytest.approx(default_result)
 
     def test_the_reference_window_is_read_from_the_registry_not_hardcoded(self) -> None:
-        # By construction (module docstring): at the reference window, vibration and
-        # independent variance sum to PHASE_RESOLUTION_RAD^2 exactly. Moving the
-        # reference window and re-checking the identity there (rather than at the
-        # original 1 ms) proves the window itself came from the registry.
         moved_registry = _registry_with({"IF.vibration_reference_window_s": 5.0e-3})
 
         vibration = vibration_phase_std_rad(5.0e-3, registry=moved_registry)

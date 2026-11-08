@@ -26,18 +26,8 @@ type FloatArray = NDArray[np.float64]
 
 _E_C: Final[float] = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 
-#: Fraction of the (sorted) sweep used to estimate the ion-saturation current — the most
-#: negative points, where the electron branch has underflowed.
 _ION_SAT_FRACTION_OF_SWEEP: Final[float] = 0.1
 
-#: Lower and upper bounds, as a fraction of the recovered electron-saturation current, of
-#: the window the log-slope fit uses. Excludes the ion-saturation-dominated points below
-#: and the already-saturated points above, the same practical window a real analysis uses.
-#: The lower bound is not arbitrary: below ~10-15 % of the electron-saturation current the
-#: constant-ion-current subtraction of step 2 below is no longer a good approximation at
-#: the default probe geometry (the sheath-expanded ion current at the bottom of the sweep
-#: is itself a comparable fraction of the electron-saturation current there), and fitting
-#: through that region biases even the Maxwellian recovery. 0.2-0.4 is clear of it.
 _FIT_WINDOW_LOWER_FRACTION: Final[float] = 0.2
 _FIT_WINDOW_UPPER_FRACTION: Final[float] = 0.4
 

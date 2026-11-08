@@ -88,43 +88,16 @@ __all__ = [
 
 FloatArray: TypeAlias = NDArray[np.float64]
 
-#: ``kappa = 1``: ``f0 ~ exp(-eps/T_e)``. The shape the Boltzmann-electron relation of
-#: doc 03 §3.1 assumes, and the shape doc 03 §3.2 says the sheath does not have.
 MAXWELLIAN_KAPPA: Final[float] = 1.0
 
-#: ``kappa = 2``: ``f0 ~ exp(-(eps/eps_0)**2)``. The exact solution of the two-term
-#: equation for a constant momentum-transfer cross section and a cold gas, and the shape
-#: doc 03 §3.2 names as typical of a low-pressure discharge.
 DRUYVESTEYN_KAPPA: Final[float] = 2.0
 
-#: Ratio of the mean energy to the temperature of a Maxwellian, ``<eps> = (3/2) k T_e``.
 _THREE_HALVES: Final[float] = 1.5
 
-#: The kappa distribution's spectral index below which the mean energy diverges.
-#:
-#: ``<eps> = integral eps**(3/2) f0 deps`` is, up to a factor, the Beta-function integral
-#: ``B(5/2, kappa - 3/2)``, which requires ``kappa - 3/2 > 0`` to converge (Summers & Thorne
-#: 1991; Pierrard & Lazar 2010). At and below this bound there is no temperature for the
-#: distribution to carry, so :func:`kappa_eedf` refuses to evaluate rather than return a
-#: value with no physical mean energy behind it. Numerically equal to :data:`_THREE_HALVES`,
-#: but named separately because the two play unrelated roles: one is "how the moment
-#: identity for a Maxwellian is stated", the other is "where a different family's validity
-#: domain ends".
 KAPPA_DISTRIBUTION_MINIMUM_KAPPA: Final[float] = _THREE_HALVES
 
-#: Order shift between the normalisation Beta integral, ``B(3/2, kappa - 1/2)``, and the
-#: mean-energy Beta integral, ``B(5/2, kappa - 3/2)``, in :func:`kappa_eedf`. Algebra, not a
-#: measurement: it is the ``1/2`` that separates ``sqrt(eps)`` from ``eps**(3/2)`` under the
-#: same substitution ``eps = (kappa - 3/2) T_e x``.
 _HALF: Final[float] = 0.5
 
-#: Largest exponent evaluated before the result is taken as an underflow to zero.
-#:
-#: ``exp(-x)`` underflows to zero at ``x ~ 745``, and NumPy reports that as a RuntimeWarning
-#: which pytest's ``filterwarnings = ["error"]`` turns into a failure. The underflow is the
-#: *correct* answer — the tail of a kappa = 5 distribution really is zero to double
-#: precision long before the grid ends — so it is produced deliberately rather than
-#: allowed to happen and then suppressed.
 _MAX_EXPONENT: Final[float] = 700.0
 
 

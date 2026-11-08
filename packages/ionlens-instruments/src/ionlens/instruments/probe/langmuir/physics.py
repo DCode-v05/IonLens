@@ -38,33 +38,14 @@ _E_C: Final[float] = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _M_E: Final[float] = float(magnitude_in(ELECTRON_MASS, "kg"))
 _EPS0: Final[float] = float(magnitude_in(VACUUM_PERMITTIVITY, "F/m"))
 
-# ── the electron-retardation energy grid ────────────────────────────────────────────
-#
-# generalised_eedf underflows to exactly zero far into the tail (see its module
-# docstring), so a generous span costs accuracy nowhere; it only has to reach past the
-# largest retarding energy the sweep can present.
 
-#: Grid points spanning ``[0, span * T_e]`` for the retarding-current integral.
 _ENERGY_GRID_POINTS: Final[int] = 4000
 
-#: How many electron temperatures the energy grid spans. The widest sweep
-#: :mod:`ionlens.instruments.probe.langmuir.instrument` defaults to is 90 V below the plasma
-#: potential at T_e as low as ~2 eV; 30 T_e covers that with a wide margin before the
-#: EEDF has underflowed.
 _ENERGY_GRID_SPAN_IN_TE: Final[float] = 30.0
 
-# ── default geometry — a thin tungsten wire probe, the common laboratory choice ────
-#
-# Chosen so a cylindrical probe's sheath-expansion systematic (the effect this module
-# exists to reproduce) is visible: Mott-Smith & Langmuir (1926) derive it specifically
-# for a thin cylinder, where the sheath thickness is not negligible next to the probe
-# radius. Re-exported by :mod:`ionlens.instruments.probe.langmuir.instrument`, which is the
-# only other consumer.
 
-#: Probe wire radius — a 0.25 mm diameter tip, typical of a laboratory W probe.
 DEFAULT_PROBE_RADIUS_M: Final[float] = 1.25e-4
 
-#: Exposed collecting length.
 DEFAULT_PROBE_LENGTH_M: Final[float] = 5.0e-3
 
 
@@ -226,10 +207,6 @@ def electron_current_a(
     shape = generalised_eedf(
         energy_grid_ev, mean_energy_ev=1.5 * electron_temperature_ev, kappa=kappa
     )
-    # Rescale once from the eV-normalised f0 (integral f0 sqrt(eps_eV) d(eps_eV) = 1) to
-    # the SI-consistent g_J with integral g_J(eps_J) sqrt(eps_J) d(eps_J) = 1, so the
-    # tail integrals below are exact SI moments and not eV-vs-Joule algebra repeated at
-    # every call. See the module docstring's Merlino (2007) / Druyvesteyn (1930) citation.
     g_j = shape / _E_C**1.5
     energy_grid_j = energy_grid_ev * _E_C
 

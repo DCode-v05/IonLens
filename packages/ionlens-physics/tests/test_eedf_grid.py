@@ -88,7 +88,6 @@ class TestQuadrature:
         grid = EnergyGrid.linear(max_ev=4.0, n_cells=7)
         f0 = np.full(grid.n_cells, 3.0)
 
-        # integral_0^4 3 sqrt(eps) deps = 3 * (2/3) * 4**1.5 = 16
         assert grid.moment(f0, 0) == pytest.approx(16.0)
 
     @pytest.mark.physics
@@ -96,7 +95,6 @@ class TestQuadrature:
         grid = EnergyGrid.quadratic(max_ev=4.0, n_cells=9)
         f0 = np.full(grid.n_cells, 1.0)
 
-        # integral_0^4 eps**1.5 deps = (2/5) * 4**2.5 = 12.8
         assert grid.moment(f0, 1) == pytest.approx(12.8)
 
     def test_the_cell_masses_sum_to_the_zeroth_moment_weight(self) -> None:
@@ -139,7 +137,6 @@ class TestRefinement:
 
         finer = grid.refined(2)
 
-        # A quadratic grid refined must stay finer at the bottom than at the top.
         assert finer.widths_ev[0] < finer.widths_ev[-1]
 
     def test_refining_by_one_returns_the_same_boundaries(self) -> None:

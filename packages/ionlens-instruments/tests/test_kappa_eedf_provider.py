@@ -46,9 +46,6 @@ class TestNormalisation:
         assert grid.moment(f0, 0) == pytest.approx(1.0, rel=1e-9)
 
     def test_f0_is_the_grid_renormalised_kappa_eedf_shape(self, grid: EnergyGrid) -> None:
-        # Same relationship MaxwellianEedf has to maxwellian_eedf: the provider calls the
-        # distribution function and then renormalises on the discrete grid, so the two
-        # must agree once that renormalisation is applied to both.
         from ionlens.physics.eedf.analytic import kappa_eedf
 
         provider = KappaEedf(grid=grid, kappa=2.0)
@@ -81,9 +78,6 @@ class TestValidation:
     def test_construction_rejects_kappa_at_or_below_the_validity_bound(
         self, grid: EnergyGrid
     ) -> None:
-        # Fail fast, at construction, the same way OesInstrument.centre_wavelength_nm's
-        # setter validates eagerly rather than waiting for the first forward() — a bad
-        # kappa should be caught at the manifest line that set it, not several calls later.
         with pytest.raises(ValueError, match="kappa"):
             KappaEedf(grid=grid, kappa=KAPPA_DISTRIBUTION_MINIMUM_KAPPA)
 
@@ -106,9 +100,6 @@ class TestRepr:
 
 class TestGenuinelyDifferentFromTheMaxwellian:
     def test_the_two_providers_disagree_at_the_same_T_e(self, grid: EnergyGrid) -> None:
-        # The point of the whole task: doc 05 §7.1's "EEDF parameterisation" mismatch
-        # needs a second *shape*, not a relabelled Maxwellian. At the same T_e the two
-        # providers must produce measurably different distributions.
         kappa_provider = KappaEedf(grid=grid, kappa=2.0)
         maxwellian_provider = MaxwellianEedf(grid=grid)
 

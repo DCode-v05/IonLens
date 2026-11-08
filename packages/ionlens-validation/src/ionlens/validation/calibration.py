@@ -80,29 +80,14 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: Confidence level of the interval placed *around each coverage estimate*. Distinct from
-#: the credible levels being tested, and easy to conflate with them: 0.9 here would mean
-#: "a 90 % confidence interval on the measured coverage of the 90 % credible interval".
 COVERAGE_INTERVAL_LEVEL: Final[float] = 0.95
 
-#: KS p-value below which the PIT is judged not uniform. Lower than the conventional 0.05
-#: deliberately: at doc 11 §9's 400+ cases the test has ample power against the
-#: miscalibrations that matter (a factor of two in the interval width is caught with
-#: p < 1e-30), so the binding consideration is the false-alarm rate on a figure that will be
-#: presented — at 0.05 a perfectly calibrated run is condemned one time in twenty.
 _UNIFORMITY_THRESHOLD: Final[float] = 0.01
 
-#: Mean absolute deviation of a Uniform(0, 1) variate from its own centre, ``E|U - 1/2|``.
-#: The dividing line between PIT mass at the edges (overconfident) and at the centre
-#: (underconfident). Exact, not fitted.
 _UNIFORM_MEAN_ABSOLUTE_DEVIATION: Final[float] = 0.25
 
-#: Standard deviations of the PIT mean away from 1/2 before the miscalibration is reported
-#: as a *shift* rather than as a width error. Three, so that ordinary sampling scatter on a
-#: calibrated ensemble is not diagnosed as bias.
 _BIAS_SIGMAS: Final[float] = 3.0
 
-#: Variance of a Uniform(0, 1) variate. Structure, not measurement.
 _UNIFORM_VARIANCE: Final[float] = 1.0 / 12.0
 
 
@@ -234,9 +219,6 @@ def coverage_report(pit: ArrayLike, *, levels: tuple[float, ...]) -> CoverageRep
     empirical: dict[float, float] = {}
     interval: dict[float, tuple[float, float]] = {}
     for level in levels:
-        # The equal-tailed interval at `level` contains the truth exactly when the PIT
-        # falls in the central `level` of the unit interval — which is what makes one PIT
-        # sample sufficient for every level at once.
         margin = 0.5 * (1.0 - level)
         hits = int(np.count_nonzero((values > margin) & (values < 1.0 - margin)))
         empirical[level] = hits / n

@@ -29,53 +29,22 @@ __all__ = [
     "magnitude_in",
 ]
 
-#: What a quantity's magnitude may be: a plain float for a scalar, an array for a field.
 Magnitude: TypeAlias = float | NDArray[np.float64]
 
-#: The single shared unit registry.
-#:
-#: pint quantities built by *different* registries raise on any binary operation, and the
-#: error surfaces far from the import that caused it. One registry, imported everywhere,
-#: and registered as pint's application registry so third-party code finds the same one.
 UREG: pint.UnitRegistry[Magnitude] = pint.UnitRegistry(autoconvert_offset_to_baseunit=False)
 
-# Units the project needs that pint does not ship.
-#
-# The townsend is the conventional unit of reduced electric field E/N, against which
-# doc 03 section 3.2 tabulates every rate coefficient the fluid model consumes.
 UREG.define("townsend = 1e-21 * volt * meter**2 = Td")
 
-# pint ships `torr` but will not accept an SI prefix on it, so `mTorr` does not parse.
-# That is the unit every pressure in docs 01 and 02 is quoted in, so it is defined here
-# rather than rewriting the documents into a unit no plasma physicist uses.
 UREG.define("millitorr = 1e-3 * torr = mTorr = mtorr = milliTorr")
 
 pint.set_application_registry(UREG)  # type: ignore[no-untyped-call]
 
-#: A dimensional quantity drawn from :data:`UREG`, of unspecified magnitude type.
-#:
-#: Deliberately ``pint.Quantity[Any]`` rather than ``pint.Quantity[float | NDArray]``.
-#: pint's ``Quantity`` is *invariant* in its magnitude, so the union form makes
-#: ``Quantity[float]`` unassignable to it — and every parameter position in the project
-#: would then reject the scalar quantities that are the common case. The rule that falls
-#: out is the usual one: **accept broadly, return precisely.** Parameters take
-#: :data:`Quantity`; returns are :data:`ScalarQuantity` or :data:`ArrayQuantity` wherever
-#: which one it is is a fact about the quantity rather than about one caller.
 Quantity: TypeAlias = pint.Quantity[Any]
 
-#: A quantity whose magnitude is known to be a scalar.
-#:
-#: Use this in a signature wherever the scalar-ness is a fact about the quantity rather
-#: than about one caller — a sheath thickness is always one number. It lets
-#: :func:`magnitude_in` return a plain ``float`` instead of a union the caller then has
-#: to narrow, and hand-narrowing at every call site is how a union type stops being
-#: checked at all.
 ScalarQuantity: TypeAlias = pint.Quantity[float]
 
-#: A quantity whose magnitude is known to be an array — a field, a grid, an axis.
 ArrayQuantity: TypeAlias = pint.Quantity[NDArray[np.float64]]
 
-#: Quantity constructor bound to :data:`UREG`. ``Q_(5.0, "mTorr")``.
 Q_ = UREG.Quantity
 
 
@@ -131,10 +100,6 @@ def magnitude_in(value: Quantity, units: str) -> Magnitude:
         )
 
     try:
-        # ``m_as`` converts and strips in one step, so no converted-but-unasserted
-        # quantity ever exists. The cast is needed because `Quantity` is
-        # `pint.Quantity[Any]` in parameter position (see its docstring), so pint can
-        # only promise `Any` back; the overloads above are what give callers a real type.
         return cast("Magnitude", value.m_as(units))
     except pint.DimensionalityError as exc:
         raise DimensionalityError(

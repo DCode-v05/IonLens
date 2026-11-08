@@ -311,8 +311,6 @@ def estimate_hierarchy_discrepancy(
                 f"the two models returned different shapes ({low.shape} and {high.shape}); "
                 f"they must predict the same channels for the difference to mean anything"
             )
-        # Where the low-fidelity prediction vanishes there is no scale to be relative to,
-        # and a channel the inversion predicts nothing in carries no information either way.
         relative = np.divide(high - low, low, out=np.zeros_like(low), where=np.abs(low) > 0.0)
         squared.append(relative**2)
 

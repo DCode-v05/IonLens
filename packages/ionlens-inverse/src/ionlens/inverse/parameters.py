@@ -91,13 +91,7 @@ __all__ = [
 
 _REGISTRY: Final = default_registry()
 
-#: Full turn, in radians. Structure rather than measurement: doc 05 §2.1's ``uniform
-#: [0, 2π)`` is the statement that the RF phase is a phase, and there is nowhere to source
-#: a value of 2π from.
 TWO_PI: Final[float] = 2.0 * math.pi
-
-
-# ─── transforms ──────────────────────────────────────────────────────────────────
 
 
 @runtime_checkable
@@ -158,11 +152,6 @@ class LogTransform:
     """
 
     def to_constrained(self, u: float) -> float:
-        # `math.exp` rather than `np.exp` for two reasons. It is several times faster on a
-        # scalar, which matters in a likelihood evaluated 10^6 times (doc 05 §5); and it
-        # signals overflow by raising instead of by emitting a `RuntimeWarning`, which the
-        # project's pytest configuration turns into a test failure. Overflow to `+inf` is
-        # the correct limit of `exp` and a caller integrating over all of R will reach it.
         try:
             return math.exp(u)
         except OverflowError:
@@ -220,9 +209,6 @@ class LogitTransform:
 
     def log_abs_det_jacobian(self, u: float) -> float:
         return float(math.log(self.width) + log_expit(u) + log_expit(-u))
-
-
-# ─── the doc 05 §2.1 table ───────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -341,23 +327,14 @@ CONTROL_PARAMETERS: Final[tuple[ControlParameterSpec, ...]] = (
     ),
 )
 
-#: doc 05 §2.1: "Level A — control parameters (θ_c, ~8)".
 N_CONTROL: Final[int] = len(CONTROL_PARAMETERS)
 
-#: The RF phase has no registry nominal, because there is nothing to source: doc 05 §2.1
-#: gives it a uniform prior over the whole circle, which is the statement that no phase is
-#: preferred. The reference vector therefore uses the midpoint of that prior, which is also
-#: where the logit sits at ``u = 0`` — so a run started from the reference point starts an
-#: optimiser at the origin in this coordinate rather than at a boundary.
 _REFERENCE_PHI_RF: Final[float] = TWO_PI / 2.0
 
 
 def control_parameter_names() -> tuple[str, ...]:
     """Field names in doc 05 §2.1 table order — the order of every array here."""
     return tuple(spec.name for spec in CONTROL_PARAMETERS)
-
-
-# ─── the vector ──────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -415,7 +392,6 @@ class ControlParameters:
                 f"(0, inf) {spec.units}; doc 05 §4.2 makes positivity structural"
             )
 
-    # ── constructors ────────────────────────────────────────────────────────────
 
     @classmethod
     def reference(cls) -> ControlParameters:
@@ -455,7 +431,6 @@ class ControlParameters:
             }
         )
 
-    # ── views ───────────────────────────────────────────────────────────────────
 
     def as_array(self) -> NDArray[np.float64]:
         """The eight values in doc 05 §2.1 table order."""
@@ -499,9 +474,6 @@ def _as_vector(values: ArrayLike) -> NDArray[np.float64]:
             f"doc 05 §2.1 has {N_CONTROL} Level A control parameters; got {vector.size} values"
         )
     return vector
-
-
-# ─── the change of variables ─────────────────────────────────────────────────────
 
 
 def log_abs_det_jacobian(u: ArrayLike) -> float:

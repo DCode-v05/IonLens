@@ -68,8 +68,6 @@ class TestEveryStateTypeIsPrintable:
         assert "DC" in repr(params)
 
     def test_plasma_params_with_rf_bias(self, params: PlasmaParams) -> None:
-        # The RF branch formats a quantity the DC branch never touches, so it needs its
-        # own exercise — this is the branch that was broken.
         assert "MHz" in repr(params.replace(rf_frequency=Q_(13.56, "MHz")))
 
     def test_scalar_field(self, grid: SpatialGrid) -> None:

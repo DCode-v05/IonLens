@@ -49,9 +49,6 @@ def rp1() -> AblationResult:
     return run_rp1_baseline(seed=_SEED)
 
 
-# ── fast: what _prepare builds, before any recovery runs ────────────────────────────
-
-
 class TestPrepare:
     def test_the_joint_likelihood_has_every_channel_name(self) -> None:
         prepared = _prepare(seed=_SEED, wall_bias_v=-100.0, registry=None)
@@ -59,9 +56,6 @@ class TestPrepare:
         assert prepared.joint.names == CHANNEL_NAMES
 
     def test_without_returns_a_new_object_and_leaves_the_original_untouched(self) -> None:
-        # doc 11 §9 item 6's primitive, and the first risk a peer review flagged: an
-        # ablation sweep that quietly degraded the baseline it is compared against would
-        # make every row in the table look plausible while comparing nothing real.
         prepared = _prepare(seed=_SEED, wall_bias_v=-100.0, registry=None)
         baseline_names_before = prepared.joint.names
 
@@ -73,18 +67,12 @@ class TestPrepare:
         assert without_oes.names == tuple(n for n in CHANNEL_NAMES if n != OES_CHANNEL)
 
     def test_the_grid_is_sized_from_rp1_regardless_of_the_operating_bias(self) -> None:
-        # closed_loop's own module docstring: a spatial grid sized from anything other than
-        # the fixed RP-1 reference is the theta-dependent-grid inverse crime wearing a
-        # different hat. The operating bias is a chosen experimental setting, not the
-        # unknown being estimated, but this pins that changing it does not move the grid.
         at_reachable_bias = _prepare(seed=_SEED, wall_bias_v=-100.0, registry=None)
         at_rp1_bias = _prepare(seed=_SEED, wall_bias_v=None, registry=None)
 
         np.testing.assert_array_equal(at_reachable_bias.grid.z_m, at_rp1_bias.grid.z_m)
 
     def test_wall_bias_v_is_read_off_the_operating_reference_not_hardcoded(self) -> None:
-        # RP-1's bias comes from the registry via ControlParameters.reference(), not from a
-        # literal duplicated in this module — this is the check that keeps the two in sync.
         at_rp1_bias = _prepare(seed=_SEED, wall_bias_v=None, registry=None)
 
         assert at_rp1_bias.wall_bias_v == ControlParameters.reference().V_w
@@ -96,17 +84,11 @@ class TestPrepare:
         assert at_reachable_bias.wall_bias_v != ControlParameters.reference().V_w
 
 
-# ── slow: the reachable-bias sweep doc 11 §9 item 6 asks for ───────────────────────
-
-
 @pytest.mark.slow
 class TestRunAblation:
     def test_the_baseline_is_reported_first_and_the_ablations_follow_in_a_fixed_order(
         self, sweep: tuple[AblationResult, ...]
     ) -> None:
-        # One leave-one-out row per channel, in CHANNEL_NAMES order — doc 11 §9 item 6's
-        # "drop *each* channel". Asserted against CHANNEL_NAMES rather than a hand-listed
-        # pair so that connecting a fifth channel without ablating it fails here.
         assert [result.label for result in sweep] == [
             BASELINE_LABEL,
             *(without_label(name) for name in CHANNEL_NAMES),
@@ -123,10 +105,6 @@ class TestRunAblation:
     def test_each_ablation_drops_exactly_its_own_channel_and_keeps_the_rest(
         self, sweep: tuple[AblationResult, ...]
     ) -> None:
-        # Generalised from the two hand-written cases this had when the set was OES+LIF.
-        # The property is the same one those asserted — the named channel is gone and
-        # nothing else is — but stated once over every channel, so a new channel is
-        # covered the moment it is connected rather than whenever someone remembers.
         for dropped, result in zip(CHANNEL_NAMES, sweep[1:], strict=True):
             assert result.label == without_label(dropped)
             assert dropped not in result.contributing
@@ -135,9 +113,6 @@ class TestRunAblation:
     def test_every_configuration_is_scored_against_the_same_sealed_truth(
         self, sweep: tuple[AblationResult, ...]
     ) -> None:
-        # Only the likelihood changes between rows; a table where the truth itself drifted
-        # between rows would not be an ablation of one recovery, it would be three
-        # unrelated ones that happen to share a table.
         truths = {result.gamma_e_true_w_per_m2 for result in sweep}
 
         assert len(truths) == 1
@@ -152,9 +127,6 @@ class TestRunAblation:
     def test_every_configuration_reports_an_interval_or_states_its_absence_explicitly(
         self, sweep: tuple[AblationResult, ...]
     ) -> None:
-        # doc 05 §6 / ADR-012: a non-positive-definite Hessian is a result (the combination
-        # is not identified), not a crash, and `_gamma_e_interval` returns (None, None) for
-        # it rather than a manufactured number. Both fields must agree about the absence.
         for result in sweep:
             has_interval = result.interval_w_per_m2 is not None
             assert has_interval == (result.interval_width_w_per_m2 is not None)
@@ -163,25 +135,11 @@ class TestRunAblation:
                 assert result.interval_width_w_per_m2 >= 0.0
 
 
-# ── slow: the RP-1 datapoint, run separately from the reachable-bias sweep ──────────
-
-
 @pytest.mark.slow
 class TestRp1Baseline:
     def test_every_channel_contributes_at_rp1_after_the_lif_gate_was_reanchored(
         self, rp1: AblationResult
     ) -> None:
-        # This used to pin doc 01 IF-6's exclusion: LIF declared itself blind at RP-1's
-        # -250 V because its tuning-range gate compared against the free-fall speed at the
-        # *wall*. ionlens-instruments has since re-anchored that gate at the sheath-edge Bohm
-        # speed (see ablation.py's module docstring, "RP-1's blindness, past tense"), and
-        # channels.py's LIF channel now measures at the sheath edge by default too, so both
-        # channels are informative here. This is the check that would catch a regression
-        # back to the old, wall-anchored gate.
-        # Widened from (OES, LIF) to the whole set when Thomson and interferometry were
-        # connected: the property being pinned is unchanged — nothing is excluded at RP-1 —
-        # and asserting it over CHANNEL_NAMES keeps it true of every channel rather than of
-        # the two that existed when it was written.
         assert rp1.contributing == CHANNEL_NAMES
         assert rp1.excluded == ()
 
@@ -190,9 +148,6 @@ class TestRp1Baseline:
 
     def test_it_runs_at_rp1s_own_bias_not_the_reachable_sweeps(self, rp1: AblationResult) -> None:
         assert rp1.wall_bias_v == ControlParameters.reference().V_w
-
-
-# ── fast: the text table, independent of any physics ────────────────────────────────
 
 
 def _fabricated(

@@ -89,10 +89,6 @@ class Signal:
         if not np.all(np.isfinite(array)):
             raise ValueError("signal must be finite; found nan or inf")
 
-        # Negative samples are legal and deliberately not rejected. An ADU trace with the
-        # bias offset removed goes negative on the read-noise tail (doc 04 §7.1), and a
-        # type that clipped it would bias the low end of the V-28 photon-transfer curve
-        # upward — turning a verification test into a test of the clip.
 
         array.flags.writeable = False
         object.__setattr__(self, "values", array)

@@ -67,28 +67,19 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-# ── constants ───────────────────────────────────────────────────────────────────
 
 _C_M_PER_S: Final[float] = float(magnitude_in(SPEED_OF_LIGHT, "m / s"))
 _K_B_J_PER_K: Final[float] = float(magnitude_in(BOLTZMANN, "J / K"))
 _ATOMIC_MASS_KG: Final[float] = float(magnitude_in(ATOMIC_MASS, "kg"))
 
-#: Metres in a nanometre — see the note in :mod:`ionlens.instruments.oes.escape`.
 _METRES_PER_NM: Final[float] = float(magnitude_in(Q_(1.0, "nm"), "m"))
 
-#: ``2 sqrt(2 ln 2)`` — FWHM of a Gaussian in units of its standard deviation.
 _FWHM_PER_SIGMA: Final[float] = 2.0 * math.sqrt(2.0 * math.log(2.0))
 
-#: ``sqrt(8 ln 2)`` — the coefficient in ``Delta lambda / lambda = sqrt(8 ln 2 kT / m c^2)``.
 _DOPPLER_COEFFICIENT: Final[float] = math.sqrt(8.0 * math.log(2.0))
 
-#: Olivero & Longbothum (1977), *J. Quant. Spectrosc. Radiat. Transfer* **17** 233:
-#: ``f_V = 0.5346 f_L + sqrt(0.2166 f_L^2 + f_G^2)``, stated accurate to 0.02 %.
 OLIVERO_LORENTZ_COEFFICIENT: Final[float] = 0.5346
 
-#: The other half of the same expression. Note ``0.5346^2 = 0.2858``, not 0.2166; the two
-#: coefficients are an independent fit and not related by squaring, which is the mistake
-#: this note exists to prevent.
 OLIVERO_GAUSSIAN_COEFFICIENT: Final[float] = 0.2166
 
 
@@ -103,9 +94,6 @@ def _checked_width(value: float, *, name: str) -> float:
 def fwhm_to_gaussian_sigma(fwhm: float) -> float:
     """Standard deviation of a Gaussian of this full width at half maximum."""
     return fwhm / _FWHM_PER_SIGMA
-
-
-# ── the individual mechanisms ───────────────────────────────────────────────────
 
 
 def doppler_fwhm_nm(*, wavelength_nm: float, temperature_k: float, mass_u: float) -> float:
@@ -170,9 +158,6 @@ def natural_fwhm_nm(*, wavelength_nm: float, total_a_per_s: float) -> float:
     wavelength_m = wavelength_nm * _METRES_PER_NM
     fwhm_hz = total_a_per_s / (2.0 * math.pi)
     return fwhm_hz * wavelength_m**2 / _C_M_PER_S / _METRES_PER_NM
-
-
-# ── the combination ─────────────────────────────────────────────────────────────
 
 
 def voigt_profile(offset: ArrayLike, *, gaussian_fwhm: float, lorentz_fwhm: float) -> FloatArray:

@@ -41,7 +41,6 @@ __all__ = ["solve_poisson"]
 
 _EPS0_F_PER_M: Final[float] = float(magnitude_in(VACUUM_PERMITTIVITY, "F/m"))
 
-#: Options for a direct factorisation. See :func:`ionlens.physics.fluid.forms.run_newton`.
 _DIRECT: Final[dict[str, str]] = {"ksp_type": "preonly", "pc_type": "lu"}
 
 

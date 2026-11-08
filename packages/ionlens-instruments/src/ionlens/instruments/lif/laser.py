@@ -46,12 +46,6 @@ from ionlens.instruments.lif.transition import ProbeTransition
 
 __all__ = ["Laser", "TuningRange"]
 
-#: Below this projection factor the beam is treated as blind rather than merely inefficient.
-#:
-#: Doc 02 §4.2 check 2 calls a diagnostic geometry that cannot see the velocity component
-#: of interest "a complete design failure". At ``sin(theta_L) -> 0`` the recovered ``v_z``
-#: is a finite detuning divided by zero, so the failure mode is an infinity rather than a
-#: large error; the guard turns it into a message that names the design check it violates.
 _MINIMUM_PROJECTION: float = 1e-6
 
 
@@ -100,7 +94,6 @@ class Laser:
             grazing_angle=entries.quantity("LIF.grazing_angle"),
         )
 
-    # ── the beam ────────────────────────────────────────────────────────────────
 
     @property
     def peak_intensity(self) -> ScalarQuantity:
@@ -130,7 +123,6 @@ class Laser:
             "m",
         )
 
-    # ── the grazing geometry (doc 02 §4.2 check 2) ──────────────────────────────
 
     @property
     def projection_factor(self) -> float:
@@ -147,7 +139,6 @@ class Laser:
         """
         return 1.0 / self.projection_factor
 
-    # ── saturation (doc 04 §3.4) ────────────────────────────────────────────────
 
     def saturation_parameter(self, transition: ProbeTransition) -> float:
         """``S = I / I_sat`` — the number doc 04 §3.4 requires every run to report."""
@@ -167,7 +158,6 @@ class Laser:
         factor = saturation / self.saturation_parameter(transition)
         return replace(self, power=self.power * factor)
 
-    # ── sweeps ──────────────────────────────────────────────────────────────────
 
     def with_beam_waist(self, beam_waist: Quantity) -> Laser:
         """The same laser focused to a different waist."""
@@ -181,7 +171,6 @@ class Laser:
         """The same laser at a different delivered power."""
         return replace(self, power=power)
 
-    # ── SI magnitudes for hot loops (doc 08 §5) ─────────────────────────────────
 
     @property
     def beam_waist_m(self) -> float:
@@ -241,7 +230,6 @@ class TuningRange:
                 "the reconstructed field, not to scan further."
             )
 
-    # ── what the limit means in velocity and energy ─────────────────────────────
 
     def velocity_ceiling(self, *, transition: ProbeTransition, laser: Laser) -> ScalarQuantity:
         """The largest ``|v_z|`` the scan can reach — doc 04 §3.2's mapping, inverted.

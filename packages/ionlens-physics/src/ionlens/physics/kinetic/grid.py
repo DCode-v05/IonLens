@@ -29,10 +29,6 @@ enable_double_precision()
 
 __all__ = ["UniformGrid"]
 
-#: Display-only unit conversions for __repr__. Not physics — a sheath is naturally quoted in
-#: millimetres and a PIC cell in micrometres — but the literal-lint rule of doc 08 §5 does not
-#: distinguish, and it is right not to: a bare 1e6 in a physics module is exactly what the
-#: rule exists to stop, and exempting "but this one is only for printing" would gut it.
 _M_PER_MM: float = 1e3
 _M_PER_UM: float = 1e6
 

@@ -67,9 +67,6 @@ __all__ = ["CoupledSolution", "solve_drift_diffusion_poisson"]
 _E_C: Final[float] = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _EPS0_F_PER_M: Final[float] = float(magnitude_in(VACUUM_PERMITTIVITY, "F/m"))
 
-#: Default Newton iteration cap. Generous: doc 03 §3.4's claim is that Newton converges
-#: where Gummel does not, and a cap tight enough to be the binding constraint would turn
-#: a hard problem into a failed one without saying which.
 DEFAULT_MAX_ITERATIONS: Final[int] = 50
 
 
@@ -199,8 +196,6 @@ def solve_drift_diffusion_poisson(
         reference = _scaled(electron_coupling_reference, 1.0 / reference_density)
         continuity += electron_coupling_rate * (electrons - reference) * density_test * ufl.dx
 
-    # The residual blocks are rescaled onto a common size so that "the Newton increment
-    # is small" means the same thing in both. See the module docstring.
     continuity_scale = length / max(abs(drift), diffusivity / length)
 
     debye_squared = _EPS0_F_PER_M * electron_temperature_volts / (_E_C * reference_density)

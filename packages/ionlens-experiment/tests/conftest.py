@@ -17,8 +17,6 @@ from omegaconf import OmegaConf
 
 from ionlens.experiment import Manifest, RunStore, load_manifest
 
-#: The manifests that ship with the package. They are the fixtures deliberately: a test
-#: that used its own private copy would keep passing while the shipped example rotted.
 _EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
 
 _RUNNABLE = _EXAMPLES / "l0-child-langmuir-rp1.yaml"

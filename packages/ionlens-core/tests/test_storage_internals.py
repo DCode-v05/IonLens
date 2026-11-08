@@ -60,9 +60,6 @@ def _posterior(seed: int = 0) -> Posterior:
 
 class TestQuantitiesThatCannotBeStoredAsScalars:
     def test_an_array_valued_quantity_is_refused(self, tmp_path: Path) -> None:
-        # Control parameters are scalars. A quantity that arrived as a profile is a wiring
-        # error, and HDF5 would happily store it under a name every reader expects to be
-        # one number.
         with (
             h5py.File(tmp_path / "x.h5", "w") as handle,
             pytest.raises(ValueError, match="scalar"),
@@ -72,10 +69,6 @@ class TestQuantitiesThatCannotBeStoredAsScalars:
 
 class TestAttributesWrittenByAnotherTool:
     def test_a_provenance_field_stored_as_a_utf_8_blob_still_reads(self) -> None:
-        # HDF5 lets a writer store a string attribute as a byte blob, and not every tool
-        # that might produce a IonLens-shaped file is h5py. Decoding is the difference between
-        # reading such a file and rejecting it for a reason that has nothing to do with
-        # its contents.
         record = Provenance(
             manifest_sha256="4a7f2e91" + "0" * 56,
             git_commit="9c1d8b3" + "0" * 33,
@@ -99,8 +92,6 @@ class TestAttributesWrittenByAnotherTool:
 
 class TestPosteriorSummaryInvariants:
     def test_a_mean_without_a_credible_interval_is_refused(self) -> None:
-        # doc 06 §8 rejects a point estimate reported without an interval. A summary that
-        # could hold one without the other would let exactly that reach a report.
         with pytest.raises(ValueError, match="credible interval"):
             PosteriorSummary(
                 mean={"V_w": np.asarray(1.0)},
@@ -114,8 +105,6 @@ class TestPosteriorSummaryInvariants:
     def test_two_archives_of_the_same_posterior_summarise_identically(
         self, tmp_path: Path, record: Provenance
     ) -> None:
-        # doc 00 E3: the same inputs give the same result. Two writes of one posterior are
-        # the cheapest available instance of that promise.
         posterior = _posterior()
         write_posterior(tmp_path / "a.zarr", posterior, provenance=record)
         write_posterior(tmp_path / "b.zarr", posterior, provenance=record)

@@ -38,18 +38,14 @@ from ionlens.experiment.run.reproduce import reproduce
 
 __all__ = ["DEFAULT_STORE", "STORE_VARIABLE", "main"]
 
-#: Where runs go when nothing says otherwise.
 DEFAULT_STORE: Final[Path] = Path("runs")
 
-#: Environment variable overriding :data:`DEFAULT_STORE`.
 STORE_VARIABLE: Final[str] = "IONLENS_RUN_STORE"
 
 _EXIT_OK: Final[int] = 0
 _EXIT_FAILED: Final[int] = 1
 _EXIT_USAGE: Final[int] = 2
 
-#: The failures that are outcomes rather than bugs. Each already carries a message
-#: written for the person who caused it, so the handler prints it and nothing else.
 _REPORTED: Final[tuple[type[Exception], ...]] = (
     FileExistsError,
     FileNotFoundError,

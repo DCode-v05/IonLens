@@ -28,8 +28,6 @@ from ionlens.inverse.parameters import (
     unconstrained_bounds,
 )
 
-#: doc 05 §2.1, transcribed from the table rather than read from the registry. The point
-#: of a transcription is that it fails when the registry drifts away from the document.
 DOC_05_TABLE = {
     "n_0": ("m**-3", (1.0e15, 1.0e19)),
     "T_e": ("eV", None),
@@ -41,9 +39,6 @@ DOC_05_TABLE = {
     "kappa": ("dimensionless", (1.0, 5.0)),
 }
 
-#: A point strictly inside every parameter's support, used wherever a test needs "some
-#: legal vector". Not the reference point: a test that only ever evaluates at the
-#: registry defaults cannot distinguish a transform from the identity.
 INTERIOR = ControlParameters(
     n_0=3.7e16,
     T_e=4.25,
@@ -64,7 +59,6 @@ class TestTheLevelATable:
     """The vector is doc 05 §2.1's table and not an approximation of it."""
 
     def test_there_are_eight_control_parameters(self) -> None:
-        # doc 05 §2.1: "Level A — control parameters (theta_c, ~8)".
         assert len(DOC_05_TABLE) == N_CONTROL
         assert len(CONTROL_PARAMETERS) == N_CONTROL
 
@@ -89,8 +83,6 @@ class TestTheLevelATable:
                 assert spec.support is None
 
     def test_positivity_is_structural_for_the_positive_quantities(self) -> None:
-        # doc 05 §4.2: "Positivity | log-parameterisation of n, T | structural". A log
-        # transform cannot produce a negative value, which is what "structural" means.
         for name in ("n_0", "T_e", "T_i", "p"):
             spec = next(s for s in CONTROL_PARAMETERS if s.name == name)
             assert isinstance(spec.transform, LogTransform)
@@ -101,8 +93,6 @@ class TestTheLevelATable:
             assert isinstance(spec.transform, LogitTransform)
 
     def test_the_wall_bias_is_unconstrained(self) -> None:
-        # V_w is signed — doc 01 §2.1 registers RP1.bias as -250 V — so neither a log nor
-        # a logit applies, and pretending otherwise would exclude the sign the physics has.
         spec = next(s for s in CONTROL_PARAMETERS if s.name == "V_w")
         assert isinstance(spec.transform, IdentityTransform)
 
@@ -128,7 +118,6 @@ class TestTheVectorItself:
         ]
 
     def test_the_reference_point_is_rp1(self) -> None:
-        # doc 01 §2.1 defines RP-1 and doc 05 §2.1's priors are centred on it.
         reference = ControlParameters.reference()
 
         assert reference.n_0 == pytest.approx(1.0e17)
@@ -197,8 +186,6 @@ class TestTransformImages:
             assert 1.0 <= x <= 5.0
 
     def test_the_logit_transform_is_centred_on_the_midpoint(self) -> None:
-        # u = 0 is where an optimiser is initialised when it has nothing better; the
-        # midpoint of a uniform prior is the right place for that to land.
         transform = LogitTransform(low=1.0, high=5.0)
 
         assert transform.to_constrained(0.0) == pytest.approx(3.0, rel=1e-15)
@@ -244,11 +231,6 @@ class TestJacobiansAgainstNumericalDerivatives:
         assert analytic == pytest.approx(float(numerical.df), rel=1e-9)
 
     def test_the_vector_log_determinant_matches_the_numerical_jacobian_matrix(self) -> None:
-        # The full 8x8 Jacobian is diagonal because the transform acts componentwise. That
-        # is an assumption the sum-of-logs implementation relies on, so it is verified
-        # here by building the matrix numerically and taking `slogdet` of the whole thing.
-        # Taken from a legal point, because the finite-difference stencil constructs
-        # `ControlParameters` at every stencil node and those must be inside the support.
         u = INTERIOR.to_unconstrained()
 
         jacobian = np.zeros((N_CONTROL, N_CONTROL))
@@ -288,13 +270,9 @@ class TestJacobiansAgainstNumericalDerivatives:
         assert IdentityTransform().log_abs_det_jacobian(3.3) == 0.0
 
     def test_the_log_jacobian_is_the_point_itself(self) -> None:
-        # d(exp u)/du = exp u, so log |dx/du| = u exactly. Worth its own test because it
-        # is the one case where an off-by-a-sign is invisible at u = 0.
         assert LogTransform().log_abs_det_jacobian(-2.5) == pytest.approx(-2.5, rel=1e-15)
 
     def test_the_logit_jacobian_does_not_overflow_in_the_tails(self) -> None:
-        # A naive `log(width * s * (1 - s))` underflows to -inf around |u| ~ 40, which is
-        # well inside the region an unconstrained sampler visits during warm-up.
         transform = LogitTransform(low=0.0, high=1.0)
 
         assert transform.log_abs_det_jacobian(-500.0) == pytest.approx(-500.0, rel=1e-12)
@@ -305,9 +283,6 @@ class TestUnconstrainedBounds:
     """What an L-BFGS-B run needs to know about the space it is searching."""
 
     def test_a_log_uniform_parameter_keeps_its_box_in_log_space(self) -> None:
-        # doc 05 §2.1's log-uniform priors have bounded support, so the "unconstrained"
-        # space is unconstrained in the sense the transform makes it, not in the sense of
-        # having no box at all. An optimiser is told where the box is.
         lower, upper = unconstrained_bounds()
         index = control_parameter_names().index("n_0")
 

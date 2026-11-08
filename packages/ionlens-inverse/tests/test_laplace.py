@@ -68,15 +68,12 @@ class _FlatPrior:
     """Improper and constant — so a flat likelihood direction stays flat in the posterior."""
 
     def log_prob_unconstrained(self, u: np.ndarray) -> float:
-        del u  # constant density: the point is that it contributes no curvature
+        del u
         return 0.0
 
 
 class TestAgainstTheAnalyticPosterior:
     def test_the_covariance_matches_the_linear_gaussian_closed_form(self) -> None:
-        # The anchor. For y = A u + eps, eps ~ N(0, s^2 I), prior N(0, v I), the posterior
-        # covariance is (A'A/s^2 + I/v)^-1 exactly. A factor of two anywhere in the Hessian
-        # shows up here and nowhere else.
         rng = np.random.default_rng(20260806)
         n = 4
         design = rng.normal(size=(7, n))
@@ -98,8 +95,6 @@ class TestAgainstTheAnalyticPosterior:
         np.testing.assert_allclose(posterior.covariance, expected, rtol=1e-5, atol=1e-8)
 
     def test_the_marginal_standard_deviations_match_the_closed_form(self) -> None:
-        # The quantity actually reported. Correct covariance with a mis-taken diagonal
-        # would still pass nothing else in this file.
         rng = np.random.default_rng(11)
         n = 3
         design = rng.normal(size=(5, n))
@@ -118,9 +113,6 @@ class TestAgainstTheAnalyticPosterior:
         np.testing.assert_allclose(posterior.marginal_std, expected, rtol=1e-5)
 
     def test_the_hessian_is_symmetric(self) -> None:
-        # A finite-difference Hessian is only symmetric if the cross terms are formed
-        # correctly; an asymmetric one means the mixed differences are mismatched, and it
-        # would still invert to something plausible.
         rng = np.random.default_rng(3)
         design = rng.normal(size=(6, 3))
 
@@ -137,9 +129,6 @@ class TestAgainstTheAnalyticPosterior:
 
 class TestFlatDirections:
     def test_a_singular_hessian_is_refused_rather_than_inverted(self) -> None:
-        # doc 05 §6's null space, made concrete: the likelihood constrains u0 + u1 and says
-        # nothing about u0 - u1. numpy will happily return an enormous finite inverse, and
-        # reporting that as a covariance converts "not identified" into "measured badly".
         def log_likelihood(u: np.ndarray) -> float:
             return float(-0.5 * (u[0] + u[1]) ** 2)
 
@@ -147,9 +136,6 @@ class TestFlatDirections:
             laplace_posterior(np.zeros(2), log_likelihood=log_likelihood, prior=_FlatPrior())
 
     def test_the_refusal_names_the_flat_direction(self) -> None:
-        # An error saying only "not positive definite" sends the reader to the optimiser.
-        # The useful information is *which combination* of parameters is unconstrained,
-        # because that is a statement about the experiment, not about the code.
         def log_likelihood(u: np.ndarray) -> float:
             return float(-0.5 * (u[0] + u[1]) ** 2)
 
@@ -161,9 +147,6 @@ class TestFlatDirections:
         assert "doc 05 §6" in message
 
     def test_a_maximum_rather_than_a_minimum_is_refused(self) -> None:
-        # A MAP that stopped at a saddle or a maximum reports converged=True just as
-        # readily. The Hessian is the cheapest place to catch it, and a negative curvature
-        # direction is not a wide error bar — it is a point that is not an optimum.
         def log_likelihood(u: np.ndarray) -> float:
             return float(+0.5 * u @ u)
 
@@ -173,9 +156,6 @@ class TestFlatDirections:
 
 class TestCredibleIntervals:
     def test_the_unconstrained_interval_is_the_gaussian_quantile(self) -> None:
-        # In unconstrained space the approximation *is* Gaussian, so the 95 % interval is
-        # exactly mean +/- 1.959964 sigma. Anything else is a z/t confusion or a one-sided
-        # tail mistaken for two.
         n = 2
 
         def log_likelihood(u: np.ndarray) -> float:
@@ -217,10 +197,6 @@ class TestCredibleIntervals:
 
 class TestThePhysicalInterval:
     def test_the_endpoints_are_the_transformed_unconstrained_endpoints(self) -> None:
-        # Every transform in ionlens.inverse.parameters is strictly increasing, so a marginal
-        # interval maps through *exactly* — no delta method, no linearisation error. This
-        # test is what licenses that shortcut; if a non-monotone transform is ever added it
-        # fails, which is the point.
         prior = default_control_prior()
         mean = np.asarray(prior.median().to_unconstrained())
 
@@ -240,9 +216,6 @@ class TestThePhysicalInterval:
             assert actual_low < actual_high, f"{spec.name} interval is inverted"
 
     def test_the_physical_point_estimate_is_the_median_not_the_mean(self) -> None:
-        # The transform is non-linear, so E[x] != x(E[u]) — but median(x) = x(median(u))
-        # under a strictly increasing map. Reporting the transformed mean and calling it a
-        # posterior mean is a real, quiet bias; the median is exact and is what is reported.
         prior = default_control_prior()
         mean = np.asarray(prior.median().to_unconstrained())
 
@@ -256,9 +229,6 @@ class TestThePhysicalInterval:
         np.testing.assert_allclose(median.to_unconstrained(), posterior.mean, rtol=1e-10)
 
     def test_a_vector_that_is_not_the_control_vector_has_no_physical_reading(self) -> None:
-        # The engine is dimension-agnostic on purpose (see map.py). A two-parameter
-        # verification problem has no ControlParameters representation and inventing one
-        # would be worse than refusing.
         def log_likelihood(u: np.ndarray) -> float:
             return float(-0.5 * u @ u)
 
@@ -273,9 +243,6 @@ class TestThePhysicalInterval:
 
 class TestSampling:
     def test_the_empirical_covariance_recovers_the_covariance(self) -> None:
-        # Sampling is how a *derived* quantity like Gamma_E gets an interval: it is a
-        # non-linear function of several parameters, so no endpoint transform applies and
-        # the only honest route is to push samples through the forward model.
         rng = np.random.default_rng(5)
         design = rng.normal(size=(6, 3))
 
@@ -292,7 +259,6 @@ class TestSampling:
         np.testing.assert_allclose(np.cov(draws, rowvar=False), posterior.covariance, atol=2e-3)
 
     def test_samples_are_reproducible_from_the_generator(self) -> None:
-        # doc 00 E3: bit-for-bit reproduction.
         def log_likelihood(u: np.ndarray) -> float:
             return float(-0.5 * u @ u)
 
@@ -308,9 +274,6 @@ class TestSampling:
 
 class TestTheValidityLabel:
     def test_a_laplace_posterior_is_unvalidated_by_default(self) -> None:
-        # doc 05 §5: "its validity is tested, not assumed", against NUTS. NUTS is not built,
-        # so nothing in this project can currently validate a Laplace posterior, and the
-        # object says so rather than leaving it to a footnote somebody drops.
         def log_likelihood(u: np.ndarray) -> float:
             return float(-0.5 * u @ u)
 

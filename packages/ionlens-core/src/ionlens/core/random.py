@@ -47,39 +47,19 @@ class Stream(StrEnum):
     resulting artifact would be reproducible but wrong.
     """
 
-    #: Particle loading and initial field state (doc 03 §4.2 step 0).
     PLASMA_INIT = "plasma_init"
-    #: Null-collision Monte-Carlo draws (doc 03 §4.5).
     COLLISIONS = "collisions"
-    #: Photon statistics in the emission and scattering models (doc 04 §4.3).
     PHOTONS = "photons"
-    #: The 18 detector and digitiser noise sources of doc 04 §7.2.
     DETECTOR_NOISE = "detector_noise"
-    #: Calibration measurement noise, so that an imperfect calibration (doc 04 §7.3) is
-    #: reproducible independently of the data it is applied to.
     CALIBRATION = "calibration"
-    #: Sampler proposals and chain initialisation (doc 05 §5).
     SAMPLER = "sampler"
-    #: Design-of-experiment draws: Latin hypercube and Sobol points (doc 09 §4.1).
     EXPERIMENT_DESIGN = "experiment_design"
-    #: Deterministic subsampling of particle dumps for storage (doc 08 §7).
     SUBSAMPLING = "subsampling"
-    #: Multi-start perturbations for :func:`~ionlens.inverse.map.maximum_a_posteriori` (doc 05
-    #: §5). OES's likelihood surface is multimodal (measured: 4/15 single-start fits land
-    #: confidently on a wrong mode) and a single L-BFGS-B run from one point cannot tell a
-    #: local optimum from the global one. This stream seeds the *extra* start points a
-    #: multi-start search adds beyond the first — never the first, which stays exactly the
-    #: prior-median/caller-supplied point single-start already used, so ``n_starts=1``
-    #: draws nothing from this stream and is bit-for-bit unchanged.
     MAP_MULTISTART = "map_multistart"
 
 
-#: Domain separation for the keyed hash, so a seed derived here cannot collide with one
-#: derived by some other part of the project that happens to hash the same string.
 _DOMAIN: Final[bytes] = b"ionlens/stream-seed/v1"
 
-#: Width of the derived seed. 64 bits is what ``SeedSequence`` consumes comfortably and
-#: is far beyond any plausible collision risk across the streams enumerated above.
 _SEED_BYTES: Final[int] = 8
 
 

@@ -139,13 +139,8 @@ def _frozen_spectrum(values: NDArray[np.float64], *, n_params: int) -> NDArray[n
     if not np.all(np.isfinite(array)):
         raise ValueError("eigenvalues must be finite; found nan or inf")
     if np.any(array < 0.0):
-        # I = J^T Sigma^-1 J is positive semi-definite by construction (doc 05 §6.1), so
-        # a negative eigenvalue is an arithmetic failure and not a weak direction. Reading
-        # it as one would report a null space that the data do in fact constrain.
         raise ValueError("eigenvalues must be non-negative; the Fisher matrix is PSD")
     if np.any(np.diff(array) > 0.0):
-        # condition_number and weakest_direction both index by position. An unordered
-        # spectrum makes both silently name the wrong mode.
         raise ValueError("eigenvalues must be in descending order, largest first")
 
     array.flags.writeable = False
@@ -218,7 +213,6 @@ class IdentifiabilityReport:
             variance.flags.writeable = False
             object.__setattr__(self, "posterior_variance", variance)
 
-    # ── the doc 05 §6.2 spectrum ────────────────────────────────────────────────
 
     @property
     def condition_number(self) -> float:
@@ -286,9 +280,6 @@ class IdentifiabilityReport:
     def _same_posterior_variance(self, other: IdentifiabilityReport) -> bool:
         mine, theirs = self.posterior_variance, other.posterior_variance
         if mine is None or theirs is None:
-            # A report with the fitted variances attached is not the same report as one
-            # computed ahead of the fit for experiment design (doc 05 §9), even at the
-            # same operating point: only one of them can answer §6.1's question.
             return mine is None and theirs is None
         return bool(np.array_equal(mine, theirs))
 

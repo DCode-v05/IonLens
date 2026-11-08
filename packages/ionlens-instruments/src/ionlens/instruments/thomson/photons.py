@@ -127,36 +127,24 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-# ── the photon budget — doc 02 §7.1, TS-L1, TS-O2, TS-O3 ────────────────────────────
 
-#: ``E_L`` — TS-L1.
 LASER_PULSE_ENERGY_J: Final[float] = 0.5
 
-#: ``L`` — the doc 02 §7.1 spatial resolution element along the beam, TS-O3.
 SPATIAL_RESOLUTION_M: Final[float] = 90.0e-6
 
-#: ``Delta_Omega`` as doc 02 §7.1's formula states it (the f/4 collection of TS-O2 rounds
-#: to 0.049 sr; §7.1 uses 0.05 sr in the worked calculation this module reproduces).
 COLLECTION_SOLID_ANGLE_SR: Final[float] = 0.05
 
-#: ``eta`` — combined transmission x QE, doc 02 §7.1: "appropriate for a triple-grating
-#: spectrometer with a Gen III ICCD".
 COMBINED_TRANSMISSION_QE: Final[float] = 0.05
 
-#: TS-L1: 10 Hz repetition rate.
 REPETITION_RATE_HZ: Final[float] = 10.0
 
 _CLASSICAL_ELECTRON_RADIUS_M: Final[float] = float(magnitude_in(CLASSICAL_ELECTRON_RADIUS, "m"))
 
-#: ``sigma_T = (8/3) pi r_e^2``, the classical Thomson cross section, computed rather than
-#: quoted so it stays tied to :data:`~ionlens.core.constants.CLASSICAL_ELECTRON_RADIUS`'s
-#: CODATA provenance. Evaluates to 6.652e-29 m^2, matching doc 02 §7.1's quoted value.
 THOMSON_CROSS_SECTION_M2: Final[float] = (8.0 / 3.0) * math.pi * _CLASSICAL_ELECTRON_RADIUS_M**2
 
 _PLANCK_J_S: Final[float] = float(magnitude_in(PLANCK, "J*s"))
 _SPEED_OF_LIGHT_M_PER_S: Final[float] = float(magnitude_in(SPEED_OF_LIGHT, "m/s"))
 
-#: ``h*nu`` at the TS-L1 laser line.
 _PHOTON_ENERGY_J: Final[float] = _PLANCK_J_S * _SPEED_OF_LIGHT_M_PER_S / LASER_WAVELENGTH_M
 
 
@@ -179,21 +167,10 @@ def photoelectrons_per_shot(electron_density_m3: float) -> float:
     )
 
 
-# ── accumulation and the "cannot follow transients" floor — doc 02 §7.1 consequence 2 ──
-
-#: RP-1 — doc 01 §2.1 / doc 02 §3.3 regime B, the reference operating point every
-#: doc 02 §7.1 worked number in this module is checked against.
 REFERENCE_OPERATING_DENSITY_M3: Final[float] = 1.0e17
 
-#: The doc 02 §7.1 table's standard benchmark: "shots for 3 %".
 DEFAULT_TARGET_RELATIVE_UNCERTAINTY: Final[float] = 0.03
 
-#: Below one total expected photoelectron across the whole spectrum, the Poisson process
-#: this channel is (doc 02 §7.1 consequence 1) reports exactly zero counts with
-#: probability ``exp(-1) ~ 37 %` and cannot be distinguished from a dark frame the rest of
-#: the time either — doc 02 §7.1 consequence 2's "any single-shot or few-shot event is
-#: invisible", pinned to the smallest accumulation this module will treat as an
-#: observation rather than as nothing.
 MINIMUM_EXPECTED_TOTAL_PHOTOELECTRONS: Final[float] = 1.0
 
 
@@ -286,24 +263,14 @@ def is_blind(*, electron_density_m3: float, shots: float) -> bool:
     )
 
 
-# ── stray light — doc 02 §4.3, TS-3 ─────────────────────────────────────────────────
-
-#: TS-3's requirement.
 STRAY_LIGHT_REJECTION_REQUIREMENT: Final[float] = 1.0e8
 
-#: Doc 02 §4.3: "with 10x margin against the 1e8 requirement".
 STRAY_LIGHT_REJECTION_MARGIN: Final[float] = 10.0
 
-#: Brewster-angle entrance window — doc 02 §4.3.
 BREWSTER_WINDOW_REJECTION: Final[float] = 10.0
-#: Baffled entrance snout (3 knife-edge baffles) — doc 02 §4.3.
 BAFFLED_SNOUT_REJECTION: Final[float] = 1.0e2
-#: Rayleigh-horn viewing dump — doc 02 §4.3.
 RAYLEIGH_HORN_REJECTION: Final[float] = 1.0e2
-#: Triple-grating spectrometer notch at 532 nm — doc 02 §4.3, TS-S1.
 TRIPLE_GRATING_NOTCH_REJECTION: Final[float] = 1.0e4
-#: Polarisation discrimination — doc 02 §4.3: "Thomson signal is polarised; stray light
-#: is less so".
 POLARISATION_DISCRIMINATION_REJECTION: Final[float] = 5.0
 
 
@@ -325,10 +292,6 @@ def combined_rejection_factor() -> float:
     )
 
 
-#: Doc 06 §4 term 11: the background-subtraction systematic on Gamma_E. Used here as the
-#: relative uncertainty on the *subtraction* of
-#: :func:`stray_light_pedestal_pe_per_shot` (see the module docstring's honest flag on
-#: that figure's provenance).
 STRAY_LIGHT_BACKGROUND_RELATIVE_UNCERTAINTY: Final[float] = 0.02
 
 
@@ -379,26 +342,14 @@ def stray_light_spectrum_pe_per_shot(
     return pedestal * shape
 
 
-# ── Rayleigh calibration uncertainty chain — doc 02 §7.3, §11; doc 06 §5 ────────────
-
-#: The quantity name :meth:`~ionlens.core.protocols.CalibrationSet.for_quantity` looks up for
-#: the Rayleigh standard — doc 02 §11's "Rayleigh scattering in Ar" row.
 RAYLEIGH_CALIBRATION_QUANTITY: Final[str] = "rayleigh_scattering"
 
-#: Doc 06 §5 chain, term 1: Rayleigh cross-section literature value.
 RAYLEIGH_CROSS_SECTION_UNCERTAINTY: Final[float] = 0.02
-#: Doc 06 §5 chain, term 2: calibration-gas purity.
 GAS_PURITY_UNCERTAINTY: Final[float] = 0.01
-#: Doc 06 §5 chain, term 3: pressure gauge accuracy.
 PRESSURE_GAUGE_UNCERTAINTY: Final[float] = 0.02
-#: Doc 06 §5 chain, term 4: optical stability of the calibration setup.
 OPTICAL_STABILITY_UNCERTAINTY: Final[float] = 0.03
-#: Doc 06 §5 chain, term 5, and the dominant one: photon statistics of the calibration
-#: measurement itself — the same photon-starvation problem the science measurement has.
 CALIBRATION_PHOTON_STATISTICS_UNCERTAINTY: Final[float] = 0.05
 
-#: The five doc 06 §5 terms combined in quadrature (~6.56 %); doc 06 §4 term 3 books the
-#: rounded figure as 7.0 %. Computed rather than hard-coded so the chain stays auditable.
 RAYLEIGH_CALIBRATION_RELATIVE_UNCERTAINTY: Final[float] = math.sqrt(
     RAYLEIGH_CROSS_SECTION_UNCERTAINTY**2
     + GAS_PURITY_UNCERTAINTY**2

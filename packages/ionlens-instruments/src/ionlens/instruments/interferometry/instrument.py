@@ -151,32 +151,14 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: The doc 08 §7 artifact group key.
 INTERFEROMETRY_INSTRUMENT_ID: Final[InstrumentId] = "interferometry"
 
-#: Units of what :meth:`InterferometryInstrument.forward` and :meth:`observe` return.
-#: This channel reports a signed phase (doc 02 §8.1's heterodyne detection recovers the
-#: sign), never a density — see the module docstring's "honesty point".
 PHASE_UNITS: Final[str] = "rad"
 
-#: Which grid point the chord ladder starts at, in metres from the wall. Doc 02's port
-#: table (§4.1) fixes the chords' azimuth and elevation but not their z-height relative
-#: to whatever domain a given solver's z-grid spans; anchoring at the wall is the most
-#: conservative default — see the module docstring.
 _DEFAULT_START_Z_M: Final[float] = 0.0
 
-#: The quantity name :meth:`InterferometryInstrument.calibrate` looks up. The absolute
-#: scale of a phase measurement is set by the AOM frequency reference and path-length
-#: metrology chain (doc 02 §8.1), not by anything radiometric, so this is a distinct
-#: calibration quantity from the other channels' — see doc 01 SYS-3's "single documented
-#: reference source per chain".
-#:
-#: Public: the experiment layer needs this name to build the
-#: :class:`~ionlens.core.protocols.instrument.CalibrationSet` that :meth:`calibrate` requires,
-#: so it cannot stay private the way an instrument's own internal-only constants can.
 INTERFEROMETER_PHASE_SCALE_QUANTITY: Final[str] = "interferometer_phase_scale"
 
-#: Private alias, kept so every call site inside this module can stay unchanged.
 _PHASE_SCALE_QUANTITY: Final[str] = INTERFEROMETER_PHASE_SCALE_QUANTITY
 
 
@@ -199,7 +181,7 @@ def _time_averaged_values(field: ScalarField, w: AcquisitionWindow) -> FloatArra
     """
     if field.is_steady:
         return field.values
-    assert field.time is not None  # doc 03 §5.2: non-steady implies a time grid.
+    assert field.time is not None
     times = field.time.t_s
     inside = np.flatnonzero((times >= w.start_s) & (times <= w.start_s + w.duration_s))
     if inside.size == 0:
@@ -248,13 +230,9 @@ class InterferometryInstrument:
         self._fringe_jump_rate: float | None = None
         self._calibration: Calibration | None = None
         self._applied_state = CalibrationState.ESTIMATED
-        # Vibration and fringe-jump noise are mechanical/electronic, not photon
-        # statistics, so this draws on Stream.DETECTOR_NOISE (doc 10 §5) — the same
-        # convention LangmuirProbe uses for its own amplifier/digitiser noise.
         self._rng = generator(root_seed, Stream.DETECTOR_NOISE)
         self._calibration_rng = generator(root_seed, Stream.CALIBRATION)
 
-    # ── configuration ───────────────────────────────────────────────────────────
 
     def configure(self, cfg: InstrumentConfig) -> None:
         """Apply one entry of the manifest's ``instruments:`` list — doc 08 §6.
@@ -333,7 +311,6 @@ class InterferometryInstrument:
             raise RuntimeError(f"{self.instrument_id}: configure() must be called before use.")
         return self._fringe_jump_rate
 
-    # ── calibration ─────────────────────────────────────────────────────────────
 
     def calibrate(self, refs: CalibrationSet) -> Calibration:
         """Derive the phase-measurement scale from a reference standard — doc 04 §7.3.
@@ -366,7 +343,6 @@ class InterferometryInstrument:
         """
         self._applied_state = CalibrationState.TRUE
 
-    # ── the shared code path — doc 04 §9 ────────────────────────────────────────
 
     def forward(self, state: PlasmaState, w: AcquisitionWindow) -> Observable:
         """The noiseless phase per chord the likelihood compares against — doc 04 §9."""
@@ -432,7 +408,6 @@ class InterferometryInstrument:
             )
 
         if self._applied_state is CalibrationState.TRUE:
-            # doc 04 §7.3's deliberate inverse crime: the unit scale, not a draw.
             scale = 1.0
         else:
             if self._calibration is None:
@@ -477,7 +452,6 @@ class InterferometryInstrument:
             dtype=np.float64,
         )
 
-    # ── the likelihood and the gate ─────────────────────────────────────────────
 
     def likelihood(
         self,
@@ -602,10 +576,6 @@ class InterferometryInstrument:
 
         apply_calibration = calibration_uncertainty and obs.calibration is not CalibrationState.TRUE
         if not apply_calibration and coherent_discrepancy is None:
-            # The pre-existing bespoke Sherman-Morrison path — untouched, bit for bit.
-            # `coherent_discrepancy is None` is load-bearing here: this branch is what
-            # protects every existing caller (and the T0/T1 regression baselines) from a
-            # change only opt-in callers of the new argument asked for.
             d_inv_r = residual / d
             d_inv_v = v / d
             quad_diag = float(residual @ d_inv_r)
@@ -617,13 +587,6 @@ class InterferometryInstrument:
             log_det = float(np.sum(np.log(d))) + math.log(m)
             return float(-0.5 * quadratic - 0.5 * log_det - 0.5 * n * math.log(2.0 * math.pi))
 
-        # Either the calibration row, the discrepancy rows, or both are being added on top
-        # of the vibration row `v` — never fewer than one extra row, since this branch is
-        # only reached when `apply_calibration` or `coherent_discrepancy is not None`.
-        # Composed through the shared Woodbury kernel rather than a second hand-derived
-        # Sherman-Morrison-for-two-terms identity, which is exactly what this method's own
-        # docstring says must not be allowed to disagree with the k=1 path above about the
-        # vibration term both paths share.
         rows: list[FloatArray] = [v]
         if apply_calibration:
             if self._calibration is None:

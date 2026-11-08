@@ -74,13 +74,6 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-# ── vibration spectrum shape and calibration ────────────────────────────────────
-#
-# Every parameter of the vibration shape is an invented number with no citable source
-# (module docstring) — registered ASSUMED in instruments-interferometry.yaml rather than
-# held as a bare module literal (doc 00 C1). :func:`_load_vibration_params` is the single
-# place this module reads them.
-
 
 @dataclass(frozen=True, slots=True)
 class _VibrationParams:
@@ -212,18 +205,8 @@ def independent_phase_std_rad(*, registry: ParameterRegistry | None = None) -> f
     return math.sqrt(1.0 - params.common_mode_variance_fraction) * PHASE_RESOLUTION_RAD
 
 
-# ── fringe jumps ─────────────────────────────────────────────────────────────────
-
-#: One fringe of phase-unwrapping ambiguity: 2*pi rad. Doc 04 §5.2 describes the failure
-#: as "a plausible-looking but completely wrong density" from an integer multiple of 2*pi
-#: added by a failed unwrap; exactly one fringe (the minimal, most probable failure) is
-#: modelled here rather than a distribution over multiple simultaneous skips.
 FRINGE_JUMP_MAGNITUDE_RAD: Final[float] = 2.0 * math.pi
 
-#: Default fringe-jump probability per chord, per observation. Doc 04 §5.2 calls this a
-#: discrete failure "under fast transients"; well-behaved, non-transient acquisition
-#: should essentially never trigger it, so the default represents a rare event the doc 07
-#: robustness study exercises deliberately rather than routine operation.
 DEFAULT_FRINGE_JUMP_RATE: Final[float] = 1.0e-3
 
 

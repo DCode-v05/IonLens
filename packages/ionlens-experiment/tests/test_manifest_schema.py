@@ -121,8 +121,6 @@ class TestThePlasmaBlock:
     def test_a_quantity_in_the_wrong_dimension_is_refused_when_it_is_used(
         self, runnable_document: dict[str, Any]
     ) -> None:
-        # `metre` parses; a pressure in metres does not. The units layer catches it at the
-        # boundary where the meaning is still known (doc 08 §5).
         runnable_document["plasma"]["pressure"] = {"value": 5.0, "units": "metre"}
         manifest = manifest_from_document(runnable_document)
         with pytest.raises(TypeError, match="Pa"):
@@ -175,9 +173,6 @@ class TestTheNoiseBlock:
     def test_an_unquoted_yaml_true_calibration_is_refused_with_the_quoting_named(
         self, documented_document: dict[str, Any]
     ) -> None:
-        # doc 08 §6 comments "NOT 'true' — doc 04 §7.3". YAML turns an unquoted `true`
-        # into a boolean, so the mode name and the boolean are indistinguishable by the
-        # time the loader sees them unless the failure says so.
         documented_document["noise"]["calibration"] = True
         with pytest.raises(ValueError, match="quote"):
             manifest_from_document(documented_document)

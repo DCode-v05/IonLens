@@ -301,9 +301,6 @@ class JointLikelihood:
         weights: list[float] = []
 
         for channel in self._channels:
-            # The gate is asked *before* the prediction is formed. doc 01 IF-6 makes this a
-            # correctness point rather than an optimisation, but it is also the difference
-            # between skipping a Thomson forward model and computing one to discard.
             if not channel.instrument.is_informative(getattr(state, "params", state)):
                 excluded.append(channel.name)
                 continue
@@ -315,10 +312,6 @@ class JointLikelihood:
                     f"({value}); a NaN propagates through the sum and makes every parameter "
                     f"look equally good, so the optimiser stops and reports a result"
                 )
-            # Multiplying a float by exactly 1.0 is exact in IEEE 754, so an unweighted
-            # likelihood is bit-for-bit what it was before weights existed. That is asserted
-            # in the tests rather than assumed: it is what makes every number measured
-            # before this change still comparable with every number measured after it.
             total += channel.weight * value
             contributing.append(channel.name)
             weights.append(float(channel.weight))

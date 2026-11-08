@@ -79,8 +79,6 @@ class TestWhenReproductionFails:
         try:
             original = execute(manifest, store=store)
 
-            # The code changed underneath the archived manifest — which is exactly the
-            # regression doc 13 §6's nightly re-run exists to catch.
             class _Drifted(AnalyticSheathForwardSolver):
                 def configure(self, cfg: SolverConfig) -> None:
                     super().configure(SolverConfig(values={"model": "matrix"}))

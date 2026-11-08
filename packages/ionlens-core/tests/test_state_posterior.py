@@ -27,8 +27,6 @@ from ionlens.core.state import (
     SamplerDiagnostics,
 )
 
-# A miniature version of the doc 05 §2 split: two control parameters, one nuisance
-# parameter and one discrepancy-field coefficient.
 _LEVELS: Mapping[str, ParameterLevel] = {
     "n_0": ParameterLevel.CONTROL,
     "T_e": ParameterLevel.CONTROL,
@@ -88,8 +86,6 @@ class TestGateConstants:
 
 class TestSamplerDiagnosticsConstruction:
     def test_rejects_a_parameter_with_an_r_hat_but_no_ess(self) -> None:
-        # G-V3 requires ESS *per parameter*; a missing entry would let a parameter
-        # through the gate without ever being tested.
         with pytest.raises(ValueError, match="ess"):
             SamplerDiagnostics(r_hat={"n_0": 1.0, "T_e": 1.0}, ess={"n_0": 900.0}, divergences=0)
 
@@ -137,12 +133,9 @@ class TestSamplerDiagnosticsGate:
         assert _diagnostics(r_hat=1.005, ess=900.0, divergences=0).is_clean()
 
     def test_an_r_hat_exactly_at_the_threshold_fails_because_the_gate_is_strict(self) -> None:
-        # doc 07 §6 writes "R-hat < 1.01", not "<=".
         assert not _diagnostics(r_hat=GATE_MAX_R_HAT).is_clean()
 
     def test_an_ess_exactly_at_the_floor_fails_because_the_gate_is_strict(self) -> None:
-        # doc 07 §6 and V-44 both write "ESS > 400". ADR-005 writes ">= 400"; the gate
-        # is authoritative and the strict form is the safe reading of the two.
         assert not _diagnostics(ess=GATE_MIN_ESS).is_clean()
 
     def test_one_parameter_below_the_floor_fails_the_whole_gate(self) -> None:
@@ -294,8 +287,6 @@ class TestPosteriorConstruction:
 
 class TestPosteriorDerivedQuantities:
     def test_carries_derived_quantities_alongside_the_samples(self) -> None:
-        # doc 05 §10 requires Gamma_E(z, t), Gamma_i, <E_i> and the wall IEDF, none of
-        # which are sampled parameters: they are functions of the samples.
         gamma_e = np.ones((4, 8, 16))
         posterior = _posterior(derived={"Gamma_E": gamma_e, "E_i_mean": np.ones((4, 8))})
 
@@ -311,8 +302,6 @@ class TestPosteriorDerivedQuantities:
             _posterior(derived={"T_e": np.ones((4, 8))})
 
     def test_rejects_a_derived_quantity_whose_draw_axes_do_not_match(self) -> None:
-        # A derived quantity is a function of the samples, so it has one value per
-        # draw. Anything else means it was computed against different chains.
         with pytest.raises(ValueError, match="Gamma_E"):
             _posterior(derived={"Gamma_E": np.ones((4, 7, 16))})
 
@@ -391,14 +380,12 @@ class TestPosteriorSummaries:
         np.testing.assert_allclose(posterior.mean("Gamma_E"), np.arange(16.0))
 
     def test_credible_interval_is_equal_tailed(self) -> None:
-        # Equal-tailed at 95%: the 2.5% and 97.5% quantiles of 1..100.
         interval = self._ramped().credible_interval("n_0", 0.95)
 
         assert float(interval.lower) == pytest.approx(3.475)
         assert float(interval.upper) == pytest.approx(97.525)
 
     def test_credible_interval_carries_the_level_it_was_computed_at(self) -> None:
-        # doc 06 §8: the metadata travels with the value, mechanically.
         interval = self._ramped().credible_interval("n_0", 0.5)
 
         assert isinstance(interval, CredibleInterval)
@@ -407,7 +394,6 @@ class TestPosteriorSummaries:
         assert float(interval.upper) == pytest.approx(75.25)
 
     def test_credible_interval_defaults_to_the_ninety_five_percent_level(self) -> None:
-        # doc 06 §7.1 makes 95% the level the coverage gate G-V4 is stated at.
         assert self._ramped().credible_interval("n_0").level == 0.95
 
     def test_credible_interval_of_a_derived_profile_is_computed_per_point(self) -> None:
@@ -430,8 +416,6 @@ class TestPosteriorSummaries:
             self._ramped().mean("V_w")
 
     def test_samples_for_refuses_a_derived_name(self) -> None:
-        # Derived quantities are not samples; conflating them would let a caller treat
-        # a function of the posterior as a sampled parameter.
         posterior = _posterior(derived={"Gamma_E": np.ones((4, 8, 3))})
 
         with pytest.raises(KeyError, match="Gamma_E"):
@@ -456,15 +440,11 @@ class TestEssAwareThinning:
         np.testing.assert_allclose(thinned.samples, posterior.samples[:, ::19, :])
 
     def test_thinning_thins_derived_quantities_alongside_the_samples(self) -> None:
-        # If the derived quantities were not thinned with the samples, the draw index
-        # would no longer line up and every derived credible interval would be wrong.
         thinned = self._run().thin(19)
 
         assert thinned.derived_for("Gamma_E").shape == (4, 106, 3)
 
     def test_the_thinned_posterior_reports_its_reduced_ess(self) -> None:
-        # ADR-005: thinning must be ESS-aware. A thinned posterior that kept the
-        # pre-thinning ESS would let downstream gates pass on numbers it no longer has.
         thinned = self._run().thin(19)
 
         assert thinned.diagnostics.ess["n_0"] == pytest.approx(424.0)
@@ -475,8 +455,6 @@ class TestEssAwareThinning:
         assert thinned.diagnostics.ess["n_0"] == pytest.approx(600.0)
 
     def test_thinning_preserves_r_hat_and_the_divergence_count(self) -> None:
-        # Divergences are a property of the sampling run, not of the retained draws;
-        # ADR-005 keeps the full chains regenerable, so the count stays true of them.
         posterior = _posterior(n_chains=4, n_draws=2000, ess=1600.0, r_hat=1.004)
         thinned = posterior.thin(19)
 
@@ -487,8 +465,6 @@ class TestEssAwareThinning:
         assert self._run().thin(19).tier is Tier.T2
 
     def test_max_safe_stride_is_the_largest_stride_that_holds_the_g_v3_floor(self) -> None:
-        # 4 chains x 2000 draws: stride 19 retains 4 x 106 = 424 > 400; stride 20
-        # retains exactly 400, which the strict gate rejects.
         assert self._run().max_safe_stride() == 19
 
     def test_the_maximum_safe_stride_yields_a_posterior_that_passes_the_gate(self) -> None:
@@ -501,8 +477,6 @@ class TestEssAwareThinning:
             self._run().thin(20)
 
     def test_refuses_to_thin_a_posterior_that_already_fails_the_floor(self) -> None:
-        # No stride can rescue a chain that never reached the floor, so even a no-op
-        # thin is refused rather than blessing the samples as archival.
         with pytest.raises(ValueError, match="ESS"):
             self._run(ess=300.0).thin(1)
 
@@ -511,8 +485,6 @@ class TestEssAwareThinning:
             self._run(ess=300.0).max_safe_stride()
 
     def test_an_explicitly_lowered_floor_permits_deeper_thinning(self) -> None:
-        # The escape hatch is not silent: the floor is named at the call site and the
-        # thinned posterior's own diagnostics then fail G-V3.
         thinned = self._run().thin(100, min_ess=50.0)
 
         assert thinned.n_draws == 20
@@ -546,9 +518,6 @@ class TestPosteriorProvenanceAndEquality:
         assert a != "not a posterior"
 
     def test_with_diagnostics_replaces_them_without_touching_the_samples(self) -> None:
-        # doc 05 §10 emits diagnostics per inversion, but ESS recomputed on the thinned
-        # draws by ionlens-uq supersedes the bound thinning uses; installing it must not
-        # be an excuse to rebuild the posterior.
         posterior = _posterior()
         replaced = posterior.with_diagnostics(_diagnostics(ess=777.0))
 

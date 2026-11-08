@@ -78,8 +78,6 @@ def plasma_state(*, n_0_per_m3: float = 1e17, t_e_ev: float = 3.0) -> PlasmaStat
         gamma_se=0.1,
         kappa=1.0,
     )
-    # A crude sheath: density rising from the wall, T_e flat. Nothing here is a physics
-    # claim; the instrument is being tested, not the sheath.
     profile = n_0_per_m3 * (0.1 + 0.9 * np.linspace(0.0, 1.0, N_POINTS))
     fields = {
         "n_e": ScalarField(name="n_e", values=profile, units="m**-3", grid=spatial, time=None),
@@ -125,9 +123,6 @@ def references() -> CalibrationSet:
     )
 
 
-# ── the doc 08 §4 contract ──────────────────────────────────────────────────────
-
-
 def test_the_instrument_satisfies_the_protocol(grid: EnergyGrid) -> None:
     assert isinstance(build_instrument(grid), Instrument)
 
@@ -152,9 +147,6 @@ def test_configure_refuses_a_wavelength_the_grating_cannot_reach(grid: EnergyGri
     instrument = build_instrument(grid)
     with pytest.raises(ValueError, match="cannot diffract"):
         instrument.configure(InstrumentConfig(values={"centre_wavelength_nm": 2000.0}))
-
-
-# ── forward ─────────────────────────────────────────────────────────────────────
 
 
 @pytest.mark.physics
@@ -192,9 +184,6 @@ def test_the_line_sits_where_the_wavelength_axis_says_it_does(grid: EnergyGrid) 
     spectrum = instrument.forward(plasma_state(), window()).values[-1]
     axis = instrument.wavelength_axis()
     assert axis[int(np.argmax(spectrum))] == pytest.approx(811.53, abs=0.01)
-
-
-# ── observe, and doc 04 §9's shared code path ───────────────────────────────────
 
 
 @pytest.mark.physics
@@ -274,9 +263,6 @@ def test_observe_is_reproducible_from_the_seed(grid: EnergyGrid) -> None:
     )
 
 
-# ── calibration — doc 04 §7.3 ───────────────────────────────────────────────────
-
-
 def test_calibration_is_estimated_and_carries_the_doc_02_uncertainty(
     grid: EnergyGrid,
 ) -> None:
@@ -296,9 +282,6 @@ def test_calibration_needs_a_radiometric_standard(grid: EnergyGrid) -> None:
 def test_observing_before_calibrating_is_refused(grid: EnergyGrid) -> None:
     with pytest.raises(RuntimeError, match="calibrate"):
         build_instrument(grid).observe(plasma_state(), window())
-
-
-# ── the likelihood and the detection gate ───────────────────────────────────────
 
 
 @pytest.mark.physics
@@ -346,9 +329,6 @@ def test_the_detection_floor_gates_the_channel_off(grid: EnergyGrid) -> None:
     instrument = build_instrument(grid)
     assert instrument.is_informative(plasma_state(n_0_per_m3=1e17).params)
     assert not instrument.is_informative(plasma_state(n_0_per_m3=1e13).params)
-
-
-# ── doc 08 §1 principle 5 ───────────────────────────────────────────────────────
 
 
 def test_the_instrument_layer_does_not_import_the_inverse_layer() -> None:

@@ -90,9 +90,6 @@ def _solver(*, scale: float = 1.0, database: str = "synthetic") -> TwoTermSolver
     )
 
 
-# ── the table doc 03 §3.2 asks for ─────────────────────────────────────────────
-
-
 class TestTheTable:
     @pytest.mark.physics
     def test_it_carries_every_quantity_doc_03_section_3_2_lists(self) -> None:
@@ -128,8 +125,6 @@ class TestTheTable:
 
     @pytest.mark.physics
     def test_the_excitation_rate_exceeds_the_ionisation_rate_at_every_field(self) -> None:
-        # Lower threshold, so it samples a less depleted part of the tail. True for argon
-        # over this whole range and a cheap check that the channels have not been swapped.
         table = tabulate(_solver(), FIELDS_TD)
 
         assert np.all(table.excitations["E + Ar -> E + Ar*"] > table.ionisation)
@@ -154,9 +149,6 @@ class TestTheTable:
 
     @pytest.mark.physics
     def test_warm_starting_does_not_change_the_answer(self) -> None:
-        # The sweep warm-starts each solve from the previous field. It has to be
-        # verifiably invisible in the result: an initial guess that moved the answer would
-        # mean the iteration had stopped short of its fixed point rather than at it.
         solver = _solver()
         table = tabulate(solver, FIELDS_TD)
 
@@ -166,8 +158,6 @@ class TestTheTable:
             )
 
     def test_the_iteration_count_is_reported_per_field(self) -> None:
-        # Reported because a sweep whose iteration count climbs at the top end is a sweep
-        # running out of grid, and that is worth seeing without re-running anything.
         table = tabulate(_solver(), FIELDS_TD)
 
         assert table.iterations.shape == FIELDS_TD.shape
@@ -186,9 +176,6 @@ class TestTheTable:
 
         assert "synthetic" in text
         assert "40" in text
-
-
-# ── the three-database spread (doc 09 §2.1, doc 06 §4 term 2) ───────────────────
 
 
 def _three_sets() -> Iterator[tuple[ElectronDatabase, CrossSectionSet]]:

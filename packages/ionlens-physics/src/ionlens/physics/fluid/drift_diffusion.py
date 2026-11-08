@@ -58,11 +58,8 @@ class Stabilisation(StrEnum):
     says so rather than being indistinguishable from one that did not.
     """
 
-    #: Doc 03 §3.4's choice. Scharfetter-Gummel, in its finite element form.
     EXPONENTIAL_FITTING = "exponential_fitting"
 
-    #: Plain centred Galerkin. Oscillates above cell Peclet one; present so that can be
-    #: demonstrated rather than asserted.
     NONE = "none"
 
 
@@ -114,8 +111,6 @@ def solve_drift_diffusion(
         domain=domain, drift=drift, diffusivity=diffusivity, stabilisation=stabilisation
     )
 
-    # -integral( (u n - D n') v' ) = integral( S v ), the flux form of the residual with
-    # the test function vanishing at both Dirichlet ends.
     bilinear = (
         total_diffusivity * ufl.grad(trial)[0] * ufl.grad(test)[0]
         - drift * trial * ufl.grad(test)[0]

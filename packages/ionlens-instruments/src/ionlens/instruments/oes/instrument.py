@@ -121,24 +121,13 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: Units of everything this instrument returns. Spectral radiance, as doc 04 §1 defines the
-#: output of ``F2``: "spectral radiance L(lambda, r, Omega, t) [W m^-2 sr^-1 nm^-1]".
 RADIANCE_UNITS: Final[str] = "W / m**2 / sr / nm"
 
-#: The default channel key, and the one doc 08 §6's manifest uses.
 _DEFAULT_INSTRUMENT_ID: Final[InstrumentId] = "oes"
 
-#: Smallest photoelectron count the Gaussian branch of the likelihood will divide by. A
-#: pixel that expects zero photons still receives none with probability one, and a
-#: zero-variance Gaussian there would return ``-inf`` for a perfectly ordinary observation.
 _MINIMUM_VARIANCE_COUNTS: Final[float] = 1.0
 
 
-#: Smallest counting variance, in photoelectrons, the correlated-Gaussian branch of
-#: :meth:`OesInstrument.likelihood` will divide by. A pixel expecting no photons receives
-#: none with probability one; a zero-variance Gaussian there is infinitely confident about a
-#: perfectly ordinary observation. Mirrors ``_MINIMUM_VARIANCE_COUNTS`` in
-#: :mod:`ionlens.inverse.likelihood`, for the same reason.
 _MINIMUM_COUNTING_VARIANCE: Final[float] = 1.0
 
 
@@ -291,7 +280,6 @@ class OesInstrument:
         self._rng = generator(root_seed, Stream.PHOTONS)
         self._calibration_rng = generator(root_seed, Stream.CALIBRATION)
 
-    # ── configuration ───────────────────────────────────────────────────────────
 
     @property
     def centre_wavelength_nm(self) -> float:
@@ -300,9 +288,6 @@ class OesInstrument:
 
     @centre_wavelength_nm.setter
     def centre_wavelength_nm(self, value: float) -> None:
-        # Validate by tuning: the grating raises if the wavelength is unreachable, and
-        # discovering that at the first `forward` rather than at configuration time would
-        # put the failure a long way from the manifest line that caused it.
         self.spectrograph.reciprocal_dispersion_nm_per_mm(value)
         self._centre_wavelength_nm = value
 
@@ -350,13 +335,11 @@ class OesInstrument:
         )
         return self._calibration
 
-    # ── the axis ────────────────────────────────────────────────────────────────
 
     def wavelength_axis(self) -> FloatArray:
         """The wavelength of each detector pixel at the current setting."""
         return self.spectrograph.wavelength_axis(centre_nm=self.centre_wavelength_nm)
 
-    # ── the shared code path — doc 04 §9 ────────────────────────────────────────
 
     def forward(self, state: PlasmaState, w: AcquisitionWindow) -> Observable:
         """The noiseless spectral radiance the likelihood compares against — doc 04 §9."""
@@ -406,14 +389,10 @@ class OesInstrument:
 
         counts = self._rng.poisson(radiance * per_radiance).astype(np.float64)
         observed = counts / (per_radiance * scale)
-        # The uncertainty a real pipeline reports comes from the data it has, not from the
-        # truth it does not: sqrt of the *observed* count, floored so an empty pixel does
-        # not claim zero uncertainty and take the likelihood to -inf.
         return observed, np.sqrt(np.maximum(counts, _MINIMUM_VARIANCE_COUNTS)) / (
             per_radiance * scale
         )
 
-    # ── the physics ─────────────────────────────────────────────────────────────
 
     def _radiance(self, state: PlasmaState, w: AcquisitionWindow) -> FloatArray:
         """Spectral radiance at every grid point, averaged over the acquisition window."""
@@ -492,7 +471,6 @@ class OesInstrument:
             ],
         )
 
-    # ── radiometry ──────────────────────────────────────────────────────────────
 
     @property
     def etendue_m2_sr(self) -> float:
@@ -530,7 +508,6 @@ class OesInstrument:
             / photon_energy_j
         )
 
-    # ── the likelihood and the gate ─────────────────────────────────────────────
 
     def likelihood(
         self,
@@ -635,17 +612,10 @@ class OesInstrument:
         bright = expected > threshold
 
         counts = np.rint(observed)
-        # Poisson log-pmf, written out rather than imported: scipy.stats would be a new
-        # dependency for one expression, and doc 08 §2's "buy" applies to capabilities and
-        # not to three terms of arithmetic.
         poisson = counts * np.log(expected) - expected - special.gammaln(counts + 1.0)
         residual = observed - expected
         gaussian = -0.5 * residual**2 / expected - 0.5 * np.log(2.0 * math.pi * expected)
 
-        # Assemble the coherent directions, in radiance, before any of them is converted to
-        # counts. Order matters only for readability — the Woodbury form is invariant to the
-        # order of the basis rows — so calibration comes first because it is the term that is
-        # a property of the instrument rather than of the model being scored.
         rows: list[FloatArray] = []
         if calibration_uncertainty and obs.calibration is not CalibrationState.TRUE:
             rows.append(
@@ -657,30 +627,14 @@ class OesInstrument:
         if coherent_discrepancy is not None:
             rows.append(np.asarray(coherent_discrepancy, dtype=np.float64))
 
-        # A 1-D input is a single coherent direction; a 2-D input is a basis whose rows span
-        # the directions the error was actually observed to take (rank k). Both go through
-        # the same Woodbury path, with rank one as the k = 1 case — one code path rather than
-        # two that could disagree. `None` means nothing coherent was supplied, and the
-        # pre-existing uncorrelated likelihood is returned unchanged and bit for bit.
         stacked = stack_coherent_rows(rows, expected_shape=expected.shape)
         if stacked is None:
             return float(np.sum(np.where(bright, gaussian, poisson)))
 
-        # per_radiance is per *pixel* and broadcasts against the (spatial, pixel) prediction;
-        # the basis is already flattened over both axes, so broadcast the factor to the
-        # prediction's shape before flattening it too.
         flat_per_radiance = np.broadcast_to(
             np.asarray(per_radiance, dtype=np.float64), expected.shape
         ).reshape(-1)
         basis = stacked * flat_per_radiance
-        # Floor the counting variance at one photoelectron. The Poisson/Gaussian switch above
-        # protects the faint pixels by sending them to the Poisson branch; this branch is
-        # Gaussian everywhere, so without a floor a pixel expecting ~0 counts gets weight
-        # 1/epsilon and dominates the entire likelihood. Measured consequence when it was
-        # missing: the near-zero pixels — which are also the pixels where L0 and L1 agree, so
-        # they carry no discrepancy — pinned n_0 tightly and the discrepancy term had almost
-        # no effect on the posterior width. Same constant and same reasoning as
-        # ionlens.inverse.likelihood's _MINIMUM_VARIANCE_COUNTS.
         return coherent_gaussian_log_prob(
             residual=residual.reshape(-1),
             variance=np.maximum(expected.reshape(-1), _MINIMUM_COUNTING_VARIANCE),

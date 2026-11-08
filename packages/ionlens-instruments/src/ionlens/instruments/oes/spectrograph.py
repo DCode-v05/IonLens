@@ -100,25 +100,14 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: Gauss-Legendre nodes per trapezoid panel in the instrument-function convolution. Three
-#: panels, split at the trapezoid corners; the integrand is smooth on each, so this
-#: converges to machine precision and the tests assert normalisation to 1e-5 against an
-#: independent trapezoid rule.
 PANEL_NODES: Final[int] = 64
 
-#: How far out, in multiples of the crude width estimate, :meth:`Spectrograph.instrument_fwhm_nm`
-#: samples the profile when measuring its width. Generous: the Voigt component has wings.
 FWHM_SEARCH_SPAN: Final[float] = 12.0
 
-#: Samples used in that width measurement. The result is interpolated onto the
-#: half-maximum crossing, so this sets the smoothness of the profile and not the precision
-#: of the answer.
 _FWHM_SAMPLES: Final[int] = 20001
 
-#: Nanometres in a millimetre, for the groove spacing.
 _NM_PER_MM: Final[float] = 1.0e6
 
-#: Millimetres in a micrometre.
 _MM_PER_UM: Final[float] = 1.0e-3
 
 
@@ -242,11 +231,9 @@ def _geometric_kernel(slit_nm: float, pixel_nm: float) -> tuple[FloatArray, Floa
     nodes, quadrature = np.polynomial.legendre.leggauss(PANEL_NODES)
 
     if slit_nm == 0.0 and pixel_nm == 0.0:
-        # No geometric smearing: the kernel is a delta and the caller gets the Voigt back.
         return np.zeros(1, dtype=np.float64), np.ones(1, dtype=np.float64)
 
     if slit_nm == 0.0 or pixel_nm == 0.0:
-        # One rectangle. Smooth on its own support, so one panel is exact enough.
         width = max(slit_nm, pixel_nm)
         return np.asarray(0.5 * width * nodes), np.asarray(0.5 * quadrature)
 
@@ -261,8 +248,6 @@ def _geometric_kernel(slit_nm: float, pixel_nm: float) -> tuple[FloatArray, Floa
     positions = np.ravel(half[:, None] * nodes[None, :] + 0.5 * (lower + upper)[:, None])
     weights = np.ravel(half[:, None] * quadrature[None, :])
 
-    # The trapezoid itself, written as the overlap length of the two rectangles so that the
-    # plateau and the two ramps come out of one expression rather than three branches.
     overlap = np.minimum(0.5 * wide, positions + 0.5 * narrow) - np.maximum(
         -0.5 * wide, positions - 0.5 * narrow
     )
@@ -320,7 +305,6 @@ class Spectrograph:
                 "'measured-style Voigt, not a delta'."
             )
 
-    # ── construction ────────────────────────────────────────────────────────────
 
     @classmethod
     def from_registry(cls, registry: ParameterRegistry | None = None) -> Self:
@@ -355,7 +339,6 @@ class Spectrograph:
             raise ValueError(f"a pixel pitch cannot be negative, got {pixel_pitch_um} um")
         return replace(self, pixel_pitch_um=pixel_pitch_um)
 
-    # ── dispersion ──────────────────────────────────────────────────────────────
 
     def reciprocal_dispersion_nm_per_mm(self, wavelength_nm: float) -> float:
         """``dlambda/dx = d cos(beta) / (m f)`` — doc 02 §6.2 OES-S3.
@@ -381,7 +364,6 @@ class Spectrograph:
             self.pixel_pitch_um * _MM_PER_UM
         )
 
-    # ── the instrument function ─────────────────────────────────────────────────
 
     @property
     def optical_gaussian_fwhm_nm(self) -> float:
@@ -458,7 +440,6 @@ class Spectrograph:
         )
         return float(right - left)
 
-    # ── the detector axis ───────────────────────────────────────────────────────
 
     def wavelength_axis(self, *, centre_nm: float) -> FloatArray:
         """The wavelength of each detector pixel, ascending.

@@ -106,60 +106,26 @@ __all__ = [
     "sheath_edge_density",
 ]
 
-#: A field sampled on the spatial grid, in SI magnitudes.
 FloatArray: TypeAlias = NDArray[np.float64]
 
-# ── constants ───────────────────────────────────────────────────────────────────
-#
-# Physical constants are unwrapped to SI floats exactly once, here. Doc 08 §5 puts bare
-# arrays inside hot loops and quantities at module boundaries; doc 00 C1 forbids a numeric
-# literal with physical meaning anywhere. Both hold if the unwrapping happens at import
-# from :mod:`ionlens.core.constants` and nowhere else.
 
-#: The registry is "the sole source of numeric defaults" (doc 08 §5). Reading it once at
-#: import, rather than repeating its values as literals here, is what makes that true
-#: instead of aspirational: there is exactly one place to change h_l, and a divergence
-#: between this module and the registry is not expressible.
 _REGISTRY: Final = default_registry()
 
 _E_C: Final[float] = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _EPS0_F_PER_M: Final[float] = float(magnitude_in(VACUUM_PERMITTIVITY, "F/m"))
 
-#: ``gamma_i`` reproducing doc 01 §2.2's ``c_s = sqrt(e T_e / m_i)``. See the module
-#: docstring: this is the default, and it is a choice between two Baseline statements.
 GAMMA_I_COLD_ION: Final[float] = float(_REGISTRY.value_in("sheath.gamma_i", "dimensionless"))
 
-#: ``gamma_i`` for 1-D adiabatic ions — doc 03 §2.1.
 GAMMA_I_ADIABATIC: Final[float] = 3.0
 
-#: The planar edge-to-centre density ratio ``h_l`` used in doc 03 §2.3's own arithmetic
-#: (``Gamma_i = 0.61e17 * 2691``). doc 03 §2.1 gives the Godyak low-pressure form
-#: ``h_l ~ 0.86 / sqrt(3 + L / (2 lambda_i))``, which needs a discharge length ``L`` that
-#: is not part of :class:`PlasmaParams`; ``h_l`` is therefore a registered DESIGN
-#: parameter passed in, and this is the RP-1 value the specification uses.
-#:
-#: It is also, satisfyingly, ``exp(-1/2) = 0.607`` to two figures — the Boltzmann factor
-#: for the ``T_e / 2`` presheath drop that accelerates ions to the Bohm speed. So ``h_l``
-#: already carries the presheath drop, which is why the sheath models below reference
-#: their Boltzmann electrons to ``n_s`` and not to ``n_0``: doing both would count the
-#: presheath twice.
 DEFAULT_EDGE_TO_CENTRE_RATIO: Final[float] = float(
     _REGISTRY.value_in("sheath.h_l", "dimensionless")
 )
 
-#: Ar+/Ar symmetric charge-exchange cross section at RP-1 — doc 01 §2.2, class PUBLISHED.
-#: Doc 01 §2.2 is explicit that the implementation "uses the energy-dependent Ar+/Ar
-#: symmetric charge-exchange cross section from LXCat rather than a constant" (doc 09), so
-#: this is exported as a named reference value and never as a default argument: a caller
-#: reaching for it has to name it, and the LXCat substitution stays visible.
 SIGMA_CX_ARGON: Final[Quantity] = _REGISTRY["collisions.sigma_cx_Ar"].quantity
 
-#: Default domain size in sheath thicknesses — doc 01 R-SPAT-3 ("field of view must extend
-#: to >= 10 x s") so that the presheath and bulk boundary conditions are on the grid.
 DEFAULT_DOMAIN_SHEATHS: Final[int] = 10
 
-#: Default samples across one sheath thickness — doc 01 R-SPAT-1 ("resolve s ~ 0.89 mm
-#: with >= 10 samples").
 DEFAULT_SAMPLES_PER_SHEATH: Final[int] = 10
 
 
@@ -170,42 +136,25 @@ class SheathModel(StrEnum):
     round-trips into a checked member and back out for the provenance record.
     """
 
-    #: Doc 03 §2.3. The collisionless high-voltage limit and the V-03 target.
     CHILD_LANGMUIR = "child_langmuir"
 
-    #: Doc 03 §2.2. Uniform ion density, no ion acceleration. Valid only for ``V << T_e``;
-    #: doc 03 §2.2 uses it "as a limiting case and as a numerical initialisation".
     MATRIX = "matrix"
 
 
 class CollisionalRegime(StrEnum):
     """Which doc 03 §2.4 current-voltage law applies in the mobility-limited sheath."""
 
-    #: ``J_i ~ V_w^(3/2) / s^(5/2)`` (Warren). Doc 03 §2.4 makes this the default
-    #: "because Ar+/Ar charge exchange has a weakly energy-dependent cross section,
-    #: making lambda_CX the better-behaved constant".
     CONSTANT_MEAN_FREE_PATH = "constant_mean_free_path"
 
-    #: ``J_i = (9/8) eps_0 mu_i V_w^2 / s^3``.
     CONSTANT_MOBILITY = "constant_mobility"
 
 
-#: The exponent ``p`` in ``Phi(z) = -V_w (1 - z/s)^p`` for each model.
-#:
-#: The matrix value is quoted verbatim in doc 03 §2.2. The Child-Langmuir value follows in
-#: three lines from the equations doc 03 §2.3 already states: constant ion flux with
-#: ``u ~ sqrt(-Phi)`` gives ``n_i ~ (-Phi)^(-1/2)``, so Poisson gives
-#: ``d^2Phi/dz'^2 ~ (-Phi)^(-1/2)``, whose solution is ``-Phi ~ z'^(4/3)`` with ``z'``
-#: measured from the sheath edge (Langmuir 1913; Lieberman & Lichtenberg §6.3).
 _PROFILE_EXPONENT: Final[Mapping[SheathModel, float]] = MappingProxyType(
     {
         SheathModel.MATRIX: 2.0,
         SheathModel.CHILD_LANGMUIR: 4.0 / 3.0,
     }
 )
-
-
-# ── validation helpers ──────────────────────────────────────────────────────────
 
 
 def _checked_ratio(h_l: float) -> float:
@@ -240,9 +189,6 @@ def _positive_length_m(value: Quantity, *, name: str) -> float:
 def _debye_length_m(*, n_per_m3: float, T_e_J: float) -> float:
     """``lambda_D = sqrt(eps_0 k T_e / (n e^2))`` — doc 01 §2.2, in SI."""
     return float(np.sqrt(_EPS0_F_PER_M * T_e_J / (n_per_m3 * _E_C**2)))
-
-
-# ── the models ──────────────────────────────────────────────────────────────────
 
 
 def debye_length(params: PlasmaParams) -> Quantity:
@@ -322,7 +268,6 @@ def child_langmuir_thickness(params: PlasmaParams, *, h_l: float | None = None) 
     density = params.n_0_per_m3 if h_l is None else _checked_ratio(h_l) * params.n_0_per_m3
     lambda_D = _debye_length_m(n_per_m3=density, T_e_J=params.T_e_J)
 
-    # V_w and T_e both appear as potentials, so the ratio is taken in volts.
     T_e_volts = params.T_e_J / _E_C
     normalised_bias = 2.0 * float(magnitude_in(params.bias_magnitude, "V")) / T_e_volts
 
@@ -606,12 +551,8 @@ def ion_energy_flux(
         gamma_i: Ion adiabatic index. See :func:`bohm_speed` and the module docstring.
     """
     flux = float(magnitude_in(ion_flux(params, h_l=h_l, gamma_i=gamma_i), "1 / (m**2 * s)"))
-    # e V_w, in joules: the energy one ion gains falling through the whole sheath drop.
     energy_per_ion = _E_C * float(magnitude_in(params.bias_magnitude, "V"))
     return Q_(flux * energy_per_ion, "W/m**2")
-
-
-# ── the assembled state ─────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -732,8 +673,6 @@ class AnalyticSheathSolver:
         n_s = self.h_l * params.n_0_per_m3
         T_e_eV = params.T_e_J / _E_C
 
-        # At zero bias there is no sheath and the profile expressions divide by s. The
-        # limit is unambiguous: a flat potential and a uniform quasineutral plasma.
         phi_volts = (
             np.zeros(mesh.n_points, dtype=np.float64)
             if s_m <= 0.0
@@ -755,8 +694,6 @@ class AnalyticSheathSolver:
                 "n_e": _field("n_e", n_e, "m**-3"),
                 "n_i": _field("n_i", n_i, "m**-3"),
                 "Phi": _field("Phi", phi_volts, "V"),
-                # Isothermal. doc 03 §3.1 makes the electron energy equation optional and
-                # L0 does not solve it; a uniform T_e is the assumption, stated as a field.
                 "T_e": _field("T_e", np.full(mesh.n_points, T_e_eV), "eV"),
                 "u_i": _field("u_i", u_i, "m/s"),
             },

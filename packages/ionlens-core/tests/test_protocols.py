@@ -92,8 +92,6 @@ from ionlens.core.state import (
 )
 from ionlens.core.units import Q_, DimensionalityError
 
-# ── fixtures ────────────────────────────────────────────────────────────────────────
-
 
 @pytest.fixture
 def argon() -> Species:
@@ -175,9 +173,6 @@ def _empty_traceability_registry() -> Iterator[None]:
     clear_registry()
     yield
     clear_registry()
-
-
-# ── fakes: complete implementations of each doc 08 §4 protocol ──────────────────────
 
 
 class SolverDemandingATimeGrid:
@@ -352,8 +347,6 @@ class FakeEngine:
         self._cfg = cfg
 
     def fit(self, data: MeasurementSet, model: ForwardModel) -> Posterior:
-        # doc 05 §7.1: the level used inside the inversion must differ from the one that
-        # generated the truth, so an engine that never asked could not report its tier.
         self.model_fidelity = model.fidelity()
         rng = default_rng(seed=20260804 + data.n_observations)
         return Posterior(
@@ -393,9 +386,6 @@ class FakeNoise:
 
     def enabled(self) -> bool:
         return self._enabled
-
-
-# ── near-misses: structurally incomplete ────────────────────────────────────────────
 
 
 class SolverWithoutCostEstimate:
@@ -459,9 +449,6 @@ class NoiseWithoutSwitch:
         raise NotImplementedError
 
 
-# ── near-misses: right names, wrong types ───────────────────────────────────────────
-
-
 class SolverReturningBareFloatFlux:
     """``flux`` returns a number instead of the doc 01 §1.2 decomposition."""
 
@@ -515,9 +502,6 @@ def _requires_instrument(instrument: Instrument) -> Instrument:
     return instrument
 
 
-# ── the supporting types ────────────────────────────────────────────────────────────
-
-
 class TestCitation:
     def test_carries_the_reference_doc_00_c2_requires_of_every_algorithm(self) -> None:
         cited = Citation(key="birdsall1991", reference="Birdsall (1991)")
@@ -534,8 +518,6 @@ class TestCitation:
             Citation(key="birdsall1991", reference="")
 
     def test_rejects_a_doi_that_is_not_a_doi(self) -> None:
-        # A URL stored in the doi field looks right in a repr and resolves to nothing
-        # through a DOI resolver, which is exactly the failure that survives review.
         with pytest.raises(ValueError, match="doi"):
             Citation(key="k", reference="r", doi="https://example.org/paper")
 
@@ -545,8 +527,6 @@ class TestDetectionFloor:
         assert floor.admits(Q_(1e17, "m**-3")) is True
 
     def test_refuses_a_state_below_the_floor(self, floor: DetectionFloor) -> None:
-        # doc 01 IF-6: at 1e16 the CO2 interferometer is below its own detection floor,
-        # and an inversion that ingests its noise as data produces confident nonsense.
         assert floor.admits(Q_(1e16, "m**-3")) is False
 
     def test_the_floor_itself_is_admitted(self, floor: DetectionFloor) -> None:
@@ -557,8 +537,6 @@ class TestDetectionFloor:
             floor.admits(Q_(3.0, "eV"))
 
     def test_must_name_the_requirement_that_fixed_it(self) -> None:
-        # doc 00 C4: no hidden assumptions. A detection floor with no requirement behind
-        # it is a number somebody chose, and nothing in the artifact says who.
         with pytest.raises(TraceabilityError, match="IF6"):
             DetectionFloor(quantity="n_0", threshold=Q_(3.3e16, "m**-3"), requirement="IF6")
 
@@ -569,7 +547,6 @@ class TestDetectionFloor:
 
 class TestSolverMetadata:
     def test_requires_at_least_one_citation(self) -> None:
-        # doc 00 C2: "Every algorithm must have a citation."
         with pytest.raises(ValueError, match="citation"):
             SolverMetadata(name="ionlens.physics.mystery", version="0.1.0", citations=())
 
@@ -615,7 +592,6 @@ class TestInstrumentMetadata:
     def test_rejects_an_empty_instrument_id(
         self, citation: Citation, floor: DetectionFloor
     ) -> None:
-        # The id names the HDF5 group of doc 08 §7; an empty one names nothing.
         with pytest.raises(ValueError, match="instrument id"):
             InstrumentMetadata(
                 instrument_id="   ",
@@ -634,13 +610,9 @@ class TestConfig:
         assert cfg.section("mesh").require_str("dz") == "lambda_D/2"
 
     def test_an_int_is_acceptable_where_a_float_is_required(self) -> None:
-        # YAML writes `1000` and `1.0e17` for quantities of the same kind, and refusing
-        # the first would push a float() call into every solver's configure().
         assert SolverConfig(values={"draws": 4000}).require_float("draws") == 4000.0
 
     def test_a_bool_is_not_acceptable_where_a_number_is_required(self) -> None:
-        # bool is a subclass of int, so an `enabled: true` landing in a count field
-        # would otherwise read as 1 and run a sweep of one case.
         with pytest.raises(TypeError, match="n_ppc"):
             SolverConfig(values={"n_ppc": True}).require_int("n_ppc")
 
@@ -675,10 +647,6 @@ class TestConfig:
         assert cfg["metrics"] == ("rel_error", "coverage")
 
     def test_a_solver_config_is_not_an_instrument_config(self) -> None:
-        # Nominal, not structural. `configure(cfg: SolverConfig)` must not silently
-        # accept the instrument block of the same manifest. Held through `object` here
-        # because mypy makes the stronger statement on its own — comparing the two
-        # directly is a non-overlapping equality check and fails the type gate.
         solver: object = SolverConfig(values={"a": 1})
         instrument: object = InstrumentConfig(values={"a": 1})
 
@@ -707,8 +675,6 @@ class TestConfig:
             SolverConfig(values={"n_ppc": 1000}).section("n_ppc")
 
     def test_a_nested_block_is_not_itself_a_solver_config(self) -> None:
-        # `mesh:` inside `forward:` is not something configure() should accept, so
-        # section() deliberately widens the type rather than preserving it.
         block = SolverConfig(values={"mesh": {"dz": "lambda_D/2"}}).section("mesh")
 
         assert type(block) is Config
@@ -725,8 +691,6 @@ class TestConfig:
             InverseConfig(values={"engine": 4}).require_str("engine")
 
     def test_require_float_rejects_a_string(self) -> None:
-        # `dz: lambda_D/2` is stored as the string the manifest wrote, for the physics
-        # package to resolve; reading it as a number here would have to invent one.
         with pytest.raises(TypeError, match="dz"):
             SolverConfig(values={"dz": "lambda_D/2"}).require_float("dz")
 
@@ -735,8 +699,6 @@ class TestConfig:
             SolverConfig(values={"seeds": {1, 2}})  # type: ignore[dict-item]
 
     def test_rejects_a_key_that_is_not_a_string(self) -> None:
-        # YAML permits `1: x`. Nothing downstream addresses a manifest block by integer,
-        # and a non-string key would break both the provenance hash and the error paths.
         with pytest.raises(TypeError, match="keys are strings"):
             SolverConfig(values={"mesh": {1: "x"}})  # type: ignore[dict-item]
 
@@ -755,8 +717,6 @@ class TestIonEnergyFlux:
         assert flux.particle_flux.magnitude == pytest.approx(1.0e19)
 
     def test_mean_impact_energy_is_the_ratio_of_the_two_factors(self, argon: Species) -> None:
-        # doc 01 §1.2: <E_i> = Gamma_E / Gamma_i, and the two factors are constrained by
-        # different physics — which is why both are stored rather than just the product.
         flux = IonEnergyFlux(
             position=Q_(0.0, "m"),
             species=argon,
@@ -770,7 +730,6 @@ class TestIonEnergyFlux:
     def test_the_mean_impact_energy_crosses_module_boundaries_dimensionally(
         self, argon: Species
     ) -> None:
-        # doc 08 §5: pint quantities at module boundaries, raw arrays only in hot loops.
         flux = IonEnergyFlux(
             position=Q_(0.0, "m"),
             species=argon,
@@ -782,9 +741,6 @@ class TestIonEnergyFlux:
         assert float(flux.mean_impact_energy.to("eV").magnitude) == pytest.approx(249.6, rel=1e-3)
 
     def test_a_positive_flux_means_energy_arriving_at_the_wall(self, argon: Species) -> None:
-        # doc 02 §2, and consistent with VelocityDistribution.particle_flux_toward_wall:
-        # the wall is at z = 0, z is positive into the plasma, so an ion that reaches the
-        # wall has v_z < 0 and the sign is absorbed in the name, not in a stray minus.
         flux = IonEnergyFlux(
             position=Q_(0.0, "m"),
             species=argon,
@@ -798,8 +754,6 @@ class TestIonEnergyFlux:
     def test_mean_impact_energy_is_undefined_rather_than_zero_where_no_ions_arrive(
         self, argon: Species
     ) -> None:
-        # Zero would be a claim: "the ions that arrived carried no energy". There were no
-        # ions. NaN says so, and propagates instead of quietly biasing an average down.
         flux = IonEnergyFlux(
             position=Q_(0.0, "m"),
             species=argon,
@@ -814,9 +768,6 @@ class TestIonEnergyFlux:
         assert np.isnan(energies[1])
 
     def test_reports_the_fidelity_that_produced_it(self, argon: Species) -> None:
-        # doc 03 §6 applies the same functional at every level "so that results are
-        # comparable"; benchmark B-03 compares L1 against L2 and must not lose track of
-        # which curve is which once the solver is gone and only the artifact remains.
         flux = IonEnergyFlux(
             position=Q_(0.0, "m"),
             species=argon,
@@ -853,8 +804,6 @@ class TestIonEnergyFlux:
             )
 
     def test_rejects_factors_of_different_shapes(self, argon: Species) -> None:
-        # Gamma_E and Gamma_i are moments of one distribution. Different shapes means
-        # they came from different states, and their ratio would be meaningless.
         with pytest.raises(ValueError, match="same shape"):
             IonEnergyFlux(
                 position=Q_(0.0, "m"),
@@ -901,9 +850,6 @@ class TestIonEnergyFlux:
 
 class TestCostEstimate:
     def test_an_estimate_names_itself_an_estimate(self) -> None:
-        # doc 10 §3.2 is explicit that its GPU throughput is "an estimate, not a
-        # measurement", and gate G-1.4 requires the measurement to replace it. A type
-        # that could not tell the two apart would let the estimate survive the gate.
         cost = CostEstimate.estimated(
             wall_clock=Q_(5.0, "s"), device=Device.GPU, source="doc 10 §3.1"
         )
@@ -920,8 +866,6 @@ class TestCostEstimate:
         assert measured.is_measured is True
 
     def test_scaling_by_a_case_count_gives_the_campaign_total(self) -> None:
-        # doc 10 §3.1 multiplies unit cost by count to schedule a campaign; §6 uses that
-        # total to size the work queue.
         unit = CostEstimate.estimated(
             wall_clock=Q_(5.0, "s"), device=Device.GPU, source="doc 10 §3.1"
         )
@@ -931,9 +875,6 @@ class TestCostEstimate:
         assert total.basis is CostBasis.ESTIMATED
 
     def test_scaling_preserves_peak_memory_because_cases_run_one_at_a_time(self) -> None:
-        # doc 10 §6 schedules a local process pool over a serial queue; a campaign of
-        # 5500 cases does not need 5500x the VRAM, and pretending it did would fail the
-        # doc 10 §3.3 feasibility check against the 16 GB of C3 for no reason.
         unit = CostEstimate.estimated(
             wall_clock=Q_(5.0, "s"),
             device=Device.GPU,
@@ -952,8 +893,6 @@ class TestCostEstimate:
             CostEstimate.estimated(wall_clock=Q_(5.0, "GB"), device=Device.CPU, source="doc 10")
 
     def test_an_uncharacterised_workload_reports_no_peak_memory(self) -> None:
-        # Doc 10 §3.3 checks every workload against the 16 GB of doc 00 C3. A workload
-        # nobody has measured says so rather than reporting a zero that would pass.
         unit = CostEstimate.estimated(wall_clock=Q_(5.0, "s"), device=Device.CPU, source="doc 10")
 
         assert unit.peak_memory_bytes is None
@@ -986,8 +925,6 @@ class TestCostEstimate:
 
 class TestCalibration:
     def test_records_whether_the_true_or_the_estimated_response_was_used(self) -> None:
-        # doc 04 §7.3: the pipeline works with the estimated response. Applying the true
-        # one "would be a form of inverse crime and would understate the error".
         estimated = Calibration(
             instrument_id="thomson",
             coefficients={"absolute": 1.03},
@@ -1011,9 +948,6 @@ class TestCalibration:
         assert truth.is_inverse_crime is True
 
     def test_an_estimated_calibration_cannot_claim_to_be_exact(self) -> None:
-        # An estimated response with zero uncertainty everywhere is the true response
-        # wearing the honest label — indistinguishable in the artifact, and it makes the
-        # doc 06 §4 calibration terms vanish from the error budget.
         with pytest.raises(ValueError, match="uncertainty"):
             Calibration(
                 instrument_id="thomson",
@@ -1044,7 +978,6 @@ class TestCalibration:
             )
 
     def test_requires_a_named_reference_source(self) -> None:
-        # doc 01 SYS-3: "traceable, with a single documented reference source".
         with pytest.raises(ValueError, match="reference"):
             Calibration(
                 instrument_id="thomson",
@@ -1075,8 +1008,6 @@ class TestCalibration:
             )
 
         assert build(CalibrationState.ESTIMATED) == build(CalibrationState.ESTIMATED)
-        # doc 04 §7.3: the same numbers derived the honest way and the crooked way are
-        # not the same calibration, and an artifact comparison must not say they are.
         assert build(CalibrationState.ESTIMATED) != build(CalibrationState.TRUE)
         assert build(CalibrationState.ESTIMATED) != "not a calibration"
 
@@ -1122,9 +1053,6 @@ class TestCalibrationSet:
             refs.for_quantity("absolute_radiometric")
 
     def test_refuses_two_standards_for_one_quantity(self) -> None:
-        # doc 01 SYS-3 requires a single documented reference source per chain. Two
-        # standards for one quantity means the calibration chain is ambiguous, and
-        # whichever the loader reached first would decide the absolute scale.
         duplicate = CalibrationReference(
             name="lamp A",
             quantity="absolute_radiometric",
@@ -1209,8 +1137,6 @@ class TestSignal:
         assert signal.n_samples == 2
 
     def test_derives_a_new_signal_at_the_same_stage(self) -> None:
-        # NoiseModel.apply returns a Signal, and a noise source that moved the signal to
-        # a different stage of the chain would be a layering violation (doc 04 §1).
         signal = Signal(values=np.asarray([1.0, 2.0]), domain=SignalDomain.ADU)
         noisier = signal.with_values(np.asarray([1.5, 2.5]))
 
@@ -1227,9 +1153,6 @@ class TestSignal:
             signal.values[0] = 5.0
 
     def test_a_negative_sample_is_legal_after_offset_subtraction(self) -> None:
-        # An ADU trace with the bias removed goes negative on the read-noise tail. A type
-        # that rejected it would force every detector model to clip, which biases the
-        # photon-transfer curve of V-28 upward at the low end.
         signal = Signal(values=np.asarray([-1.0, 2.0]), domain=SignalDomain.ADU)
 
         assert signal.values[0] == pytest.approx(-1.0)
@@ -1243,8 +1166,6 @@ class TestSignal:
             Signal(values=np.asarray([]), domain=SignalDomain.ADU)
 
     def test_rejects_a_scalar(self) -> None:
-        # A detector stage acts on a frame or a trace. A bare scalar would broadcast
-        # against everything and silently collapse a whole frame's noise to one draw.
         with pytest.raises(ValueError, match="scalar"):
             Signal(values=np.asarray(1.0), domain=SignalDomain.ADU)
 
@@ -1272,8 +1193,6 @@ class TestIdentifiabilityReport:
     def test_reports_the_condition_number_the_identifiability_map_is_coloured_by(
         self, params: PlasmaParams
     ) -> None:
-        # doc 05 §6.2: "The condition number lambda_max/lambda_min is reported for every
-        # operating point, producing the identifiability map required by doc 00 S5."
         assert self._report(params).condition_number == pytest.approx(100.0)
 
     def test_a_singular_information_matrix_has_an_infinite_condition_number(
@@ -1288,8 +1207,6 @@ class TestIdentifiabilityReport:
         assert np.isinf(report.condition_number)
 
     def test_the_weakest_direction_names_the_degeneracy(self, params: PlasmaParams) -> None:
-        # doc 05 §6.2: "The eigenvectors name the degeneracies." The expected one is an
-        # n_0-T_e correlation, since Gamma_i ~ n_0 sqrt(T_e).
         report = self._report(
             params,
             eigenvalues=np.asarray([100.0, 1.0]),
@@ -1301,7 +1218,6 @@ class TestIdentifiabilityReport:
     def test_the_cramer_rao_bound_is_the_best_any_unbiased_estimator_could_do(
         self, params: PlasmaParams
     ) -> None:
-        # doc 05 §6.1: Cov >= I^-1. With an identity eigenbasis the bound is 1/lambda.
         bound = self._report(params).cramer_rao_variance
 
         assert bound[0] == pytest.approx(0.01)
@@ -1321,8 +1237,6 @@ class TestIdentifiabilityReport:
     def test_efficiency_says_whether_information_is_being_left_on_the_table(
         self, params: PlasmaParams
     ) -> None:
-        # doc 05 §6.1 asks exactly this: "is the inversion extracting the information
-        # that is present, or is it leaving some on the table?"
         report = self._report(params, posterior_variance=np.asarray([0.02, 1.0]))
 
         assert report.information_efficiency()[0] == pytest.approx(0.5)
@@ -1337,14 +1251,10 @@ class TestIdentifiabilityReport:
     def test_rejects_eigenvalues_that_are_not_in_descending_order(
         self, params: PlasmaParams
     ) -> None:
-        # lambda_max/lambda_min and weakest_direction both index by position. An
-        # unordered spectrum would make both silently name the wrong mode.
         with pytest.raises(ValueError, match="descending"):
             self._report(params, eigenvalues=np.asarray([1.0, 100.0]))
 
     def test_rejects_a_negative_eigenvalue(self, params: PlasmaParams) -> None:
-        # The Fisher information matrix is positive semi-definite by construction, so a
-        # negative eigenvalue is an arithmetic failure and not a weak direction.
         with pytest.raises(ValueError, match="negative"):
             self._report(params, eigenvalues=np.asarray([1.0, -1.0]))
 
@@ -1372,7 +1282,6 @@ class TestIdentifiabilityReport:
             )
 
     def test_rejects_a_non_finite_eigenvalue(self, params: PlasmaParams) -> None:
-        # An infinite Fisher eigenvalue is an arithmetic failure, not perfect knowledge.
         with pytest.raises(ValueError, match="finite"):
             self._report(params, eigenvalues=np.asarray([np.inf, 1.0]))
 
@@ -1387,8 +1296,6 @@ class TestIdentifiabilityReport:
             self._report(params, posterior_variance=np.asarray([0.02]))
 
     def test_rejects_a_non_positive_posterior_variance(self, params: PlasmaParams) -> None:
-        # A zero marginal variance would divide the efficiency ratio by zero and report
-        # a perfectly efficient inversion at exactly the point the sampler collapsed.
         with pytest.raises(ValueError, match="positive"):
             self._report(params, posterior_variance=np.asarray([0.0, 1.0]))
 
@@ -1402,8 +1309,6 @@ class TestIdentifiabilityReport:
     def test_a_report_with_the_fitted_variances_differs_from_one_without(
         self, params: PlasmaParams
     ) -> None:
-        # Only one of the two can answer doc 05 §6.1's question, so they are not
-        # interchangeable even at the same operating point with the same spectrum.
         fitted = self._report(params, posterior_variance=np.asarray([0.02, 1.0]))
 
         assert fitted != self._report(params)
@@ -1437,13 +1342,8 @@ class TestIdentifiabilityClassification:
             classify_by_condition_number(10.0, weak_above=1.0e8, non_identifiable_above=1.0e3)
 
     def test_refuses_a_condition_number_below_one(self) -> None:
-        # lambda_max >= lambda_min by construction, so cond < 1 means the caller passed
-        # the ratio upside down — and it would classify a singular point as pristine.
         with pytest.raises(ValueError, match="condition number"):
             classify_by_condition_number(0.5, weak_above=1.0e3, non_identifiable_above=1.0e8)
-
-
-# ── the traceability annotations of doc 08 §9 ───────────────────────────────────────
 
 
 class TestTraceabilityIdShapes:
@@ -1480,9 +1380,6 @@ class TestTraceabilityIdShapes:
         "typo", ["R-SPAT1", "RSPAT-1", "V22", "r-spat-1", "V-", "V-0", "", "  ", "V-2 2"]
     )
     def test_refuses_a_malformed_id(self, typo: str) -> None:
-        # doc 08 §9 generates the traceability matrix from these annotations. A typo that
-        # registered silently would put a row in the matrix that no requirement claims
-        # and no test covers, which is worse than having no matrix at all.
         with pytest.raises(TraceabilityError):
             canonical_requirement_id(typo)
 
@@ -1491,8 +1388,6 @@ class TestTraceabilityIdShapes:
             canonical_requirement_id("ZZ-1")
 
     def test_refuses_an_evidence_id_where_a_requirement_belongs(self) -> None:
-        # "@satisfies('V-22')" is a real mistake: it reads plausibly and produces a
-        # requirement row for a test.
         with pytest.raises(TraceabilityError, match="V"):
             canonical_requirement_id("V-22")
 
@@ -1541,8 +1436,6 @@ class TestTraceabilityAnnotations:
         assert phase_shift() == pytest.approx(0.0)
 
     def test_a_second_application_adds_rather_than_replaces(self) -> None:
-        # Splitting a long claim list across two decorator lines is normal; silently
-        # keeping only the last would drop half the matrix.
         @satisfies("R-SPAT-1")
         @satisfies("R-ACC-4")
         @verified_by("V-22")
@@ -1565,9 +1458,6 @@ class TestTraceabilityAnnotations:
         assert evidence_of(Plain) == ()
 
     def test_a_subclass_does_not_inherit_its_parents_claims(self) -> None:
-        # An inherited @satisfies would credit every subclass with the base's coverage,
-        # and the matrix would report requirements as verified by tests that never ran
-        # against the subclass.
         @satisfies("R-SPAT-1")
         @verified_by("V-22")
         class Base: ...
@@ -1583,8 +1473,6 @@ class TestTraceabilityAnnotations:
             class Empty: ...
 
     def test_refuses_evidence_with_no_ids(self) -> None:
-        # An empty @verified_by reads as verified and is not — which is precisely the
-        # state doc 08 §9's gate exists to fail.
         with pytest.raises(TraceabilityError, match="at least one"):
 
             @verified_by()
@@ -1648,7 +1536,6 @@ class TestTraceabilityMatrix:
 
 class TestTraceabilityCiGates:
     def test_a_claim_with_no_verification_fails_the_gate(self) -> None:
-        # doc 08 §9: "a @satisfies with no @verified_by fails CI".
         @satisfies("R-SPAT-1")
         class Unverified: ...
 
@@ -1665,17 +1552,12 @@ class TestTraceabilityCiGates:
         assert unverified_claims() == ()
 
     def test_evidence_without_a_claim_is_not_a_failure(self) -> None:
-        # A test-only helper may name the tests it belongs to without claiming to
-        # satisfy a requirement; doc 08 §9 gates the other direction only.
         @verified_by("V-22")
         class Helper: ...
 
         assert unverified_claims() == ()
 
     def test_a_requirement_nothing_claims_fails_the_gate(self) -> None:
-        # doc 08 §9: "a requirement with no @satisfies ... fails CI". The requirement
-        # list comes from doc 01 §6, which this package does not hold, so the catalogue
-        # is supplied by the caller.
         @satisfies("R-SPAT-1")
         @verified_by("V-22")
         class Covered: ...
@@ -1694,36 +1576,22 @@ class TestTraceabilityCiGates:
             uncovered_requirements(("R-SPAT-1", "R-SPAT1"))
 
 
-# ── the four protocols ──────────────────────────────────────────────────────────────
-
-
 class TestForwardSolverProtocol:
     def test_a_complete_implementation_satisfies_it(self) -> None:
         assert isinstance(FakeSolver(), ForwardSolver)
 
     def test_a_solver_missing_its_cost_estimate_does_not(self) -> None:
-        # doc 10 §6 schedules campaigns from cost_estimate; a solver that cannot be
-        # costed cannot be queued, and finding that out mid-sweep is too late.
         assert not isinstance(SolverWithoutCostEstimate(), ForwardSolver)
 
     def test_a_solver_whose_flux_returns_a_bare_number_is_rejected_by_the_type_checker(
         self,
     ) -> None:
-        # isinstance checks method *names*; the signature contract is mypy's. The ignore
-        # below is the assertion — warn_unused_ignores is part of --strict, so if the
-        # protocol stopped constraining the return type this line would fail the build.
         assert isinstance(SolverReturningBareFloatFlux(), ForwardSolver)
         _requires_solver(SolverReturningBareFloatFlux())  # type: ignore[arg-type]
 
     def test_a_solver_that_demands_a_time_grid_is_rejected_by_the_type_checker(
         self,
     ) -> None:
-        # The reason ForwardSolver.solve was widened from doc 08 §4's literal
-        # ``t: TimeGrid``. Parameter types are contravariant, so a solver that *insists*
-        # on a TimeGrid cannot stand in for one that accepts None — and L0 has no time
-        # dependence at all (doc 03 §1), so demanding one would make the analytic level
-        # unable to implement the contract every level is supposed to share (doc 00 E1).
-        # The ignore is the assertion: warn_unused_ignores is part of --strict.
         assert isinstance(SolverDemandingATimeGrid(), ForwardSolver)
         _requires_solver(SolverDemandingATimeGrid())  # type: ignore[arg-type]
 
@@ -1757,22 +1625,15 @@ class TestInstrumentProtocol:
         assert isinstance(FakeInstrument(), Instrument)
 
     def test_an_instrument_without_the_detection_gate_does_not(self) -> None:
-        # doc 01 IF-6 is a requirement, not a caveat: a channel below its floor must
-        # contribute no likelihood term rather than a noisy one.
         assert not isinstance(InstrumentWithoutDetectionGate(), Instrument)
 
     def test_an_instrument_whose_forward_is_noisy_is_rejected_by_the_type_checker(self) -> None:
-        # doc 04 §9 splits forward (noiseless Observable) from observe (noisy
-        # Measurement). Returning a Measurement from forward would feed an uncertainty
-        # into the likelihood twice and nothing at runtime would say so.
         assert isinstance(InstrumentReturningMeasurementFromForward(), Instrument)
         _requires_instrument(InstrumentReturningMeasurementFromForward())  # type: ignore[arg-type]
 
     def test_forward_and_observe_agree_because_they_share_a_code_path(
         self, state: PlasmaState, window: AcquisitionWindow
     ) -> None:
-        # doc 04 §9 / doc 08 §4: "Both come from the same code path", which is the
-        # invariant this test holds them to.
         instrument: Instrument = FakeInstrument()
         prediction = instrument.forward(state, window)
         observation = instrument.observe(state, window)
@@ -1827,8 +1688,6 @@ class TestInverseEngineProtocol:
         assert isinstance(FakeEngine(), InverseEngine)
 
     def test_an_engine_that_cannot_report_a_null_space_does_not(self) -> None:
-        # doc 05 §6 is "what elevates the work from an inversion to an analysis of an
-        # inversion", and doc 00 S5 requires the identifiability map.
         assert not isinstance(EngineWithoutIdentifiability(), InverseEngine)
 
     def test_a_fake_forward_model_satisfies_the_model_contract(self) -> None:
@@ -1862,9 +1721,6 @@ class TestNoiseModelProtocol:
         assert isinstance(FakeNoise(), NoiseModel)
 
     def test_a_noise_source_that_cannot_be_switched_off_does_not(self) -> None:
-        # doc 04 §8 V-30: "Noise sources switch off cleanly (each in isolation
-        # reproduces the noiseless limit)", and the manifest of doc 08 §6 lists
-        # enabled_sources explicitly.
         assert not isinstance(NoiseWithoutSwitch(), NoiseModel)
 
     def test_a_disabled_source_reproduces_the_noiseless_limit_exactly(self) -> None:
@@ -1875,8 +1731,6 @@ class TestNoiseModelProtocol:
         assert noise.enabled() is False
 
     def test_an_enabled_source_perturbs_the_signal_reproducibly(self) -> None:
-        # doc 00 E3: bit-for-bit reproducibility given the seed. The generator is passed
-        # in rather than owned so that the run's seed derivation stays in one place.
         noise: NoiseModel = FakeNoise()
         signal = Signal(values=np.asarray([100.0, 200.0]), domain=SignalDomain.PHOTOELECTRON)
         first = noise.apply(signal, default_rng(seed=20260804))
@@ -1930,14 +1784,10 @@ class TestReprs:
         assert "interf" in repr(meta)
 
     def test_a_config_lists_its_keys_and_not_its_values(self) -> None:
-        # A manifest block can be large; the keys say which block this is, which is what
-        # a "configure() got the wrong section" traceback needs.
         assert repr(SolverConfig(values={"n_ppc": 1000})) == "SolverConfig(n_ppc)"
         assert repr(InverseConfig(values={})) == "InverseConfig(empty)"
 
     def test_a_flux_shows_its_fidelity_and_magnitude(self, argon: Species) -> None:
-        # doc 03 §6 / benchmark B-03: which level produced a curve is the whole point of
-        # the comparison, so it goes in the repr rather than being looked up.
         flux = IonEnergyFlux(
             position=Q_(0.0, "m"),
             species=argon,
@@ -2035,9 +1885,6 @@ class TestProtocolExports:
         assert missing == []
 
     def test_nothing_a_submodule_makes_public_is_left_unexported(self) -> None:
-        # A supporting type reachable only as `ionlens.core.protocols.forward.CostBasis`
-        # would make the import path an implementation detail, and the first plugin to
-        # depend on it would pin the module layout doc 08 §1 principle 7 expects to move.
         import importlib
 
         import ionlens.core.protocols as protocols

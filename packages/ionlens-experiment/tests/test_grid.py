@@ -57,9 +57,6 @@ from ionlens.experiment.l2_truth import L2Truth, observation_grid, save_l2_truth
 from ionlens.physics.analytic.sheath import AnalyticSheathSolver
 from ionlens.validation.sealed import Tier, TierMismatchError, tier_of_configuration
 
-#: Stand-in scalars for the synthetic L2 artefact built below. Never asserted against
-#: anything physical — see ``_synthetic_l2_truth``'s docstring for why a physically
-#: meaningless truth is the right fixture for the two tests that use it.
 _STUB_GAMMA_E_W_PER_M2 = 9331.69
 _STUB_MEAN_ENERGY_EV = 250.0
 _STUB_THICKNESS_M = 1.0e-3
@@ -99,7 +96,6 @@ def _synthetic_l2_truth(seed: int) -> L2Truth:
             grid=grid,
             time=None,
             fields=fields,
-            # An L2 state must carry a distribution; PlasmaState enforces it.
             ion_distribution=state.ion_distribution,
             fidelity=Fidelity.L2,
         ),
@@ -123,9 +119,6 @@ def _base_cell() -> Cell:
     )
 
 
-# ── tier is delegated, not asserted ─────────────────────────────────────────────
-
-
 class TestTierIsDelegatedNotAsserted:
     """``Cell.tier`` must be ``tier_of_configuration``'s verdict, not a stored label.
 
@@ -146,16 +139,10 @@ class TestTierIsDelegatedNotAsserted:
         )
 
     def test_a_mismatched_model_cell_without_noise_raises_rather_than_labels_t0(self) -> None:
-        # doc 05 §7.1's refusal, read off Cell.tier directly rather than off
-        # tier_of_configuration: this is the property that must surface it, since a grid
-        # row is built by reading .tier, not by calling the sealed module itself.
         cell = dataclasses.replace(_base_cell(), truth=Fidelity.L1, inversion=Fidelity.L0)
 
         with pytest.raises(TierMismatchError):
             _ = cell.tier
-
-
-# ── STANDARD_CELLS is what its own comment claims ───────────────────────────────
 
 
 class TestStandardCellsShape:
@@ -176,11 +163,6 @@ class TestStandardCellsShape:
     def test_each_mismatched_pair_appears_exactly_twice_differing_only_in_calibration(
         self,
     ) -> None:
-        # The comment above STANDARD_CELLS states the pairing explicitly: each of the
-        # three mismatched (truth, inversion) combinations appears once with
-        # calibration_uncertainty off and once with it on, and nothing else differs
-        # between the two. A pairing that silently became a triple, or drifted apart on
-        # some other axis, would still "look like a grid" without this check.
         mismatched = [cell for cell in STANDARD_CELLS if not cell.same_model]
         by_configuration: dict[tuple[object, ...], list[Cell]] = {}
         for cell in mismatched:
@@ -198,19 +180,12 @@ class TestStandardCellsShape:
             assert {c.calibration_uncertainty for c in cells} == {True, False}
 
     def test_cell_label_has_no_collisions(self) -> None:
-        # A collision would silently merge two rows in the results table — the exact
-        # failure mode cell_label's own docstring says it exists to prevent.
         labels = [cell_label(cell) for cell in STANDARD_CELLS]
         assert len(set(labels)) == len(labels)
 
 
-# ── cell_label is total and collision-free across the axes ─────────────────────
-
-
 class TestCellLabelIsTotalAndStable:
     def test_the_label_is_stable_across_separately_constructed_equal_cells(self) -> None:
-        # Two independently built Cells with the same field values must produce the same
-        # label — the property a results table's join key depends on.
         assert cell_label(_base_cell()) == cell_label(_base_cell())
 
     @pytest.mark.parametrize(
@@ -237,9 +212,6 @@ class TestCellLabelIsTotalAndStable:
         )
 
 
-# ── infeasible cells refuse loudly and cheaply ──────────────────────────────────
-
-
 class TestInfeasibleCellsRefuseCheaply:
     """``InfeasibleCellError`` must arrive before the MAP search starts, not after it
     fails partway through. L2-as-inversion is unaffordable rather than unimplemented —
@@ -261,18 +233,10 @@ class TestInfeasibleCellsRefuseCheaply:
             run_cell(cell, seed=0)
         elapsed = time.perf_counter() - started
 
-        # A full run_cell on the cheapest cell measures ~28 s (a MAP search's thousands
-        # of forward solves). This refusal does one L0 truth solve and one channel
-        # forward pass before raising, with no search at all, so it should be well under
-        # that — a generous bound rather than a tight one, to keep this from flaking on a
-        # loaded machine.
         assert elapsed < 10.0, (
             f"refusing an infeasible cell took {elapsed:.1f} s; InfeasibleCellError is "
             "supposed to be the cheap way to discover this, not the slow one"
         )
-
-
-# ── L2 truth artefact discipline ────────────────────────────────────────────────
 
 
 class TestL2TruthArtefactDiscipline:
@@ -296,14 +260,7 @@ class TestL2TruthArtefactDiscipline:
         with pytest.raises(TruthArtefactRequiredError, match="seed 0") as excinfo:
             run_cell(self._l2_cell(), seed=1, l2_truth_path=artefact)
 
-        # Not pedantry — see TruthArtefactRequiredError's own docstring: scoring one
-        # draw's truth against another draw's instrument realisations produces a number
-        # that means nothing and looks entirely ordinary, so the message has to name
-        # *both* seeds for a reader to be able to tell the mismatch happened at all.
         assert "seed 1" in str(excinfo.value)
-
-
-# ── run_grid records failures in place of rows ──────────────────────────────────
 
 
 class TestRunGridRecordsFailuresInPlace:
@@ -329,9 +286,6 @@ class TestRunGridRecordsFailuresInPlace:
         assert isinstance(first_outcome, TierMismatchError)
         assert second_cell is l2_without_an_artefact
         assert isinstance(second_outcome, TruthArtefactRequiredError)
-
-
-# ── the one slow end-to-end test ────────────────────────────────────────────────
 
 
 class TestRunCellEndToEndAtT0:
@@ -360,8 +314,6 @@ class TestRunCellEndToEndAtT0:
         assert report.tier is Tier.T0
         assert set(report.contributing) == set(CHANNEL_NAMES)
         assert report.excluded == ()
-        # Loose on purpose — see the class docstring for the quantisation floor this
-        # threshold sits well above.
         assert report.relative_error < 1e-3
         assert report.truth_within_interval is True
         assert report.cell is cell

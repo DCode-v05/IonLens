@@ -54,8 +54,6 @@ def _quadratic_forward(u: np.ndarray) -> np.ndarray:
 
 class TestTheObjective:
     def test_it_is_the_negative_log_posterior_not_just_the_likelihood(self) -> None:
-        # Dropping the prior is the commonest way this goes wrong, and the result still
-        # converges — to the maximum-likelihood estimate, silently relabelled as MAP.
         prior = default_control_prior()
         u = np.asarray(prior.median().to_unconstrained())
 
@@ -67,9 +65,6 @@ class TestTheObjective:
         assert value == pytest.approx(-(-1.5 + prior.log_prob_unconstrained(u)))
 
     def test_it_includes_the_log_jacobian_through_the_prior(self) -> None:
-        # log_prob_unconstrained already carries the Jacobian. This asserts the objective
-        # uses that rather than the constrained log_prob, because the difference is a
-        # smooth bias that no convergence diagnostic would flag.
         prior = default_control_prior()
         u = np.asarray(prior.median().to_unconstrained())
 
@@ -82,8 +77,6 @@ class TestTheObjective:
         assert value == pytest.approx(-unconstrained)
 
     def test_a_point_outside_the_support_is_infinite_rather_than_an_error(self) -> None:
-        # L-BFGS-B evaluates trial points, and a bounded prior will be stepped outside.
-        # Raising there aborts the optimisation; +inf tells the line search to back off.
         prior = default_control_prior()
         u = np.full(8, 1e6)
 
@@ -95,9 +88,6 @@ class TestTheObjective:
 class TestTheGradient:
     @pytest.mark.physics
     def test_the_supplied_gradient_matches_a_finite_difference(self) -> None:
-        # The defect that makes L-BFGS-B converge to a point that is not a stationary point
-        # of the reported objective. Checked in unconstrained space, where the optimiser
-        # actually works.
         prior = default_control_prior()
         u0 = np.asarray(prior.median().to_unconstrained())
         target = _quadratic_forward(u0) + 0.3
@@ -129,9 +119,6 @@ class TestClosedFormRecovery:
 
     @pytest.mark.physics
     def test_it_finds_the_analytic_posterior_mode(self) -> None:
-        # For y = A u + eps with eps ~ N(0, s^2 I) and a N(m, S) prior, the posterior mode
-        # is (A'A/s^2 + S^-1)^-1 (A'y/s^2 + S^-1 m). Written out here independently of the
-        # engine, so agreement is evidence rather than a tautology.
         rng = np.random.default_rng(20260806)
         n = 4
         design = rng.normal(size=(6, n))
@@ -164,8 +151,6 @@ class TestClosedFormRecovery:
 
     @pytest.mark.physics
     def test_a_tighter_prior_pulls_the_estimate_toward_the_prior_mean(self) -> None:
-        # The behaviour that distinguishes MAP from maximum likelihood. If the prior were
-        # being dropped, this test would fail while every convergence check still passed.
         rng = np.random.default_rng(7)
         design = rng.normal(size=(3, 2))
         observed = design @ np.array([2.0, -2.0])
@@ -194,8 +179,6 @@ class TestClosedFormRecovery:
 class TestTheT0Contract:
     @pytest.mark.physics
     def test_noiseless_data_from_the_model_recovers_the_generating_parameters(self) -> None:
-        # doc 05 §7.2's T0: same model, no noise, "recovery to numerical tolerance".
-        # This is the engine's half of that contract.
         prior = default_control_prior()
         truth = np.asarray(prior.median().to_unconstrained())
         observed = _quadratic_forward(truth)
@@ -208,14 +191,9 @@ class TestTheT0Contract:
             log_likelihood=log_likelihood, prior=prior, initial=truth + 0.05
         )
 
-        # Two observations cannot pin eight parameters; the prior fixes the rest. What must
-        # hold is that the *data-constrained* directions are recovered and the fit is exact.
         np.testing.assert_allclose(_quadratic_forward(result.unconstrained), observed, rtol=1e-5)
 
     def test_it_starts_from_the_prior_median_by_default_not_the_reference(self) -> None:
-        # The trap the priors layer documented: eedf.kappa's RP-1 nominal sits exactly on
-        # the edge of its uniform [1,5] support, so reference().to_unconstrained() is -inf
-        # and an engine initialised there initialises nowhere.
         prior = default_control_prior()
 
         result = maximum_a_posteriori(log_likelihood=lambda _: 0.0, prior=prior)
@@ -225,9 +203,6 @@ class TestTheT0Contract:
 
 class TestTheResult:
     def test_it_reports_the_constrained_parameters_as_well(self) -> None:
-        # Callers reason about eV and m^-3, not about logits. Returning only the
-        # unconstrained vector invites an inverse transform at every call site, and one of
-        # them will get it wrong.
         prior = default_control_prior()
 
         result: MapResult = maximum_a_posteriori(log_likelihood=lambda _: 0.0, prior=prior)
@@ -238,13 +213,6 @@ class TestTheResult:
         )
 
     def test_a_point_at_the_analytic_optimum_is_reported_as_converged(self) -> None:
-        # L-BFGS-B returns ABNORMAL_TERMINATION_IN_LNSRCH when its line search stops making
-        # progress, which at this module's deliberately tight gtol (1e-10) happens routinely
-        # once the *finite-difference* gradient hits its own noise floor around 1e-8 — at a
-        # point that is already the optimum to 1e-9. Reporting that as a failure is a false
-        # negative, and in an ensemble it is an expensive one: ~5 % of perfectly good cases
-        # get discarded, and ionlens.validation.coverage refuses to report at all past a 10 %
-        # failure rate. `converged` must mean "this is a mode", not "scipy was happy".
         rng = np.random.default_rng(9)
         sigma, variance = 0.6, 2.0
         false_negatives = 0
@@ -280,8 +248,6 @@ class TestTheResult:
         )
 
     def test_it_reports_whether_the_optimiser_converged(self) -> None:
-        # A MAP that silently returns the iteration limit is how a bad fit becomes a
-        # published number.
         prior = default_control_prior()
 
         result = maximum_a_posteriori(log_likelihood=lambda _: 0.0, prior=prior)
@@ -345,8 +311,6 @@ class TestMultiStart:
         assert result.start_objectives == (result.objective,)
 
     def test_n_starts_one_is_bit_for_bit_identical_to_not_passing_it(self) -> None:
-        # The load-bearing guarantee: every number this project has published so far was
-        # measured single-start, and adding this parameter must not move any of them.
         prior = default_control_prior()
 
         baseline = maximum_a_posteriori(log_likelihood=lambda _: 0.0, prior=prior)
@@ -380,9 +344,6 @@ class TestMultiStart:
             log_likelihood=_bimodal_log_likelihood,
             prior=_FlatPrior(),  # type: ignore[arg-type]
             initial=np.array([0.0]),
-            # 20, not 5: each extra start reaches the global bump with probability ~0.16
-            # (it needs a perturbation past ~3 at scale 3.0), so 5 starts found it for only
-            # 56 of seeds 0-99. 20 starts found it for 99 of 100.
             n_starts=20,
             seed=42,
         )
@@ -390,10 +351,6 @@ class TestMultiStart:
         assert result.unconstrained[0] == pytest.approx(6.0, abs=1e-3)
         assert result.n_starts == 20
         assert len(result.start_objectives) == 20
-        # Two genuinely different optimised points among the 20 starts: the local mode this
-        # module's own start always reproduces, and the global one at least one perturbed
-        # start reached. This is doc 00's house style applied to the claim itself — "the
-        # surface is multimodal" is checked here, not just asserted in a report.
         assert result.n_distinct_modes >= 2
 
     def test_extra_starts_are_deterministic_given_the_seed(self) -> None:
@@ -427,11 +384,7 @@ class TestMultiStart:
             seed=2,
         )
 
-        # A flat objective converges every start back to the same optimum regardless of
-        # where it began, so the *starts themselves* (not the optima) are what must differ
-        # — checked through the objects the public API actually exposes: distinct calls
-        # with distinct seeds must not silently share one RNG state.
-        assert result_a.start_objectives == result_b.start_objectives  # both trivially flat
+        assert result_a.start_objectives == result_b.start_objectives
         from ionlens.inverse.map import _start_points
 
         points_a = _start_points(np.zeros(3), n_starts=3, seed=1, prior=_FlatPrior())
@@ -441,8 +394,6 @@ class TestMultiStart:
         )
 
     def test_best_by_log_posterior_is_selected_regardless_of_start_order(self) -> None:
-        # The global mode is deeper (higher log posterior / lower objective); the returned
-        # result must be it, not merely "the last start run".
         result = maximum_a_posteriori(
             log_likelihood=_bimodal_log_likelihood,
             prior=_FlatPrior(),  # type: ignore[arg-type]
@@ -480,8 +431,6 @@ class TestBoundedStarts:
     def test_every_extra_start_has_finite_prior_support(self) -> None:
         from ionlens.inverse.map import _start_points
 
-        # Half-width well inside the perturbation scale (3.0), so unbounded draws would
-        # routinely land outside it and the fix is exercised, not vacuous.
         prior = _BoxPrior(half_width=1.0)
 
         points = _start_points(np.zeros(4), n_starts=8, seed=3, prior=prior)  # type: ignore[arg-type]
@@ -496,9 +445,6 @@ class TestBoundedStarts:
     ) -> None:
         from ionlens.inverse.map import _start_points
 
-        # A half-width far too small for the shrinking schedule to reach in the attempt
-        # budget: every draw is rejected, and the start must still exist — as the
-        # reference point, not silently missing.
         prior = _BoxPrior(half_width=1e-9)
 
         points = _start_points(np.zeros(2), n_starts=3, seed=5, prior=prior)  # type: ignore[arg-type]
@@ -508,8 +454,6 @@ class TestBoundedStarts:
             np.testing.assert_array_equal(point, np.zeros(2))
 
     def test_n_starts_one_never_touches_the_prior_for_perturbation(self) -> None:
-        # n_starts=1 must stay bit-for-bit the old single-start path — including never
-        # calling into the bounded-perturbation machinery this fix added.
         class _RaisingPrior:
             def log_prob_unconstrained(self, u: np.ndarray) -> float:
                 return 0.0
@@ -527,9 +471,6 @@ class TestBoundedStarts:
         assert result.n_starts == 1
 
     def test_a_wide_multi_start_search_no_longer_crashes_on_a_narrow_box(self) -> None:
-        # The end-to-end shape of the regression: n_starts large enough that several
-        # unbounded draws would have left the box, on a prior narrow enough that they
-        # would have. Must complete without raising.
         prior = _BoxPrior(half_width=0.5)
 
         result = maximum_a_posteriori(

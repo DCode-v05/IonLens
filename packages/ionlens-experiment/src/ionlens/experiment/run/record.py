@@ -41,11 +41,6 @@ from ionlens.core.random import Stream, stream_seed
 
 __all__ = ["CONTAINER_DIGEST_VARIABLE", "RunRecord", "RunStatus", "hardware_description"]
 
-#: Environment variable naming the container a run executed in — doc 13 §2.
-#:
-#: Read rather than probed. A container cannot reliably identify its own image from the
-#: inside, and the orchestration that started it can; an absent variable is recorded as
-#: absent rather than guessed.
 CONTAINER_DIGEST_VARIABLE: Final[str] = "IONLENS_CONTAINER_DIGEST"
 
 
@@ -129,7 +124,6 @@ class RunRecord:
             raise ValueError("run record: started_utc must be timezone-aware")
         object.__setattr__(self, "started_utc", self.started_utc.astimezone(UTC))
 
-    # ── construction ────────────────────────────────────────────────────────────
 
     @classmethod
     def opened(
@@ -182,7 +176,6 @@ class RunRecord:
             failure=failure,
         )
 
-    # ── serialisation ───────────────────────────────────────────────────────────
 
     def to_mapping(self) -> dict[str, Any]:
         """The doc 13 §2 structure, in the plain types YAML carries."""

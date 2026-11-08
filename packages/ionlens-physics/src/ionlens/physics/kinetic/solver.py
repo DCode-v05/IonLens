@@ -153,15 +153,6 @@ from ionlens.physics.kinetic.push import push_leapfrog
 
 enable_double_precision()
 
-#: ``jax.jit`` applied to the verified kernels themselves, with the grid and the species
-#: static because they fix the array shapes and nothing else.
-#:
-#: Wrapping rather than rewriting is the whole point: the compiled path *is*
-#: :func:`~ionlens.physics.kinetic.fields.solve_poisson_dirichlet` and
-#: :func:`~ionlens.physics.kinetic.push.push_leapfrog`, so it cannot drift from the code their
-#: verification tests exercise. The boundary voltages and the timestep stay **traced** and
-#: not static: making them static would recompile once per distinct bias, and doc 11 WBS
-#: 3.1's ensemble sweeps thousands of them.
 _jit_poisson = jax.jit(solve_poisson_dirichlet, static_argnums=(0,))
 _jit_push = jax.jit(push_leapfrog, static_argnums=(0,))
 
@@ -203,63 +194,35 @@ _EPS0: Final[float] = float(magnitude_in(VACUUM_PERMITTIVITY, "F/m"))
 
 _REGISTRY = default_registry()
 
-#: doc 03 §4.3's default macroparticles per cell per species.
 DEFAULT_N_PPC: Final[float] = float(_REGISTRY.value_in("pic.n_ppc", "dimensionless"))
 
-#: Cells per Debye length — doc 05 §7.1's truth mesh, ``dz = lambda_D / 2``.
 DEFAULT_CELLS_PER_DEBYE: Final[float] = float(
     _REGISTRY.value_in("mesh.A.cells_per_debye", "dimensionless")
 )
 
-#: doc 03 §2.1's sheath-edge definition, ``(n_i - n_e) / n_i = delta``. A registered DESIGN
-#: parameter precisely because the sheath edge is a definition and not a surface.
 SHEATH_EDGE_TOLERANCE: Final[float] = float(
     _REGISTRY.value_in("sheath.edge_tolerance", "dimensionless")
 )
 
-#: Domain length in Child-Langmuir sheath thicknesses. Beyond 1 so the quasineutral
-#: presheath and doc 03 §3.3's ``Phi = 0`` boundary sit outside the space-charge region;
-#: not far beyond, because every extra sheath of quasineutral plasma adds an ion transit at
-#: ``c_s`` — the slowest timescale in the problem — to the run for no new physics.
 DEFAULT_DOMAIN_SHEATHS: Final[float] = 1.5
 
-#: Ion transit times simulated: one to clear the loaded sheath, the rest to average over.
 DEFAULT_TRANSITS: Final[float] = 3.0
 
-#: Fraction of the run discarded as start-up transient before anything is recorded.
 DEFAULT_EQUILIBRATION_FRACTION: Final[float] = 0.4
 
-#: Slots per species as a multiple of the loaded population. The population is bounded by
-#: the reservoir flux and the transit time rather than chosen, so the headroom is real;
-#: running out is an error rather than a silent truncation of the injected flux.
 DEFAULT_CAPACITY_FACTOR: Final[float] = 4.0
 
-#: Electron thermal speeds at which doc 03 §4.3's CFL bound is evaluated. Five sigma
-#: excludes 3e-7 of a Maxwellian and — not by coincidence — makes ``dz / v_max`` equal
-#: ``0.2 / omega_pe`` exactly at ``dz = lambda_D``, so the two doc 03 §4.3 timestep
-#: constraints meet rather than one silently dominating the other.
 CFL_SPEED_SIGMAS: Final[float] = 5.0
 
-#: Bins in the emitted wall IEDF and on the ``f_i(z, v_z)`` velocity axis.
 DEFAULT_ENERGY_BINS: Final[int] = 120
 DEFAULT_VELOCITY_BINS: Final[int] = 160
 
-#: Headroom on the energy and velocity axes over the free-fall value ``sqrt(2 e V_w / m_i)``.
-#: Ions arrive with the sheath drop *plus* their entry energy, so an axis stopping at the
-#: closed form would pile the fastest arrivals — the slowest-converging part of the IEDF,
-#: and the part doc 03 §4.3 warns about — into its last bin.
 AXIS_MARGIN: Final[float] = 1.25
 
-#: Thermal energies the IEDF axis spans even at zero bias, so an unbiased or closed-box run
-#: still produces a resolved distribution rather than one occupied bin.
 AXIS_TEMPERATURE_FLOOR: Final[float] = 10.0
 
-#: doc 03 §4.4's throughput figure, particle-steps per second per core. doc 03 §4.4 calls
-#: it "an estimate to be measured" and gate G-1.4 requires the measurement to replace it,
-#: which is why :meth:`Pic1D3VSolver.cost_estimate` reports ``ESTIMATED``.
 PARTICLE_STEPS_PER_SECOND: Final[float] = 5.0e7
 
-#: Root seed for a solver constructed without one, so that "no seed" is still reproducible.
 DEFAULT_SEED: Final[int] = 20260804
 
 _INT_KEYS: Final[tuple[str, ...]] = ("n_cells", "n_steps", "seed")
@@ -278,7 +241,6 @@ _FLOAT_KEYS: Final[tuple[str, ...]] = (
 )
 _CONFIG_KEYS: Final[frozenset[str]] = frozenset(_INT_KEYS + _FLOAT_KEYS + ("wall",))
 
-#: Field names, and the order the snapshot tuple packs them in.
 _FIELD_ORDER: Final[tuple[str, ...]] = ("n_i", "n_e", "Phi", "u_i", "T_e")
 _FIELD_UNITS: Final[dict[str, str]] = {
     "n_i": "m**-3",
@@ -287,9 +249,6 @@ _FIELD_UNITS: Final[dict[str, str]] = {
     "u_i": "m/s",
     "T_e": "eV",
 }
-
-
-# ── what a run produces ─────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -394,9 +353,6 @@ class PicRun:
     iedf: IonEnergyDistribution
     diagnostics: PicDiagnostics
     sheath_thickness_m: float
-
-
-# ── internal machinery ──────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -540,9 +496,6 @@ def _sheath_edge_m(
     return 0.0 if inside.size == 0 else float(nodes_m[int(inside[-1])])
 
 
-# ── the solver ──────────────────────────────────────────────────────────────────
-
-
 @dataclass(slots=True)
 class Pic1D3VSolver:
     """L2 of the doc 03 §1 hierarchy — 1D3V electrostatic PIC-MCC, doc 03 §4.
@@ -605,7 +558,6 @@ class Pic1D3VSolver:
     electron_collisions: NullCollisionSampler | None = None
     _last_run: PicRun | None = dataclass_field(default=None, repr=False, compare=False)
 
-    # ── the doc 08 §4 contract ──────────────────────────────────────────────────
 
     def configure(self, cfg: SolverConfig) -> None:
         """Apply the ``forward:`` block of a manifest — doc 08 §6.
@@ -720,7 +672,6 @@ class Pic1D3VSolver:
         """
         return SurfaceModel(secondary_yield=params.gamma_se, ion_reflection=self.ion_reflection)
 
-    # ── the run ─────────────────────────────────────────────────────────────────
 
     def run(self, params: PlasmaParams, t: TimeGrid | None = None) -> PicRun:
         """Execute doc 03 §4.2's six steps and return everything they produced."""
@@ -779,7 +730,6 @@ class Pic1D3VSolver:
 
         return self._assemble(params, plan, t, acc, ions, electrons, snapshots, counts, secondaries)
 
-    # ── planning ────────────────────────────────────────────────────────────────
 
     def _plan(self, params: PlasmaParams, t: TimeGrid | None) -> _Plan:
         """Derive the grid, the timestep and the run length from doc 03 §4.3's bounds."""
@@ -814,18 +764,11 @@ class Pic1D3VSolver:
         v_max = max(
             CFL_SPEED_SIGMAS * thermal_e,
             free_fall_i + c_s + CFL_SPEED_SIGMAS * thermal_i,
-            # A secondary emitted at the wall recrosses the whole drop, so whenever that
-            # channel is on it is the fastest thing in the run — doc 03 §3.3.
             math.sqrt(2.0 * _E * drop_v / _M_E) if params.gamma_se > 0.0 else 0.0,
         )
         omega_pe = electron_plasma_frequency_rad_per_s(density_m3=params.n_0_per_m3)
         dt = min(TIMESTEP_SAFETY / omega_pe, grid.dz_m / v_max) / self.timestep_refinement
 
-        # The ion transit, and the run length that follows from it: the quasineutral
-        # presheath is crossed at c_s and the sheath in free fall, and the two differ by
-        # sqrt(2 V_w / T_e) — a factor of 13 at RP-1. Using the slow branch for the whole
-        # domain, which is the safe-looking thing to write, multiplies the run by that
-        # factor for no extra physics.
         presheath = max(length - sheath, 0.0) / c_s
         transit = presheath + sheath / free_fall_i if sheath > 0.0 else length / c_s
         n_steps = self.n_steps or max(1, math.ceil(self.transits * transit / dt))
@@ -848,7 +791,6 @@ class Pic1D3VSolver:
             capacity=math.ceil(self.capacity_factor * loaded),
             sheath_thickness_m=sheath,
             bulk_temperature_ev=temperature_ev,
-            # doc 03 §3.3's bulk row: ions enter at c_s, electrons with no net drift.
             ion_source=InjectionSource(
                 density_s, thermal_i, c_s if self.wall is WallModel.ABSORBING else 0.0
             ),
@@ -856,13 +798,6 @@ class Pic1D3VSolver:
             ion_species=PushSpecies("ion", charge_i, mass_i, weight),
             electron_species=PushSpecies("electron", -_E, _M_E, weight),
             surface=self.surface_model(params),
-            # doc 03 §3.3's wall row absorbs the electron flux outright. R_i is doc 03 §8
-            # A10's *ion* reflection coefficient — Ar+ on tungsten — and the boundary step
-            # applies whatever surface it is handed to whichever species it is handed, so
-            # reusing the ion surface for the electrons reflects them at R_i as well. The
-            # default R_i = 0 hides that completely; it activates over the registry's own
-            # [0, 0.2] sweep, where it suppresses the electron wall flux and shifts
-            # Gamma_E with nothing in the ledger looking wrong.
             electron_surface=SurfaceModel(secondary_yield=0.0, ion_reflection=0.0),
             energy_edges_ev=np.linspace(0.0, energy_max, self.n_energy_bins + 1),
             velocity_edges_m_per_s=np.linspace(-speed_max, speed_max, self.n_velocity_bins + 1),
@@ -907,7 +842,6 @@ class Pic1D3VSolver:
             loaded=loaded,
         )
 
-    # ── the six steps ───────────────────────────────────────────────────────────
 
     def _fields(
         self,
@@ -1001,8 +935,6 @@ class Pic1D3VSolver:
             )
             born = np.asarray(outcome.new_electron_positions_m)
             if born.size:
-                # Ionisation makes one electron-ion pair per event, so both populations
-                # grow together and the plasma stays neutral to the macroparticle.
                 electrons.admit(born, np.asarray(outcome.new_electron_velocities_m_per_s))
                 ions.admit(
                     np.asarray(outcome.new_ion_positions_m),
@@ -1079,7 +1011,6 @@ class Pic1D3VSolver:
             )
             population.injected += count
 
-    # ── diagnostics ─────────────────────────────────────────────────────────────
 
     def _energies(
         self,
@@ -1143,8 +1074,6 @@ class Pic1D3VSolver:
             return
         edges = plan.velocity_edges_m_per_s
         speeds = ions.velocities_m_per_s[live, 2]
-        # Masked rather than clipped: clipping would pile every out-of-range ion into an
-        # end bin, and f_i's tail is the part doc 03 §4.3 says converges last.
         inside = (speeds >= edges[0]) & (speeds < edges[-1])
         if not inside.any():
             return
@@ -1155,7 +1084,6 @@ class Pic1D3VSolver:
             flat, np.full(flat.size, ions.weight), size=nodes * self.n_velocity_bins
         ).reshape(nodes, self.n_velocity_bins)
 
-    # ── assembly ────────────────────────────────────────────────────────────────
 
     def _assemble(
         self,
@@ -1212,8 +1140,6 @@ class Pic1D3VSolver:
             ion_distribution=VelocityDistribution(
                 grid=grid,
                 v_m_per_s=0.5 * (edges[:-1] + edges[1:]),
-                # int f dv_z = n: the sums are per node over `steps` steps, so dividing by
-                # the window length, the cell volume and the bin width leaves a density.
                 values=acc.distribution / (steps * plan.grid.dz_m * float(np.diff(edges)[0])),
                 species=params.species,
             ),

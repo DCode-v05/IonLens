@@ -121,57 +121,35 @@ type FloatArray = NDArray[np.float64]
 
 _E_C: Final[float] = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 
-#: The doc 08 §7 artifact group this channel would write to.
 RFEA_INSTRUMENT_ID: Final[InstrumentId] = "rfea"
 
-#: Units of what :meth:`RfeaInstrument.forward` and :meth:`observe` return.
 CURRENT_UNITS: Final[str] = "A"
 
-# ── default geometry — a small aperture, few-grid analyser (Sudit & Woods 1994 style) ──
 
 _DEFAULT_COLLECTOR_RADIUS_M: Final[float] = 1.0e-3
 _DEFAULT_WIRE_SPACING_M: Final[float] = 5.0e-5
 _DEFAULT_GRID_SEPARATION_M: Final[float] = 1.0e-3
 
-#: Combined geometric transparency of the discriminator, suppressor and shield grids —
-#: Böhm & Perrin (1993) tabulate ~0.4-0.5 per nickel mesh grid; three in series gives the
-#: product used here.
 _DEFAULT_TRANSMISSION: Final[float] = 0.15
 
-#: The fixed electron-repeller grid bias whose fringing field, not the swept discriminator
-#: voltage, sets the resolution — see the module docstring and
-#: :func:`GridGeometry.resolution_fwhm_ev`.
 _DEFAULT_REPELLER_BIAS_V: Final[float] = 40.0
 
-#: Order-unity geometric factor relating the fringing-field energy spread to the wire
-#: spacing / grid separation ratio and the repeller bias — chosen so the default geometry
-#: reproduces the ~1-2 eV FWHM Sudit & Woods (1994) report for a comparable four-grid
-#: design at a similar aperture.
 _RESOLUTION_COEFFICIENT: Final[float] = 0.5
 
-# ── default sweep ───────────────────────────────────────────────────────────────────
 
 _DEFAULT_SWEEP_START_V: Final[float] = 0.0
 _DEFAULT_SWEEP_STOP_V: Final[float] = 400.0
 _DEFAULT_SWEEP_POINTS: Final[int] = 201
 
-#: Which spatial grid point the analyser looks at — the wall, doc 02 §2's ``z = 0``,
-#: matching an RFEA's usual placement flush with (or just behind an aperture in) the
-#: target electrode.
 _DEFAULT_Z_INDEX: Final[int] = 0
 
-#: Points the interpolated energy axis is built on, for the resolution convolution and
-#: the transmitted-current integral.
 _ENERGY_AXIS_POINTS: Final[int] = 2000
 
-# ── noise and calibration ───────────────────────────────────────────────────────────
 
 _CURRENT_RELATIVE_NOISE: Final[float] = 0.02
 _MINIMUM_CURRENT_UNCERTAINTY_A: Final[float] = 1.0e-9
 _DEFAULT_SCALE_UNCERTAINTY: Final[float] = 0.03
 
-#: Below this bulk density there are too few ions in the beam for the collector current
-#: to clear the analyser's own noise floor at the default geometry.
 _DETECTION_FLOOR_N_0: Final[float] = 1.0e14
 
 
@@ -217,8 +195,6 @@ def flux_iedf_ev(
     energy_ev_descending = 0.5 * mass_kg * v_neg**2 / _E_C
     gamma_ev_descending = _E_C * f_neg / mass_kg
 
-    # v_neg is ascending (least negative last), so energy is descending; reverse both to
-    # hand back the ascending axis every caller here (and np.interp) needs.
     energy_ev = energy_ev_descending[::-1]
     gamma_ev = gamma_ev_descending[::-1]
     return np.asarray(energy_ev), np.asarray(gamma_ev)
@@ -414,9 +390,6 @@ def estimate_iedf(
     return IedfEstimate(energy_ev=voltages, gamma_ev=gamma_ev, mean_energy_ev=mean_energy_ev)
 
 
-# ── the doc 08 §4 Instrument contract ────────────────────────────────────────────────
-
-
 @dataclass(frozen=True, slots=True)
 class _Settings:
     geometry: GridGeometry
@@ -476,7 +449,6 @@ class RfeaInstrument:
         self._rng = generator(root_seed, Stream.DETECTOR_NOISE)
         self._calibration_rng = generator(root_seed, Stream.CALIBRATION)
 
-    # ── configuration ───────────────────────────────────────────────────────────
 
     def configure(self, cfg: InstrumentConfig) -> None:
         """Apply one entry of the manifest's ``instruments:`` list — doc 08 §6.
@@ -548,7 +520,6 @@ class RfeaInstrument:
             reference=standard.name,
         )
 
-    # ── the shared code path — doc 04 §9 ────────────────────────────────────────
 
     def forward(self, state: PlasmaState, w: AcquisitionWindow) -> Observable:
         """The noiseless transmitted-current curve — doc 04 §9."""
@@ -614,7 +585,6 @@ class RfeaInstrument:
             resolution_fwhm_ev=settings.geometry.resolution_fwhm_ev(),
         )
 
-    # ── the likelihood and the gate ─────────────────────────────────────────────
 
     def likelihood(self, obs: Measurement, pred: Observable) -> LogProb:
         """This channel's Gaussian term in the doc 05 §3.2 sum — see

@@ -103,8 +103,6 @@ class TestPoisson:
         )
 
     def test_it_matches_scipy_in_the_thomson_single_photoelectron_regime(self) -> None:
-        # doc 02 §7.1: 0.008 pe/channel/shot. This is the regime the Gaussian is invalid
-        # in, so it is the regime the Poisson has to be right in.
         counts = np.zeros(64)
         counts[3] = 1.0
         expected = np.full(64, 0.008)
@@ -124,9 +122,6 @@ class TestPoisson:
             poisson_log_likelihood(np.array([1.0]), np.array([-0.5]))
 
     def test_a_fractional_count_is_rejected(self) -> None:
-        # scipy returns -inf here, which would silently annihilate the posterior. A
-        # fractional "count" means a background was subtracted before the likelihood, and
-        # that is a modelling error worth a traceback.
         with pytest.raises(ValueError, match="integer"):
             poisson_log_likelihood(np.array([1.5]), np.array([2.0]))
 
@@ -148,8 +143,6 @@ class TestHeteroscedasticGaussian:
         )
 
     def test_the_variance_is_genuinely_per_sample(self) -> None:
-        # The failure this guards: broadcasting one sigma across every sample. It tightens
-        # the fit and nothing in the output says so (see `ionlens.core.state.measurement`).
         observed = np.array([1.0, 1.0])
         predicted = np.array([0.0, 0.0])
 
@@ -171,8 +164,6 @@ class TestCorrelatedGaussian:
     """doc 05 §3.1 interferometry: "Gaussian, with a correlated noise covariance"."""
 
     def test_it_matches_the_explicit_quadratic_form(self) -> None:
-        # -0.5 r' Sigma^-1 r - 0.5 logdet(2 pi Sigma), assembled from `inv` and `slogdet`
-        # rather than from the Cholesky the implementation uses.
         times = np.linspace(0.0, 1.0e-3, 12)
         covariance = coloured_noise_covariance(times, sigma=2.0e-4, correlation_time=2.5e-4)
         observed = np.linspace(-1.0, 1.0, 12) * 3.0e-4
@@ -243,10 +234,6 @@ class TestColouredNoise:
         assert covariance == pytest.approx(np.eye(6), abs=1e-9)
 
     def test_a_diagonal_covariance_overstates_the_information(self) -> None:
-        # The doc 05 §3.1 claim, tested rather than asserted. Fisher information about a
-        # constant offset is 1' Sigma^-1 1. With correlated noise it is strictly smaller
-        # than with the same per-sample variances and no correlation — which is exactly
-        # what "a diagonal covariance would overstate the information" means.
         times = np.arange(32.0)
         correlated = coloured_noise_covariance(times, sigma=1.0, correlation_time=5.0)
         diagonal = diagonal_covariance(np.ones(32))
@@ -257,12 +244,6 @@ class TestColouredNoise:
 
         assert diagonal_information == pytest.approx(32.0, rel=1e-12)
         assert correlated_information < diagonal_information
-        # Quantitatively, and against a closed form rather than an inequality. The inverse
-        # of an AR(1) covariance is tridiagonal, and summing it gives exactly
-        #     1' Sigma^-1 1  =  [N (1 - rho) + 2 rho] / (1 + rho)
-        # with rho = exp(-dt/tau) = exp(-1/5) = 0.818731. For N = 32 that is 4.0897
-        # effective samples instead of 32 — the diagonal covariance would claim 7.8x the
-        # information that is there, i.e. an error bar 2.8x too small.
         rho = math.exp(-1.0 / 5.0)
         assert correlated_information == pytest.approx(
             (32.0 * (1.0 - rho) + 2.0 * rho) / (1.0 + rho), rel=1e-12
@@ -285,10 +266,6 @@ class TestSharedSystematics:
     """doc 06 §3 and §4 terms 3 and 9 — a calibration error that does not average down."""
 
     def test_a_shared_calibration_error_does_not_average_down(self) -> None:
-        # doc 06 §3: "Treating a shared calibration error as independent per data point
-        # makes it appear to shrink as 1/sqrt(N) with accumulation. It does not shrink at
-        # all." The variance of the sample mean under a rank-one shared covariance is
-        # exactly the relative sigma squared times the mean prediction squared, for any N.
         for n in (4, 64, 1024):
             predicted = np.full(n, 3.0)
             covariance = shared_systematic_covariance(predicted, relative_sigma=0.07)
@@ -299,8 +276,6 @@ class TestSharedSystematics:
             assert variance_of_mean == pytest.approx((0.07 * 3.0) ** 2, rel=1e-13)
 
     def test_an_independent_error_does_average_down(self) -> None:
-        # The control: the same 7 % applied per-sample and independently *does* shrink,
-        # which is the mistake doc 06 §3 is warning about.
         for n, expected in ((4, 4), (64, 64), (1024, 1024)):
             predicted = np.full(n, 3.0)
             covariance = diagonal_covariance(0.07 * predicted)
@@ -316,8 +291,6 @@ class TestSharedSystematics:
         assert np.linalg.matrix_rank(covariance) == 1
 
     def test_it_sums_with_a_statistical_term_into_a_usable_covariance(self) -> None:
-        # doc 06 §4 wants terms attributable separately and combined in one covariance:
-        # term 8 (Thomson photon statistics, 3 %) plus term 3 (Rayleigh calibration, 7 %).
         predicted = np.full(5, 100.0)
         statistical = diagonal_covariance(0.03 * predicted)
         systematic = shared_systematic_covariance(predicted, relative_sigma=0.07)
@@ -358,8 +331,6 @@ class TestTheOesSwitch:
         ) == pytest.approx(gaussian, rel=1e-14)
 
     def test_the_switch_is_per_sample_not_per_channel(self) -> None:
-        # An OES frame holds faint and bright lines together, so the switch has to act
-        # sample by sample or a bright line drags the faint ones into the wrong regime.
         counts = np.array([2.0, 1020.0])
         expected = np.array([2.5, 1000.0])
 
@@ -371,12 +342,6 @@ class TestTheOesSwitch:
         assert combined == pytest.approx(piecewise, rel=1e-14)
 
     def test_the_two_families_agree_at_the_documented_threshold(self) -> None:
-        # Why ~100 is a defensible place to switch, measured rather than asserted, and
-        # reported as what it is rather than as "close enough". At lambda = 100 the two
-        # log-densities differ by 8.3e-4 nats at the mean (the Stirling remainder,
-        # 1/(12 lambda)), by under 0.04 nats within +/- 2 sigma, and by 0.36 nats at the
-        # -3 sigma edge, where the Poisson's skew starts to show. The +/- 2 sigma figure is
-        # what matters: it is the region a credible interval is drawn from.
         expected = np.full(1, OES_GAUSSIAN_SWITCH_COUNTS)
         sigma = math.sqrt(OES_GAUSSIAN_SWITCH_COUNTS)
 
@@ -392,11 +357,6 @@ class TestTheOesSwitch:
         assert max(discrepancy(o) for o in np.linspace(-3.0 * sigma, 3.0 * sigma, 13)) < 0.4
 
     def test_they_disagree_well_below_the_threshold(self) -> None:
-        # The negative control for the test above: at lambda = 3 the Gaussian is a
-        # different distribution, and it is the *upper* tail that shows it, because the
-        # Poisson is right-skewed and the Gaussian is not. At k = 9 (a +3.5 sigma
-        # fluctuation, which a 200-sample OES frame will contain) the two differ by 1.55
-        # nats — enough to move a line ratio. Hence doc 05 §3.1's refusal.
         expected = np.full(1, 3.0)
         counts = np.full(1, 9.0)
 
@@ -422,7 +382,6 @@ class TestTheDetectionGate:
         assert detection_mask(predicted, floor=3.3e16).tolist() == [False, True, True]
 
     def test_a_gated_channel_contributes_exactly_zero(self) -> None:
-        # doc 01 IF-6: "must be modelled as absent there". Not "weakly weighted" — absent.
         channel = GaussianChannel(detection_floor=1.0e17)
         observed = _measurement([2.0, 3.0], [0.5, 0.5], instrument_id="interf", units="rad")
         predicted = _observable([1.0e16, 2.0e16], instrument_id="interf", units="rad")
@@ -477,9 +436,6 @@ class TestOutlierRobustness:
         )
 
     def test_the_student_t_is_barely_moved_by_a_cosmic_ray(self) -> None:
-        # doc 04 §7.2's discrete failures. One 40-sigma point should not be allowed to
-        # dominate; under a Gaussian it contributes -800 nats and under a t it contributes
-        # a logarithm of that.
         clean = np.zeros(8)
         outlier = np.zeros(8)
         outlier[3] = 40.0
@@ -501,7 +457,6 @@ class TestOutlierRobustness:
             student_t_log_likelihood(np.zeros(2), np.zeros(2), np.ones(2), dof=0.0)
 
     def test_the_mixture_is_the_documented_two_component_density(self) -> None:
-        # doc 05 §3.3: "an explicit mixture with a broad outlier component".
         observed = np.array([0.5, 9.0])
         predicted = np.zeros(2)
         sigma = np.ones(2)
@@ -535,8 +490,6 @@ class TestOutlierRobustness:
             )
 
     def test_an_outlier_scale_below_one_is_rejected(self) -> None:
-        # The outlier component is the *broad* one; a narrow one would make the mixture a
-        # way of over-fitting rather than of resisting an over-fit.
         with pytest.raises(ValueError, match="broad"):
             outlier_mixture_log_likelihood(
                 np.zeros(2), np.zeros(2), np.ones(2), outlier_fraction=0.05, outlier_scale=0.5
@@ -555,8 +508,6 @@ class TestTheChannels:
         )
 
     def test_the_poisson_channel_ignores_the_reported_uncertainty(self) -> None:
-        # A Poisson channel's uncertainty is the rate, not a separately-supplied sigma.
-        # Silently using both would count the photon statistics twice.
         predicted = _observable([3.0], instrument_id="thomson")
         wide = _measurement([2.0], [10.0], instrument_id="thomson")
         narrow = _measurement([2.0], [0.1], instrument_id="thomson")
@@ -643,9 +594,6 @@ class TestTheAsynchronousSum:
         )
 
     def test_a_prediction_from_a_different_window_is_refused(self) -> None:
-        # doc 05 §3.2: treating a 700 s Thomson accumulation and a 2 ns OES gate as
-        # measurements of "the same instant" would be straightforwardly false. The
-        # structure refuses to let it happen silently.
         observed = _measurement([1.0], [1.0], instrument_id="thomson", window=LONG_WINDOW)
         predicted = _observable([1.0], instrument_id="thomson", window=WINDOW)
 
@@ -705,13 +653,9 @@ class TestTheAsynchronousSum:
             )
 
     def test_an_empty_measurement_set_has_zero_log_likelihood(self) -> None:
-        # doc 02 §13's degraded configurations remove channels; the fully degraded case
-        # must be the prior and not a crash.
         assert total_log_likelihood(MeasurementSet.of(), {}, {}) == 0.0
 
     def test_dropping_a_channel_reduces_the_information(self) -> None:
-        # doc 05 §6.3's leave-one-channel-out, in its crudest form: the joint
-        # log-likelihood is the sum, so removing a channel removes its term exactly.
         thomson = _measurement([0.0, 1.0], [0.0, 1.0], instrument_id="thomson", window=LONG_WINDOW)
         oes = _measurement([12.0], [3.5], instrument_id="oes")
         predictions = {
@@ -770,9 +714,6 @@ class TestLayering:
         assert leaked == []
 
     def test_ionlens_core_is_reachable(self) -> None:
-        # The other half of the statement: the inverse layer *does* depend on the core's
-        # protocols and data model (doc 08 §1 principle 1), so an isolation test that
-        # passed because nothing was imported at all would be worthless.
         import sys
 
         import ionlens.inverse  # noqa: F401  — imported for its side effect on sys.modules

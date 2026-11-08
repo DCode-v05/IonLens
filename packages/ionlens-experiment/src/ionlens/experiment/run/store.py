@@ -66,20 +66,14 @@ RECORD_FILENAME: Final[str] = "run.yaml"
 ARTIFACTS_DIRNAME: Final[str] = "artifacts"
 INDEX_FILENAME: Final[str] = "index.json"
 
-#: Where ``ionlens reproduce`` re-executes. Dot-prefixed so it cannot be mistaken for a run id
-#: and is skipped by the index scan.
 REPRODUCTIONS_DIRNAME: Final[str] = ".reproductions"
 
-#: Characters of the manifest digest in a run id — doc 13 §2's ``4a7f2e91``.
 _ID_DIGEST_CHARS: Final[int] = 8
 
-#: Longest experiment-name slug a run id carries. A path component, not a magnitude:
-#: names are free text and some filesystems still stop at 255 bytes.
 _ID_SLUG_CHARS: Final[int] = 48
 
 _NON_SLUG = re.compile(r"[^a-z0-9]+")
 
-#: Date format of the identity's first field — doc 13 §2's ``20260804``.
 _ID_DATE_FORMAT: Final[str] = "%Y%m%d"
 
 
@@ -222,7 +216,6 @@ class RunStore:
     def __init__(self, root: Path) -> None:
         self.root = Path(root)
 
-    # ── layout ──────────────────────────────────────────────────────────────────
 
     @property
     def index_path(self) -> Path:
@@ -254,7 +247,6 @@ class RunStore:
         run.artifacts_path.mkdir(parents=True, exist_ok=True)
         return run
 
-    # ── discovery ───────────────────────────────────────────────────────────────
 
     def _scan(self) -> Iterator[RunDirectory]:
         if not self.root.is_dir():
@@ -289,8 +281,6 @@ class RunStore:
         try:
             loaded = json.loads(self.index_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
-            # A truncated index is a cache miss, not a failure: doc 13 §5's rule is that
-            # regenerable data is regenerated rather than repaired.
             return self.reindex()
         return tuple(IndexEntry.from_mapping(entry) for entry in loaded)
 

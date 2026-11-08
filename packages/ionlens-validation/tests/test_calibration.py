@@ -58,8 +58,6 @@ def _calibrated_pit(n: int, seed: int = 20260806) -> np.ndarray:
 
 class TestTheProbabilityIntegralTransform:
     def test_a_truth_drawn_from_the_posterior_gives_a_uniform_pit(self) -> None:
-        # The property the whole method rests on. If this does not hold, every coverage
-        # number computed from it is meaningless.
         rng = np.random.default_rng(1)
         mean, std = 3.0, 0.7
         truth = rng.normal(mean, std, size=40_000)
@@ -68,7 +66,6 @@ class TestTheProbabilityIntegralTransform:
 
         assert pit.min() > 0.0
         assert pit.max() < 1.0
-        # Uniform mean 0.5, variance 1/12. Four sigma on 40 000 draws is ~0.0058.
         assert float(np.mean(pit)) == pytest.approx(0.5, abs=0.01)
         assert float(np.var(pit)) == pytest.approx(1.0 / 12.0, abs=0.01)
 
@@ -78,16 +75,12 @@ class TestTheProbabilityIntegralTransform:
         assert float(pit[0]) == pytest.approx(0.5)
 
     def test_a_non_positive_standard_deviation_is_refused(self) -> None:
-        # A zero-width posterior is a claim of infinite precision; dividing by it would
-        # silently produce a PIT of 0 or 1 and read as a catastrophic miss.
         with pytest.raises(ValueError, match="standard deviation"):
             gaussian_pit(np.array([1.0]), mean=np.array([0.0]), std=np.array([0.0]))
 
 
 class TestTheCoverageNumberCarriesItsOwnUncertainty:
     def test_the_report_gives_an_interval_on_every_coverage_estimate(self) -> None:
-        # The defect this module exists to prevent: a bare fraction, presented as if the
-        # ensemble had measured it exactly.
         report = coverage_report(_calibrated_pit(400), levels=_LEVELS)
 
         for level in _LEVELS:
@@ -95,11 +88,6 @@ class TestTheCoverageNumberCarriesItsOwnUncertainty:
             assert low < report.empirical[level] < high
 
     def test_four_hundred_cases_buy_about_three_percent(self) -> None:
-        # doc 11 §9 asks for "400+", and this is what 400 actually resolves. The standard
-        # error on a coverage estimate near 0.9 is sqrt(0.9*0.1/400) ~ 1.5 %, so the 95 %
-        # interval reported alongside it is ~2 x that, ~3 % wide either side. The ensemble
-        # can therefore separate 0.90 from 0.85 and cannot separate it from 0.89. Pinning
-        # the number keeps the report from implying a precision 400 cases do not buy.
         report = coverage_report(_calibrated_pit(400), levels=(0.9,))
 
         low, high = report.interval[0.9]
@@ -112,8 +100,6 @@ class TestTheCoverageNumberCarriesItsOwnUncertainty:
         assert many.half_width(0.9) < few.half_width(0.9)
 
     def test_the_wilson_interval_beats_the_normal_approximation_at_the_edge(self) -> None:
-        # At 20/20 hits the normal approximation gives the degenerate [1, 1] — "coverage is
-        # exactly 100 %, with certainty", from twenty cases. Wilson does not.
         low, high = wilson_interval(successes=20, trials=20, level=0.95)
 
         assert low < 1.0
@@ -134,10 +120,7 @@ class TestItDetectsMiscalibration:
             assert report.empirical[level] == pytest.approx(level, abs=0.04)
 
     def test_an_overconfident_posterior_is_caught(self) -> None:
-        # THE failure mode that matters: intervals too narrow, so the truth falls outside
-        # more often than advertised. PIT piles up at both ends.
         rng = np.random.default_rng(11)
-        # Truth drawn with the real spread, posterior claiming half of it.
         truth = rng.normal(0.0, 1.0, size=2000)
         pit = gaussian_pit(truth, mean=np.zeros(2000), std=np.full(2000, 0.5))
 
@@ -148,8 +131,6 @@ class TestItDetectsMiscalibration:
         assert report.diagnosis == "overconfident"
 
     def test_an_underconfident_posterior_is_caught_and_named_differently(self) -> None:
-        # Wasteful rather than misleading, and the report must not conflate the two: only
-        # one of them invalidates a published interval.
         rng = np.random.default_rng(12)
         truth = rng.normal(0.0, 1.0, size=2000)
         pit = gaussian_pit(truth, mean=np.zeros(2000), std=np.full(2000, 2.0))
@@ -161,9 +142,6 @@ class TestItDetectsMiscalibration:
         assert report.diagnosis == "underconfident"
 
     def test_a_biased_posterior_is_caught(self) -> None:
-        # A posterior of the right width in the wrong place. Coverage at a single level can
-        # look almost right while the PIT is visibly skewed, which is why the KS test on
-        # the whole distribution is the decision rule rather than one hit count.
         rng = np.random.default_rng(13)
         truth = rng.normal(1.5, 1.0, size=2000)
         pit = gaussian_pit(truth, mean=np.zeros(2000), std=np.ones(2000))
@@ -175,8 +153,6 @@ class TestItDetectsMiscalibration:
 
 class TestTheReport:
     def test_it_records_how_many_cases_it_saw(self) -> None:
-        # A coverage figure without its sample size is unreadable, and doc 11 §9's "400+"
-        # is a claim about this number.
         report = coverage_report(_calibrated_pit(400), levels=_LEVELS)
 
         assert isinstance(report, CoverageReport)

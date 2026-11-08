@@ -55,29 +55,14 @@ __all__ = [
     "scharfetter_gummel_coefficients",
 ]
 
-#: A field sampled on a grid, in SI magnitudes.
 FloatArray: TypeAlias = NDArray[np.float64]
 
-#: Below this ``|x|`` the Bernoulli function is evaluated from its Taylor series.
-#:
-#: ``x / expm1(x)`` is well conditioned for small ``x`` — ``expm1`` is exact there — but
-#: it is ``0/0`` at the origin, and the origin is reached whenever the field reverses.
-#: The series ``1 - x/2 + x^2/12`` agrees with the closed form to better than ``1e-21``
-#: at this cutoff, so the switch is invisible.
 SERIES_CUTOFF: Final[float] = 1e-5
 
-#: Above this ``x``, ``exp(x)`` overflows a float64 and the Bernoulli function is
-#: evaluated as ``x exp(-x)`` instead. ``exp(709.78)`` is the largest finite value.
 _OVERFLOW_CUTOFF: Final[float] = 700.0
 
-#: Above this argument ``tanh`` is one to double precision, so ``coth`` is too and the
-#: fitted diffusivity is its pure-upwind limit. Guarding here rather than letting the
-#: division produce an infinity keeps the expression finite for a vanishing diffusivity.
 COTH_UNITY_ARGUMENT: Final[float] = 40.0
 
-#: Smallest diffusivity the Peclet ratio is formed against, to keep the division finite
-#: when a caller passes a denormal. Purely a floating-point guard: any diffusivity this
-#: small is the collisionless limit, which is handled exactly.
 _DIFFUSIVITY_FLOOR: Final[float] = 1e-300
 
 
@@ -106,9 +91,6 @@ def bernoulli(x: FloatArray) -> FloatArray:
     large = values > _OVERFLOW_CUTOFF
     ordinary = ~(small | large)
 
-    # Explicit masking rather than np.where: np.where evaluates both branches, so the
-    # overflow it is meant to avoid happens anyway and the test configuration
-    # (filterwarnings = ["error"]) turns it into a failure.
     xs = values[small]
     result[small] = 1.0 - xs / 2.0 + xs * xs / 12.0
     xl = values[large]

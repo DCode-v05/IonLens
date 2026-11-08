@@ -84,12 +84,6 @@ _CREDIBLE_LEVEL_ATTRIBUTE: Final[str] = "credible_level"
 _THINNED_DIAGNOSTICS_ATTRIBUTE: Final[str] = "thinned_diagnostics"
 _FULL_DIAGNOSTICS_ATTRIBUTE: Final[str] = "full_diagnostics"
 
-#: Draws per chunk along the draw axis.
-#:
-#: One chain per chunk is what makes ADR-005's "appended incrementally" and doc 08 §7's
-#: "cloud-ready" true at the same time: a chunk is a contiguous slice of one chain, so a
-#: reader that wants chain 2 fetches only chain 2. The draw span is a compromise between
-#: object count and per-object size, not a physical quantity.
 DRAW_CHUNK: Final[int] = 512
 
 
@@ -299,8 +293,6 @@ def write_posterior(
     """
     record = require_provenance(provenance)
 
-    # Both raise on a posterior that never cleared the floor. Nothing is created on disk
-    # first, so a refused posterior leaves no store for a later read to misinterpret.
     stride = posterior.max_safe_stride(min_ess=min_ess)
     thinned = posterior.thin(stride, min_ess=min_ess)
     summary = _summarise(posterior, level=credible_level)

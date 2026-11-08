@@ -64,7 +64,6 @@ class PluginGroup(StrEnum):
     NOISE = "ionlens.noise"
 
 
-#: A group named either as a member or as the raw string a manifest carries.
 GroupLike: TypeAlias = PluginGroup | str
 
 
@@ -95,17 +94,8 @@ class PluginConflictError(PluginError):
     """Two installed distributions declare the same name in the same group."""
 
 
-# ── process-global state ────────────────────────────────────────────────────────
-#
-# Mutable module state, deliberately. Discovery is a property of the *process* — of what
-# is installed and what a host application has registered — and threading a registry
-# object through every call site would put the plugin mechanism into the signature of
-# every function that resolves one, which is the coupling doc 08 §1 principle 3 forbids.
-
-#: Plugins registered in-process. Shadows entry points; see :func:`register`.
 _REGISTERED: Final[dict[PluginGroup, dict[str, object]]] = {}
 
-#: Memoised results of :func:`discover`, keyed by group.
 _MEMO: Final[dict[PluginGroup, Mapping[str, object]]] = {}
 
 
@@ -128,9 +118,6 @@ def _declared(group: PluginGroup) -> dict[str, EntryPoint]:
 
     for entry in entry_points(group=str(group)):
         existing = declared.get(entry.name)
-        # Two metadata directories for one distribution name the same target, which is
-        # harmless. Two *different* targets are not: whichever the scan reached first
-        # would decide what the manifest ran, and that can change on reinstall.
         if existing is not None and existing.value != entry.value:
             raise PluginConflictError(
                 f"two installed distributions declare {entry.name!r} in group "
@@ -255,7 +242,6 @@ def discover(group: GroupLike) -> Mapping[str, object]:
         return memo
 
     loaded = {name: _resolve(entry, resolved) for name, entry in _declared(resolved).items()}
-    # Registrations last: :func:`load` prefers them, and the two must agree.
     loaded.update(_REGISTERED.get(resolved, {}))
 
     found: Mapping[str, object] = MappingProxyType(loaded)
@@ -286,7 +272,6 @@ def register(group: GroupLike, name: str, plugin: object) -> None:
     """
     resolved = _coerce_group(group)
     _REGISTERED.setdefault(resolved, {})[name] = plugin
-    # A memo built before this call does not contain it, and would be silently stale.
     _MEMO.pop(resolved, None)
 
 

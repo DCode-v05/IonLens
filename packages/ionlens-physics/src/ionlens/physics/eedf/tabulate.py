@@ -231,9 +231,6 @@ def tabulate(solver: TwoTermSolver, reduced_fields_td: ArrayLike) -> RateTable:
     )
 
 
-# ── the three-database spread — doc 09 §2.1, doc 06 §4 term 2 ───────────────────
-
-
 @dataclass(frozen=True, slots=True, eq=False)
 class DatabaseSpread:
     """One rate table per electron database, and the disagreement between them.

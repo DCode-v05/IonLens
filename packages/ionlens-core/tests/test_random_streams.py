@@ -40,8 +40,6 @@ class TestStreamsAreIndependent:
         assert not np.array_equal(a, b)
 
     def test_drawing_from_one_stream_does_not_advance_another(self) -> None:
-        # The property the whole module exists for. A generator is independent state, so
-        # exhausting the detector-noise stream must leave the plasma solve untouched.
         untouched = generator(20260804, Stream.PLASMA_INIT).normal(size=4)
 
         noise = generator(20260804, Stream.DETECTOR_NOISE)
@@ -53,16 +51,10 @@ class TestStreamsAreIndependent:
 
 class TestSeedsDeriveFromTheStreamName:
     def test_a_stream_seed_is_derived_from_the_name_not_a_position(self) -> None:
-        # This is what makes the guarantee survive the future. If streams were numbered
-        # by declaration order, inserting one would renumber every stream after it and
-        # silently change every run that used them — the exact failure doc 10 §5 forbids,
-        # reintroduced by the mechanism meant to prevent it.
         assert stream_seed(20260804, Stream.COLLISIONS) == stream_seed(20260804, Stream.COLLISIONS)
         assert stream_seed(20260804, Stream.COLLISIONS) != stream_seed(20260804, Stream.PHOTONS)
 
     def test_an_unregistered_stream_name_is_rejected(self) -> None:
-        # A typo'd stream name would silently create an independent stream that nothing
-        # else ever uses, and the run would still finish. Streams are enumerated.
         with pytest.raises(ValueError, match="collisons"):
             stream_seed(20260804, "collisons")  # type: ignore[arg-type]
 
@@ -73,10 +65,6 @@ class TestSeedsDeriveFromTheStreamName:
 
 class TestReproducibilityAcrossProcesses:
     def test_stream_seeds_are_stable_against_a_recorded_value(self) -> None:
-        # Python's built-in hash() is salted per process, so a name-derived seed built on
-        # it would differ between runs on the same machine. doc 00 E3 promises bit-for-bit
-        # reproducibility, which makes that disqualifying. These recorded values fail if
-        # the derivation ever changes — which it must not, silently.
         assert stream_seed(20260804, Stream.PLASMA_INIT) == 15474965791969378628
         assert stream_seed(20260804, Stream.COLLISIONS) == 7847133971552076085
 
@@ -90,8 +78,6 @@ class TestReproducibilityAcrossProcesses:
 
 class TestTheStreamCatalogue:
     def test_every_stream_doc_10_5_names_exists(self) -> None:
-        # doc 10 §5 lists them: "plasma initialisation, collisions, photon statistics,
-        # detector noise and sampler proposals".
         names = {s.value for s in Stream}
 
         assert {

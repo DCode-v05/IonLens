@@ -61,16 +61,8 @@ from ionlens.physics.analytic.sheath import AnalyticSheathSolver
 
 _SEED = 13
 
-#: The wall bias the reachability/sensitivity tests below run at. Not RP-1's -250 V for the
-#: same reason `test_channels.py`'s `_REACHABLE_BIAS_V` exists — this file has no LIF tuning
-#: range to worry about, but running every test at one consistent, documented operating
-#: point (rather than RP-1 in some and this bias in others) is what keeps the numbers in
-#: this file's docstrings comparable to each other.
 _OPERATING_BIAS_V = -100.0
 
-#: A wall bias far from ``_OPERATING_BIAS_V`` (RP-1's own reference point), used only to
-#: force a materially different sheath structure while holding ``n_0`` fixed — see
-#: ``TestObservableReadsTheFieldNotJustTheParameter``.
 _ALTERNATE_BIAS_V = -250.0
 
 
@@ -135,10 +127,6 @@ def _noiseless_channel() -> InterferometryChannel:
 
 class TestTheStandaloneHelpers:
     def test_interferometry_calibration_set_has_the_phase_scale_standard(self) -> None:
-        # Reads the registry rather than pinning a number. IF.phase_scale_uncertainty is
-        # ASSUMED-class (0.03) with a stated retirement path; this test follows it
-        # wherever it goes rather than hardcoding a value that could silently drift out of
-        # sync with the registry.
         registry = default_registry()
         refs = interferometry_calibration_set(registry)
         standard = refs.for_quantity("interferometer_phase_scale")
@@ -162,17 +150,9 @@ class TestBuildDefaults:
     def test_chord_length_m_is_the_doc_02_8_2_chamber_diameter(
         self, channel: InterferometryChannel
     ) -> None:
-        # doc 02 §8.2 IF-P2: the chord length is the chamber diameter, a fixed machine
-        # dimension, not a fitted parameter — see the module docstring under test. This is
-        # the same `CHAMBER_DIAMETER_M` the (unedited) physics module already names.
         assert channel.chord_length_m == pytest.approx(CHAMBER_DIAMETER_M)
 
     def test_start_z_m_is_accepted_but_no_longer_moves_anything(self) -> None:
-        # `start_z_m` has no chord ladder left to anchor (see the module docstring's
-        # reframing) but is kept in `build_interferometry_channel`'s signature because
-        # `ionlens.experiment.channels.build_channels` calls it by keyword and is out of scope
-        # for this change. This is the checked claim that supplying a value does nothing,
-        # rather than a comment asserting it.
         default = build_interferometry_channel(
             reference_state=_reference_state(), seed=_SEED, registry=default_registry()
         )
@@ -202,8 +182,6 @@ class TestBuildDefaults:
     def test_truth_and_inversion_are_separate_instrument_objects(
         self, channel: InterferometryChannel
     ) -> None:
-        # doc 04 §9: sharing one object would silently apply the drawn calibration error to
-        # both sides and cancel it out of the residual entirely.
         assert channel.truth is not channel.inversion.instrument
 
     def test_the_channel_name_matches_what_the_instruments_stamp_on_their_output(
@@ -298,26 +276,15 @@ class TestObservableReadsTheFieldNotJustTheParameter:
             time=n_e_field.time,
         )
         halved_state = dataclasses.replace(state, fields={**state.fields, "n_e": halved_field})
-        # The parameter this channel used to read is untouched: this isolates the field's
-        # own contribution from any change to n_0.
         assert halved_state.params.n_0 == state.params.n_0
 
         halved = noiseless.inversion.forward(halved_state, noiseless.window)
 
         assert baseline.values[0] != pytest.approx(halved.values[0])
         relative_change = abs(halved.values[0] - baseline.values[0]) / abs(baseline.values[0])
-        # Halving the field roughly halves the electron phase term (the neutral-gas
-        # correction, doc 04 §5.2, does not move at all, so the net change is somewhat
-        # less than 50 %) — "non-trivial" is checked as at least a few percent, not a
-        # razor-thin numerical difference that a rounding bug could also produce.
         assert relative_change > 0.05
 
     def test_the_observable_now_depends_on_sheath_profile_shape_at_fixed_n_0(self) -> None:
-        # Same n_0, very different bias -> very different sheath thickness and z-profile
-        # shape (the presheath solved by AnalyticSheathSolver looks nothing alike at -100 V
-        # vs -250 V). Before Block F this channel could not see that at all (it read only
-        # the untouched n_0 scalar); now it reads the field the profile actually lives in,
-        # so a genuinely different field must produce a genuinely different reading.
         noiseless = _noiseless_channel()
         near_wall_theta = _operating_theta()
         far_wall_theta = near_wall_theta.replace(V_w=_ALTERNATE_BIAS_V)
@@ -325,8 +292,6 @@ class TestObservableReadsTheFieldNotJustTheParameter:
 
         near_state = _state(near_wall_theta)
         far_state = _state(far_wall_theta)
-        # Sanity check that the two states really do have different sheath structure, so a
-        # moved observable below is evidence of genuine sensitivity and not a fixture bug.
         assert not np.allclose(near_state.field("n_e").values, far_state.field("n_e").values)
 
         near_phase = noiseless.inversion.forward(near_state, noiseless.window)
@@ -419,12 +384,6 @@ class TestDensitySensitivityAndTemperatureBlindness:
             observed, noiseless.inversion.forward(denser_state, noiseless.window)
         )
 
-        # Observed directly, post-Block-F: ~0.095 log-probability units at this operating
-        # point — smaller than the pre-Block-F ~0.26, because the reading is now a chord
-        # average dominated by the (~39 %-depleted) presheath-edge sample rather than the
-        # undepleted n_0 parameter, which compresses the channel's own dynamic range. Still
-        # clearly non-zero: this channel remains informative about density, just less
-        # sharply than the (structurally too-easy) parameter read was.
         assert ll_truth - ll_denser > 0.05
 
     def test_the_likelihood_is_only_negligibly_moved_by_a_comparable_change_in_t_e(
@@ -443,10 +402,6 @@ class TestDensitySensitivityAndTemperatureBlindness:
             observed, noiseless.inversion.forward(hotter_state, noiseless.window)
         )
 
-        # No longer bit-for-bit equal (see the class docstring) — but the T_e channel this
-        # method exposes is the resolved sheath domain's tiny share of the full chord, so
-        # the effect is checked to stay many orders of magnitude below the n_0 sensitivity
-        # above rather than being asserted away as exactly zero.
         assert ll_truth != ll_hotter
         assert abs(ll_truth - ll_hotter) < 1.0e-6
 
@@ -501,10 +456,6 @@ class TestCalibrationUncertaintyAdapter:
     def test_requesting_the_coherent_term_never_raises_even_though_use_true_calibration_also_ran(
         self,
     ) -> None:
-        # build_interferometry_channel() always calls calibrate() on the inversion
-        # instrument (so the standard's registered uncertainty is on record) *and*
-        # use_true_calibration() (so its predictions stay exact). This is the check that
-        # the combination actually works end to end.
         with_coherence = build_interferometry_channel(
             reference_state=_reference_state(),
             seed=_SEED,
@@ -557,10 +508,6 @@ class TestFusionIntegration:
     def test_a_plasma_below_the_detection_floor_is_excluded_by_name_not_scored_as_noise(
         self, channel: InterferometryChannel
     ) -> None:
-        # doc 01 IF-6: a blind channel contributes no term rather than a weak one. The
-        # doc 05 §2.1 prior's own lower support bound (1e15 m**-3) already sits below the
-        # doc 02 §8.2 detection floor (~8.4e15 m**-3), so it doubles as a blind point that
-        # is still a value ControlParameters.replace will accept.
         truth_state = _state(_operating_theta())
         observed = channel.truth.observe(truth_state, channel.window)
         n0_low, _n0_high, _te_median, _te_log_sigma = _map_search_bounds()

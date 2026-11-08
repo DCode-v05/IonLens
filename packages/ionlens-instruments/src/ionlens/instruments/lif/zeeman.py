@@ -70,18 +70,10 @@ __all__ = [
     "zeeman_scale",
 ]
 
-#: ``mu_B / h`` in Hz/T — 13.996 GHz/T.
-#:
-#: Assembled from CODATA rather than looked up, because :mod:`ionlens.core.constants` does not
-#: export the Bohr magneton and doc 09 §2.5 forbids typing one in. ``mu_B = e hbar / 2 m_e``,
-#: so ``mu_B / h = e / (4 pi m_e)``.
 _BOHR_MAGNETON_OVER_H_HZ_PER_T: float = float(magnitude_in(ELEMENTARY_CHARGE, "C")) / (
     4.0 * math.pi * float(magnitude_in(ELECTRON_MASS, "kg"))
 )
 
-#: Guard for the ``J = 0`` case in the Lande formula, whose denominator vanishes there.
-#: A ``J = 0`` level has no magnetic structure at all, so ``g`` is undefined rather than
-#: infinite, and the sensible value to return is the one that produces no shift.
 _LANDE_G_FOR_ZERO_J: float = 0.0
 
 
@@ -93,13 +85,9 @@ class PumpPolarisation(StrEnum):
     unpolarised or depolarised beam drives all three.
     """
 
-    #: Linear along ``B``. Shifts scale with ``g_u - g_l``.
     PI = "pi"
-    #: Circular, ``Delta m = +1``. Shifts scale with ``g_u`` about a ``g_u``-sized offset.
     SIGMA_PLUS = "sigma_plus"
-    #: Circular, ``Delta m = -1``. The mirror image of :attr:`SIGMA_PLUS`.
     SIGMA_MINUS = "sigma_minus"
-    #: All three, equally weighted — an unpolarised pump, and the ``B = 0`` default.
     ISOTROPIC = "isotropic"
 
     @property
@@ -268,9 +256,6 @@ def zeeman_pattern(
     """
     field_t = float(magnitude_in(magnetic_field, "T"))
     if field_t < 0.0:
-        # A signed field would flip sigma+ and sigma-, which is a real physical effect and
-        # a real source of confusion. The direction belongs to the geometry, not here, so
-        # this takes the magnitude and says so.
         raise ValueError(
             f"magnetic field must be given as a magnitude, got {magnetic_field}. The sense "
             "of the field relative to the beam belongs to the geometry, not to the pattern."
@@ -296,11 +281,6 @@ def zeeman_pattern(
             shift_hz = scale_hz_per_t * (g_upper * m_upper - g_lower * m_lower)
             raw.append((m_lower, delta_m, shift_hz, strength))
 
-    # No emptiness check here, deliberately. For any dipole-allowed pair every
-    # polarisation drives at least one component — the sum rule guarantees it — so a guard
-    # would be untestable dead code claiming to protect against something that cannot
-    # happen. The reachable failure is an empty *sequence* arriving at the velocity
-    # integral, and ionlens.instruments.lif.scan.fluorescence_response refuses that by name.
     total = sum(entry[3] for entry in raw)
     components = tuple(
         ZeemanComponent(

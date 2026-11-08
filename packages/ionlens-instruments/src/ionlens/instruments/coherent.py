@@ -80,8 +80,6 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: ``2 pi`` in the Gaussian normalisation. Named because doc 08 §5 permits a named
-#: constant and not a bare literal, even for one that is not a measurement.
 _TWO_PI: Final[float] = 2.0 * math.pi
 
 
@@ -179,11 +177,6 @@ def coherent_gaussian_log_prob(
             f"{flat_residual.size}; they describe the same channels."
         )
 
-    # Woodbury for Sigma = D + U^T U, with U the (k, n) basis:
-    #   r' Sigma^-1 r = r'D^-1 r - (U D^-1 r)' M^-1 (U D^-1 r),  M = I_k + U D^-1 U'
-    #   log|Sigma|    = log|D| + log|M|
-    # k is one for a calibration scale and tens for a discrepancy basis, so M is tiny and
-    # this stays O(n k^2) against the O(n^3) a dense covariance would cost per evaluation.
     weighted_residual = flat_residual / flat_variance
     scaled_basis = basis / flat_variance
     middle = np.eye(basis.shape[0]) + scaled_basis @ basis.T

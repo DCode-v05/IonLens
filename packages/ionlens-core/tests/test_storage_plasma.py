@@ -140,8 +140,6 @@ class TestPlasmaStateRoundTrip:
     def test_field_values_survive_bit_for_bit(
         self, tmp_path: Path, grid: SpatialGrid, params: PlasmaParams, record: Provenance
     ) -> None:
-        # doc 00 E3 promises bit-for-bit reproducibility. A write that rounded even one
-        # ulp would make that promise unverifiable rather than merely inaccurate.
         state = _steady(grid, params)
 
         write_plasma_state(tmp_path / "state.h5", state, provenance=record)
@@ -153,9 +151,6 @@ class TestPlasmaStateRoundTrip:
     def test_the_grid_survives_bit_for_bit(
         self, tmp_path: Path, grid: SpatialGrid, params: PlasmaParams, record: Provenance
     ) -> None:
-        # A geometrically graded mesh has no closed-form node positions worth rounding to;
-        # if the archived grid is not the grid that was solved on, every comparison
-        # against the regenerated cache is against the wrong geometry.
         state = _steady(grid, params)
 
         write_plasma_state(tmp_path / "state.h5", state, provenance=record)
@@ -207,8 +202,6 @@ class TestPlasmaStateRoundTrip:
         argon: Species,
         record: Provenance,
     ) -> None:
-        # doc 03 §1 makes the IEDF the only thing L2 produces that no other level can.
-        # An artifact that dropped it would be an L2 run nobody could check.
         state = PlasmaState(
             params=params,
             grid=grid,
@@ -228,8 +221,6 @@ class TestPlasmaStateRoundTrip:
     def test_the_fidelity_survives(
         self, tmp_path: Path, grid: SpatialGrid, params: PlasmaParams, record: Provenance
     ) -> None:
-        # doc 05 §7.2 makes reporting one fidelity as another a project defect; the same
-        # argument applies to the level that produced a state.
         state = _steady(grid, params)
 
         write_plasma_state(tmp_path / "state.h5", state, provenance=record)
@@ -251,8 +242,6 @@ class TestPlasmaStateRoundTrip:
     def test_an_rf_drive_survives_and_dc_stays_dc(
         self, tmp_path: Path, grid: SpatialGrid, params: PlasmaParams, record: Provenance
     ) -> None:
-        # ``rf_frequency=None`` means DC, not "missing". Writing a zero here would turn a
-        # DC run into an RF run with an impossible drive, which PlasmaParams rejects.
         driven = params.replace(rf_frequency=Q_(13.56, "MHz"), rf_phase=0.25)
 
         write_plasma_state(tmp_path / "dc.h5", _steady(grid, params), provenance=record)
@@ -276,7 +265,6 @@ class TestPlasmaStateOnDisk:
     def test_field_datasets_are_chunked_and_compressed(
         self, tmp_path: Path, grid: SpatialGrid, params: PlasmaParams, record: Provenance
     ) -> None:
-        # doc 08 §7 names both, and doc 10 §7's 860 GB raw budget is what pays for them.
         write_plasma_state(tmp_path / "state.h5", _steady(grid, params), provenance=record)
 
         with h5py.File(tmp_path / "state.h5", "r") as handle:
@@ -299,8 +287,6 @@ class TestPlasmaStateRefusesToLoseProvenance:
     def test_writing_without_provenance_raises_rather_than_warning(
         self, tmp_path: Path, grid: SpatialGrid, params: PlasmaParams
     ) -> None:
-        # doc 00 E4 requires every figure to carry embedded provenance. An artifact that
-        # *can* be written without it will be, and the figure it feeds inherits nothing.
         with pytest.raises(MissingProvenanceError):
             write_plasma_state(
                 tmp_path / "state.h5",
@@ -311,8 +297,6 @@ class TestPlasmaStateRefusesToLoseProvenance:
     def test_nothing_is_left_on_disk_when_provenance_is_refused(
         self, tmp_path: Path, grid: SpatialGrid, params: PlasmaParams
     ) -> None:
-        # A half-written file that a later read treats as an artifact is worse than no
-        # file: it is an artifact whose provenance is absent for a reason nobody recorded.
         with pytest.raises(MissingProvenanceError):
             write_plasma_state(
                 tmp_path / "state.h5",

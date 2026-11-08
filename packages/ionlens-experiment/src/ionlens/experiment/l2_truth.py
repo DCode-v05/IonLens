@@ -206,12 +206,6 @@ from ionlens.physics.analytic.sheath import AnalyticSheathSolver, child_langmuir
 from ionlens.validation.sealed import SealedTruth, Tier, tier_of_configuration
 
 if TYPE_CHECKING:
-    # Neither import runs at module import time, and both are load-bearing absences rather
-    # than tidiness: dolfinx (L1) is missing from the JAX machine and JAX (L2) is missing
-    # from the dolfinx machine, so a module-level import of either would make this file
-    # unimportable in exactly one of the two environments it has to work in — which is the
-    # whole reason the truth travels through a file. Under `from __future__ import
-    # annotations` every use below is a string, so neither ever runs for the interpreter.
     from ionlens.physics.fluid.sheath import FluidSheathSolver
     from ionlens.physics.kinetic.solver import Pic1D3VSolver
 
@@ -231,98 +225,32 @@ __all__ = [
 type FloatArray = NDArray[np.float64]
 
 
-# ── the L2 configuration ────────────────────────────────────────────────────────
-#
-# Every constant here except L2_DOMAIN_SHEATHS is `_sheath_solver`'s in
-# `packages/ionlens-physics/tests/test_kinetic_solver.py`. See the module docstring for why
-# they are reused rather than chosen, and for the one that is not.
-
-#: Macroparticles per cell per species — doc 03 §4.3's convergence knob, at the value
-#: verification gate V-06 demonstrated the wall IEDF to be converged at.
 L2_N_PPC: Final[float] = 400.0
 
-#: ``lambda_D / dz``. doc 03 §4.3 bounds this below by 1 and this is the bound itself: a
-#: cell wider than a Debye length is a :class:`~ionlens.physics.kinetic.constraints.
-#: StabilityViolationError`, not a warning.
 L2_CELLS_PER_DEBYE: Final[float] = 1.0
 
-#: Ion transit times simulated.
 L2_TRANSITS: Final[float] = 6.0
 
-#: Fraction of the run discarded before recording begins. With :data:`L2_TRANSITS` this is
-#: three transits of equilibration, which the kinetic suite's own note records as the point
-#: where ``Gamma_i``'s overshoot from the uniform load has drained to 0.8 % — against 26 %
-#: after 1.2 transits, a quiet failure that leaves the run looking converged.
 L2_EQUILIBRATION_FRACTION: Final[float] = 0.5
 
-#: Particle slots as a multiple of the loaded population.
 L2_CAPACITY_FACTOR: Final[float] = 1.5
 
-#: Domain length in Child-Langmuir sheath thicknesses. **The one departure from the
-#: verification suite**, which runs at 1.2. See the module docstring: 1.2 sheaths is
-#: ~0.95 mm at the sealed truth and the fixed observation grid reaches 2.28 mm, so a 1.2
-#: sheath solve would be read through 1.3 mm of space it never evaluated. 2.5 is the
-#: smallest half-integer that covers it with margin, and :func:`_require_domain_covers_
-#: observation_grid` checks the covering rather than trusting this number to stay right if
-#: the observation grid ever moves.
 L2_DOMAIN_SHEATHS: Final[float] = 2.5
 
-#: Bins on the ``f_i(z, v_z)`` velocity axis. **The second departure** from the
-#: verification suite, which leaves this at the solver's default of 160.
-#:
-#: Derived, not chosen. The axis spans ``+/-1.25 v_max``, measured at 94.2 km/s wide at the
-#: sealed truth; :func:`~ionlens.instruments.lif.scan.fluorescence_response` refuses a spacing
-#: coarser than the 41.3 m/s homogeneous line width, and this experiment asks for two
-#: samples inside that width, so ``94231.9 / (41.33 / 2) = 4560`` bins is the floor and this
-#: is the next power of two above it. ``test_l2_truth.py`` checks the resulting spacing
-#: against the instrument's own guard rather than trusting this arithmetic to stay true.
 L2_VELOCITY_BINS: Final[int] = 4608
 
-#: Root seed for the PIC streams. The kinetic suite's own ``_SEED`` (doc 00 E3), reused so
-#: that a truth solved here and a gate run there are the same realisation of the same
-#: sampler wherever their configurations coincide.
 L2_SOLVER_SEED: Final[int] = 20260805
 
-#: The tier this experiment may be reported at, decided by
-#: :func:`~ionlens.validation.sealed.tier_of_configuration` rather than asserted here. The three
-#: booleans: the physics levels differ (L2 truth, L1 inversion), the truth instruments apply
-#: their noise models, and the truth's measurement is generated through doc 04 §7.3's
-#: *estimated* radiometric response rather than the true one.
 L2_TO_L1_TIER: Final[Tier] = tier_of_configuration(
     same_model=False, noise=True, imperfect_calibration=True
 )
 
-#: Posterior draws pushed through L1's ``Gamma_E`` functional for the credible interval.
-#:
-#: ``closed_loop`` uses 20 000, which it can afford because L0's ``ion_energy_flux`` is
-#: closed form. Here every draw is a Newton solve. 2 000 puts the Monte-Carlo standard error
-#: on a 5 % quantile at about 3 % of the interval's own half-width — an order of magnitude
-#: below the model discrepancy the interval is being asked to describe, and stated rather
-#: than left for a reader to work out.
-#:
-#: **The cost claim that used to be here was wrong by a factor of 19, and the correction is
-#: kept rather than quietly replaced.** It read "20 000 would be a twenty-minute interval",
-#: implying ~65 ms per Newton solve. Measured on the FEniCSx machine at the RP-1 reference,
-#: over five ``T_e`` factors spanning the sweep, every one converging: **1.24 s per solve**
-#: (0.83-1.41 s). So 2 000 draws is ~41 minutes of interval on top of the inversion, not
-#: two, and a full grid row costs about three quarters of an hour.
-#:
-#: The value is left at 2 000 because the binding error on this interval is not Monte-Carlo:
-#: the four-channel T2 grid puts the truth 34 interval half-widths outside, so the interval
-#: is wrong by a factor of tens for reasons no number of draws addresses. Cutting draws to
-#: buy wall clock would trade a negligible error against a dominant one. It is recorded here
-#: so the next person sizing a sweep starts from the measurement rather than from the guess.
 L2_POSTERIOR_SAMPLES: Final[int] = 2000
 
-#: Field name carrying the ion density, used only to check that a loaded artefact is a
-#: plasma state rather than an arbitrary npz.
 _REQUIRED_FIELD: Final[str] = "n_i"
 
 _NPZ_SUFFIX: Final[str] = ".npz"
 
-#: Relative tolerance the loaded grid must match the fixed observation grid to. Tight
-#: because both sides are the same deterministic construction from the same registry; this
-#: is a corruption check, not a physical tolerance.
 _GRID_MATCH_RTOL: Final[float] = 1.0e-12
 
 
@@ -497,9 +425,6 @@ def _resample_l2_onto_grid(state: PlasmaState, grid: SpatialGrid) -> PlasmaState
         ),
         fidelity=state.fidelity,
     )
-
-
-# ── the truth artefact ──────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -701,9 +626,6 @@ def load_l2_truth(path: Path | str, *, registry: ParameterRegistry | None = None
     )
 
 
-# ── the L1 inversion ────────────────────────────────────────────────────────────
-
-
 @dataclass(frozen=True, slots=True)
 class L2ToL1Report:
     """One L2-truth / L1-inversion recovery — doc 05 §10's "every inversion emits" table.
@@ -844,10 +766,6 @@ def run_l2_to_l1(
     reference = _reference_theta()
     grid = observation_grid(resolved)
 
-    # The reference state that sizes the LIF scan, pins Thomson's measurement volume and
-    # anchors the interferometer's chords. L0 at the RP-1 reference, exactly as
-    # `ablation._prepare` builds it — a real instrument's field of view is fixed before the
-    # plasma is characterised, so this must not come from the truth or from a trial.
     reference_state = AnalyticSheathSolver().solve(
         _to_plasma_params(reference, species=species, registry=resolved), grid=grid
     )
@@ -872,28 +790,11 @@ def run_l2_to_l1(
         try:
             _, observed = forward.state(theta)
         except (RuntimeError, ValueError):
-            # A Newton solve that did not converge, or a mesh that could not be sized, at
-            # this trial point. Reported to the optimiser as out-of-support rather than
-            # allowed to end the run — the same treatment `ionlens.inverse.map.
-            # negative_log_posterior` already gives a non-finite likelihood.
             return -math.inf
         try:
-            # `errstate` narrowly, around this one call, and paired with the finiteness
-            # check below rather than used to look away.
-            #
-            # Far out in the tails of the search the OES prediction underflows to zero
-            # expected counts, and `OesInstrument.likelihood`'s Gaussian branch then divides
-            # the residual by it. numpy raises that as a RuntimeWarning, which under this
-            # project's `-W error` test configuration ends the run — turning "the optimiser
-            # tried an absurd theta and should be told so" into a crash. A theta at which
-            # the instrument predicts no photons at all is **out of support**, and returning
-            # -inf for it is exactly the treatment `ionlens.inverse.map.negative_log_posterior`
-            # already gives a non-finite likelihood. What is *not* done here is trusting the
-            # number that came out of the overflow: anything non-finite is rejected.
             with np.errstate(over="ignore", divide="ignore", invalid="ignore"):
                 value = joint.log_prob(observed)
         except BlindChannelError:
-            # doc 01 IF-6: nothing is above its detection floor here.
             return -math.inf
         return value if math.isfinite(value) else -math.inf
 
@@ -973,8 +874,6 @@ def _l1_gamma_e_interval(
     except PosteriorNotPositiveDefiniteError:
         return None, None
 
-    # Stream.SAMPLER (doc 10 §5), so these draws stay put when anything else in the run
-    # consumes a different number of randoms — doc 00 E3's bit-for-bit requirement.
     draws = posterior.sample(generator(seed, Stream.SAMPLER), L2_POSTERIOR_SAMPLES)
     if verbose:
         print(f"pushing {L2_POSTERIOR_SAMPLES} posterior draws through L1", flush=True)

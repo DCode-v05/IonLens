@@ -15,8 +15,6 @@ from ionlens.core.units import Q_, UREG, DimensionalityError, magnitude_in
 
 class TestSharedRegistry:
     def test_registry_is_a_single_shared_instance(self) -> None:
-        # pint quantities built by different registries cannot interoperate, and the
-        # resulting error surfaces far from its cause. One registry, imported everywhere.
         import ionlens.core.units as units_a
         import ionlens.core.units as units_b
 
@@ -30,17 +28,12 @@ class TestSharedRegistry:
 
 class TestProjectSpecificUnits:
     def test_millitorr_converts_to_pascal(self) -> None:
-        # doc 01 §2.1: the reference operating point is 5 mTorr = 0.667 Pa.
         assert magnitude_in(Q_(5.0, "mTorr"), "Pa") == pytest.approx(0.6666, rel=1e-3)
 
     def test_townsend_is_defined_for_reduced_field(self) -> None:
-        # doc 03 §3.2 tabulates rate coefficients against E/N, conventionally in
-        # townsend. pint does not ship the unit, so the registry must define it.
         assert magnitude_in(Q_(1.0, "Td"), "V * m**2") == pytest.approx(1e-21)
 
     def test_electronvolt_converts_to_kelvin_as_a_temperature(self) -> None:
-        # "T_e = 3 eV" means k_B T_e = 3 eV. Without an explicit conversion path this
-        # is the sort of factor-of-11604 error that survives review.
         assert magnitude_in(Q_(1.0, "eV").to("K", "boltzmann"), "K") == pytest.approx(
             11604.518, rel=1e-6
         )
@@ -66,15 +59,10 @@ class TestMagnitudeIn:
             magnitude_in(Q_(1.0, "m"), "s")
 
     def test_mismatch_message_names_both_dimensionalities(self) -> None:
-        # A bare "cannot convert" is not actionable at 2 a.m. The message must say
-        # what was supplied and what was wanted.
         with pytest.raises(DimensionalityError, match=r"length.*time|time.*length"):
             magnitude_in(Q_(1.0, "m"), "s")
 
     def test_rejects_a_bare_number(self) -> None:
-        # Silently attaching the expected unit to a bare float is exactly the hidden
-        # assumption doc 00 C4 forbids: it would let an unlabelled number through the
-        # boundary check that exists to catch it.
         with pytest.raises(DimensionalityError, match="not a dimensional quantity"):
             magnitude_in(2.5, "m")  # type: ignore[call-overload]
 

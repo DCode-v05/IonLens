@@ -50,48 +50,24 @@ __all__ = ["CURRENT_UNITS", "LANGMUIR_INSTRUMENT_ID", "LangmuirProbe"]
 
 type FloatArray = NDArray[np.float64]
 
-#: The doc 08 §7 artifact group this channel would write to.
 LANGMUIR_INSTRUMENT_ID: Final[InstrumentId] = "langmuir_probe"
 
-#: Units of what :meth:`LangmuirProbe.forward` and :meth:`observe` return: a collected
-#: current at every swept bias, the raw quantity a real probe circuit reports.
 CURRENT_UNITS: Final[str] = "A"
 
-# ── default sweep ───────────────────────────────────────────────────────────────────
 
 _DEFAULT_SWEEP_START_V: Final[float] = -60.0
 _DEFAULT_SWEEP_STOP_V: Final[float] = 30.0
 _DEFAULT_SWEEP_POINTS: Final[int] = 201
 
-#: Which spatial grid point the probe tip sits at. The last index: doc 02 §2 places the
-#: wall at ``z = 0`` with ``z`` increasing into the plasma, and a Langmuir probe is a bulk
-#: diagnostic inserted away from the wall, unlike OES's line-of-sight or LIF's near-wall
-#: default. A manifest overrides this for a probe scanned through the sheath.
 _DEFAULT_Z_INDEX: Final[int] = -1
 
-# ── noise and calibration ───────────────────────────────────────────────────────────
-#
-# Real probe circuits are dominated by transimpedance-amplifier and digitiser noise
-# rather than by photon shot statistics, so this is drawn on Stream.DETECTOR_NOISE
-# (doc 10 §5) rather than Stream.PHOTONS, and modelled as the usual current-measurement
-# combination of a relative term and an absolute floor rather than a counting statistic.
 
-#: Relative current noise, representative of a mid-range transimpedance amplifier chain.
 _CURRENT_RELATIVE_NOISE: Final[float] = 0.02
 
-#: Absolute noise floor, so a near-zero current does not report a near-zero uncertainty.
 _MINIMUM_CURRENT_UNCERTAINTY_A: Final[float] = 1.0e-7
 
-#: 1-sigma relative uncertainty of the current-measurement gain calibration — comparable
-#: to the transimpedance-amplifier calibration uncertainties doc 02 §11 tabulates for the
-#: real channels.
 _DEFAULT_SCALE_UNCERTAINTY: Final[float] = 0.03
 
-#: Below this bulk density, the probe's own sheath is no longer thin compared with its
-#: radius (`lambda_D ~ r_p`) and the sheath-expansion model of
-#: :mod:`ionlens.instruments.probe.langmuir.physics` is not defensible — doc 01 IF-6's
-#: detection-floor gate, applied here to keep the channel out of the likelihood where its
-#: own forward model is not trustworthy.
 _DETECTION_FLOOR_N_0: Final[float] = 1.0e14
 
 
@@ -170,7 +146,6 @@ class LangmuirProbe:
         self._rng = generator(root_seed, Stream.DETECTOR_NOISE)
         self._calibration_rng = generator(root_seed, Stream.CALIBRATION)
 
-    # ── configuration ───────────────────────────────────────────────────────────
 
     def configure(self, cfg: InstrumentConfig) -> None:
         """Apply one entry of the manifest's ``instruments:`` list — doc 08 §6.
@@ -232,7 +207,6 @@ class LangmuirProbe:
             reference=standard.name,
         )
 
-    # ── the shared code path — doc 04 §9 ────────────────────────────────────────
 
     def forward(self, state: PlasmaState, w: AcquisitionWindow) -> Observable:
         """The noiseless I-V curve the likelihood compares against — doc 04 §9."""
@@ -299,7 +273,6 @@ class LangmuirProbe:
     def _sweep_voltages(settings: _Settings) -> FloatArray:
         return np.linspace(settings.sweep_start_v, settings.sweep_stop_v, settings.sweep_points)
 
-    # ── the likelihood and the gate ─────────────────────────────────────────────
 
     def likelihood(self, obs: Measurement, pred: Observable) -> LogProb:
         """This channel's Gaussian term in the doc 05 §3.2 sum.

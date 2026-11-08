@@ -71,12 +71,6 @@ _LENGTH_UNITS: Final[str] = "m"
 _TIME_UNITS: Final[str] = "s"
 _VELOCITY_UNITS: Final[str] = "m / s"
 
-#: Units of the phase-space density ``f_i(z, v_z)``.
-#:
-#: Not carried by :class:`~ionlens.core.state.fields.VelocityDistribution`, which stores the
-#: array alone, but implied exactly by the normalisation doc 03 §5.2 states — ``int f
-#: dv_z = n`` in ``m^-3`` over a velocity axis in ``m/s``. Written so that a reader
-#: outside this package is not left to infer it.
 _DISTRIBUTION_UNITS: Final[str] = "m**-4 * s"
 
 
@@ -107,8 +101,6 @@ def _write_params(group: h5py.Group, params: PlasmaParams) -> None:
     write_quantity(group, "pressure", params.pressure)
     write_quantity(group, "bias", params.bias)
     if params.rf_frequency is not None:
-        # Absent means DC (doc 02 §3.3). A zero would be an RF run with an impossible
-        # drive, which PlasmaParams rejects — but only after the artifact claimed it.
         write_quantity(group, "rf_frequency", params.rf_frequency)
 
     group.attrs["gamma_se"] = float(params.gamma_se)

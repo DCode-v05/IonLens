@@ -244,11 +244,6 @@ from ionlens.validation.line_ratios import HC_EV_NM
 from ionlens.validation.sealed import SealedTruth, Tier, tier_of_configuration
 
 if TYPE_CHECKING:
-    # Not imported at runtime: ionlens.physics.fluid.sheath (and everything it pulls in for
-    # the FE assembly) depends on dolfinx, which is not installed in every environment
-    # this module must import cleanly in (see run_t2's own docstring). The annotations
-    # below are strings under `from __future__ import annotations`, so this import only
-    # ever runs for a type checker, never for the interpreter.
     from ionlens.physics.fluid.sheath import FluidSheathSolver
 
 __all__ = [
@@ -262,12 +257,6 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-# ─── the verification-fixture level system ─────────────────────────────────────────
-#
-# "Argon-shaped, not argon" — see the module docstring. Values follow
-# `packages/ionlens-instruments/tests/oes_system.py`'s own convention so that a reader who
-# already knows that fixture recognises this one; they are not independently sourced and
-# must never be read as atomic data (doc 00 C1).
 
 _GROUND: Final[str] = "g"
 _METASTABLE: Final[str] = "m"
@@ -282,142 +271,27 @@ _RADIATING_DEGENERACY: Final[int] = 7
 _LINE_WAVELENGTH_NM: Final[float] = 811.53
 _LINE_A_UL_PER_S: Final[float] = 3.31e7
 
-# ─── the second emission line ──────────────────────────────────────────────────────
-#
-# ## Why a second line at all — doc 05 §6.2's identifiability question, concretely
-#
-# With one line the plasma density is carried almost entirely by the spectrum's overall
-# *brightness*, and brightness is exactly what doc 04 §7.3's radiometric calibration is
-# uncertain about (`OES-C1.radiometric_uncertainty`, 6 %). "6 % denser plasma" and "6 %
-# bright lamp" then produce the same data, so `n_0` is only weakly identified the moment
-# that uncertainty is admitted. A second line changes the spectrum's **shape**, and shape
-# survives a scaling error — a uniform radiometric factor multiplies both lines equally and
-# cancels in their ratio exactly, because both travel the same optics.
-#
-# **What was measured here, stated narrowly, because the loose version is wrong.** The
-# `PosteriorNotPositiveDefiniteError` that motivated this work was observed in the
-# *multi-channel* configuration (`ionlens.experiment.channels_interferometry`), not in this
-# OES-only harness: a control run of `_run(noise=True, imperfect_calibration=True)` with
-# the second line's supply zeroed — i.e. the single-line spectrum this module had before —
-# still produces a positive-definite Hessian and a real interval at seeds 0, 1 and 2. So
-# "one line makes the posterior stop existing" is **not** a claim this module's own numbers
-# support, and it is not made. What this module's numbers do support, at T1 with
-# calibration on, seeds 0/1/2:
-#
-# * relative error on `Gamma_E` improves 10x / 3.2x / 4.1x (2.58e-4 -> 2.54e-5,
-#   3.87e-3 -> 1.20e-3, 3.18e-3 -> 7.77e-4);
-# * the 90 % interval tightens 2.4x / 3.6x / 3.3x (+-0.112 % -> +-0.046 %, and so on);
-# * along the `Gamma_i ~ n_0 sqrt(T_e)` degeneracy ridge that doc 05 §6.2 names, the OES
-#   channel's own penalty for a `k = 1.05` step rises from 2.445e3 to 2.287e4 — a factor
-#   of 9.35 more information in exactly the direction the project is stuck on. That number
-#   is `test_channels.py`'s own measurement, not one invented here.
-#
-# No separate "ratio observable" is built, deliberately. `OesInstrument.likelihood` already
-# scores the calibration as a *coherent* rank-one term (`ionlens.instruments.coherent`), which
-# projects out precisely the direction a uniform fractional scaling moves the prediction
-# along — the direction a ratio is by definition invariant to. So the ratio's information
-# already survives inside the full-spectrum likelihood, while the absolute scale is
-# down-weighted rather than discarded. A hand-built ratio would throw the absolute
-# information away instead, which is strictly worse. See `test_line_ratio.py`, which is
-# where both properties are actually checked rather than asserted in prose.
-#
-# ## Why this line, and not real argon's 750.4 nm
-#
-# doc 02 §6.3's own diagnostic pair is 750.4 nm (2p1 -> 1s2, near-pure direct excitation
-# from ground) against 811.53 nm (2p9 -> 1s5, metastable-fed). That pair **cannot be
-# observed by doc 02 §6.2's spectrograph in one frame**: `Spectrograph.from_registry` is a
-# 750 mm Czerny-Turner at 0.62 nm/mm across 1024 x 13 um pixels, so one grating setting
-# covers 5.85 nm — 808.61 to 814.45 nm around this harness's centre. 750.4 nm is 61 nm
-# outside it. Widening the window is not a free choice either: it would mean a different
-# grating or a different detector, i.e. inventing a second instrument alongside the one
-# doc 02 specifies, which is exactly what the module docstring's "what is synthetic here is
-# the atomic data, not the optics" convention forbids. So the second line is sited *inside*
-# the real window instead.
-#
-# Real argon offers no help there: every Ar I line inside a 5.85 nm window near 811 nm is a
-# 4p -> 4s transition, and the whole 4p manifold spans ~0.6 eV, so any two of them have
-# near-identical excitation thresholds and a ratio that barely moves with `T_e`. The
-# threshold *contrast* is the entire mechanism, so it is kept and the atomic data is shaped
-# — the same "argon-shaped, not argon" trade the three existing levels already make.
-#
-# ## What is chosen and what follows from it
-#
-# Exactly one number is chosen here: `SECOND_LINE_WAVELENGTH_NM`, and it is an *optics*
-# choice (where on the detector to put the line), not an atomic-data claim. The radiating
-# level's energy is then **derived** from it — the photon energy of the emitted line plus
-# the level it decays to — so the level table and the wavelength cannot disagree, and no
-# new unsourced energy is asserted. `HC_EV_NM` comes from CODATA via
-# :mod:`ionlens.core.constants`, never typed in (doc 09 §2.5).
 
-#: Where the second line sits on the detector. Chosen, not transcribed: ~2 nm below the
-#: 811.53 nm centre, which is ~80 instrument widths (`OES-S4.instrument_fwhm` = 0.026 nm)
-#: from the first line and ~0.9 nm inside the low edge of the 808.61-814.45 nm window, so
-#: both lines are fully contained and completely resolved from each other. Any value in the
-#: window's lower half would serve; this one is not tuned to a result.
 SECOND_LINE_WAVELENGTH_NM: Final[float] = 809.5
 
-#: The second radiating level, **derived** rather than chosen: it decays to `_RADIATING`
-#: emitting one `SECOND_LINE_WAVELENGTH_NM` photon, so its energy is fixed by the line's
-#: placement. That makes it ~1.53 eV above `_RADIATING_ENERGY_EV` — the threshold contrast
-#: that is the entire point (see the block comment above and `test_line_ratio.py`'s
-#: `test_the_two_lines_have_genuinely_different_thresholds`). It is fed **only** from the
-#: ground state, and is deliberately left out of the metastable cascade, mirroring the way
-#: doc 02 §6.3's 750.4 nm line is near-pure direct excitation while 811.53 nm is
-#: metastable-fed: a high-threshold level is populated by the *tail* of the electron
-#: distribution, a metastable-fed one by its *bulk*, and the ratio of the two is what tracks
-#: `T_e`.
 _SECOND_RADIATING_ENERGY_EV: Final[float] = _RADIATING_ENERGY_EV + HC_EV_NM / (
     SECOND_LINE_WAVELENGTH_NM
 )
 
-#: Shaped, like `_RADIATING_DEGENERACY` and `_METASTABLE_DEGENERACY` — see the block
-#: comment at the top of this section. Not atomic data (doc 00 C1).
 _SECOND_RADIATING_DEGENERACY: Final[int] = 3
 
-#: Shaped, same order as `_LINE_A_UL_PER_S`. The emitted intensity is `n_q A_ul`, and `n_q`
-#: is itself ~`source / A_ul` because radiative decay is this level's only significant loss,
-#: so the line's brightness is set by the excitation rate and is nearly independent of this
-#: number — it is not a knob the line ratio can be tuned with.
 _SECOND_LINE_A_UL_PER_S: Final[float] = 1.0e7
 
 _ENERGY_GRID_MAX_EV: Final[float] = 60.0
 _ENERGY_GRID_CELLS: Final[int] = 600
 
-#: doc 04 §2.2's `nu_wall` for the metastable: "diffusion to wall + surface quenching
-#: probability", a chamber property rather than an atomic one. `cr.py`'s own module
-#: docstring records the RP-1 order of magnitude — "the ~1e4 /s wall term" — which is what
-#: is used here; a real value belongs to a doc 02 §3 chamber-geometry registry entry that
-#: does not yet exist (the same gap `OES.chamber_diameter`'s own docstring records).
 _METASTABLE_WALL_LOSS_PER_S: Final[float] = 1.0e4
 
-#: Born-like threshold cross sections for the three electron-impact channels, in m^2 at
-#: their peak. Shaped, not measured — see `oes_system.py`'s `threshold_cross_section`.
 _XSEC_GROUND_TO_METASTABLE_PEAK_M2: Final[float] = 3.0e-21
 _XSEC_GROUND_TO_RADIATING_PEAK_M2: Final[float] = 1.0e-21
 _XSEC_METASTABLE_TO_RADIATING_PEAK_M2: Final[float] = 5.0e-20
 _RADIATING_THRESHOLD_FROM_METASTABLE_EV: Final[float] = _RADIATING_ENERGY_EV - _METASTABLE_ENERGY_EV
 
-#: The ground -> second-radiating channel, the only one feeding that level. Larger than
-#: `_XSEC_GROUND_TO_RADIATING_PEAK_M2` because it is the *sole* supply of a level whose
-#: threshold sits 1.5 eV further out in the tail, and the second line has to clear the
-#: detector's noise floor to be an observation at all rather than a decorative feature of
-#: the spectrum. Shaped, like the three peaks above it — and note it cannot manufacture the
-#: line ratio's temperature dependence, which comes from the threshold in the exponent and
-#: not from a prefactor that divides out of `d(ln ratio)/d(T_e)` entirely.
-#:
-#: **Measured sensitivity, recorded because it is a real caveat and not a tidy one.** This
-#: value was fixed before the ratio was measured, and the sweep run afterwards says: at
-#: 1e-20 the ratio is monotonic in `T_e` and moves +10.9 % over 2 -> 6 eV; raising it to
-#: 2e-20 / 5e-20 keeps monotonicity and *improves* the movement to +15 % / +18 %; lowering
-#: it to 6e-21 and below the ratio turns **non-monotonic**, with a minimum near
-#: `T_e` = 4 eV. The mechanism is the `q -> p` cascade: it is a term the two lines share, so
-#: it linearises an otherwise non-monotonic contrast. Two consequences worth stating
-#: plainly rather than leaving to be rediscovered — the monotonicity
-#: `test_line_ratio.py::test_the_ratio_is_monotonic_across_the_prior_range` checks is a
-#: property of this *configuration*, not of a two-line spectrum in general; and the value
-#: here is a lower bound of the well-behaved regime, kept at its pre-registered setting
-#: rather than raised after the fact, which would have been tuning a cross section to a
-#: result.
 _XSEC_GROUND_TO_SECOND_RADIATING_PEAK_M2: Final[float] = 1.0e-20
 
 
@@ -511,9 +385,6 @@ def _reference_level_system(grid: EnergyGrid) -> LevelSystem:
                 threshold_ev=_RADIATING_THRESHOLD_FROM_METASTABLE_EV,
                 peak_m2=_XSEC_METASTABLE_TO_RADIATING_PEAK_M2,
             ),
-            # Ground-fed only, and no metastable partner: that omission is the physics, not
-            # an oversight. A metastable channel here would put both lines on the same
-            # low-threshold supply and flatten their ratio.
             channel(
                 lower=_GROUND,
                 upper=_SECOND_RADIATING,
@@ -538,56 +409,19 @@ def _reference_level_system(grid: EnergyGrid) -> LevelSystem:
     )
 
 
-#: OES accumulations. Chosen (doc 04 §9's shared `_sample` code path) so that the brightest
-#: pixels of the 811.53 nm line cross `OES.poisson_gaussian_threshold` under noise (doc 05
-#: §3.1's switch is genuinely exercised at T1) while the wings stay in the Poisson regime —
-#: verified empirically for this fixture rather than derived, because the photon budget of a
-#: three-level synthetic system has no closed form to derive it from.
 _ACCUMULATIONS: Final[int] = 2000
 
-#: T0's continuum-residual objective (see `_t0_log_likelihood`) needs a positive scale to
-#: turn a sum of squared residuals into a log-density; because that scale multiplies every
-#: term identically, it does not move the location of the optimum (the objective is a
-#: constant rescaling of the sum of squares), but it does condition the finite-difference
-#: gradient `ionlens.inverse.map` computes. Too tight (1e-6 relative, checked empirically) makes
-#: the gradient numerically noisy enough to abort the line search; this value converges
-#: cleanly and is *not* a claim about measurement noise — T0 has none by definition.
 _T0_SIGMA_RELATIVE_SCALE: Final[float] = 1.0e-3
 
-#: doc 05 §7.2's "recovery to numerical tolerance", concretely: the relative error on
-#: `Gamma_E` a T0 run must not exceed. L-BFGS-B's `ftol`-driven stopping criterion (doc 05
-#: §5's `_FUNCTION_TOLERANCE`) means the achieved error varies a little with the sealed
-#: seed — observed between 1e-11 and 4e-5 across several seeds in this configuration — so
-#: this is set with a comfortable margin above the loosest of those, not tuned to whatever
-#: one run happened to produce. It is still four to five orders of magnitude tighter than a
-#: typical T1 (noisy) relative error, which is what makes it "numerical" rather than
-#: "statistical" tolerance.
 T0_RELATIVE_TOLERANCE: Final[float] = 1.0e-3
 
-#: Central probability mass of the reported `Gamma_E` interval. 0.9 because that is the
-#: level doc 11 §9 item 5's coverage test is stated at, and reporting the interval at one
-#: level and checking calibration at another would make the check answer a question nobody
-#: asked.
 CREDIBLE_LEVEL: Final[float] = 0.9
 
-#: Posterior draws pushed through the `Gamma_E` functional. `ion_energy_flux` is closed
-#: form, so this costs microseconds and the Monte-Carlo error on a 90 % quantile at this
-#: count is well under a tenth of a percent — far below the model discrepancy the interval
-#: is describing.
 _POSTERIOR_SAMPLES: Final[int] = 20000
 
-#: Spatial grid: two sheath thicknesses (doc 01 R-SPAT-3 asks for >= 10 for the full
-#: physics domain; two is enough of the profile for the OES local-CR-solve dependence on
-#: `n_e(z)` this harness relies on) at eleven points. Both were tuned empirically against
-#: T0's tolerance — see the module docstring's account of the grid-aliasing bug this
-#: configuration was chosen to avoid reintroducing.
 _DOMAIN_SHEATHS: Final[float] = 2.0
 _N_SPATIAL_POINTS: Final[int] = 11
 
-#: Multiplicative offsets applied to RP-1's `n_0` and `T_e` to build the sealed truth. Kept
-#: away from 1.0 so that the default MAP start (the prior median, which coincides with RP-1
-#: for both `n_0` and `T_e` — see `_reference_theta`) is never the answer by construction;
-#: a harness that "recovered" its own starting point would prove nothing about the search.
 _TRUE_N0_FACTOR_RANGE: Final[tuple[float, float]] = (1.15, 1.45)
 _TRUE_TE_FACTOR_RANGE: Final[tuple[float, float]] = (1.10, 1.30)
 
@@ -596,9 +430,6 @@ _GAS_MASS_ENTRY: Final[str] = "species.Ar.mass"
 _SINGLY_IONISED: Final[int] = 1
 
 _LOG_TRANSFORM: Final = LogTransform()
-
-
-# ─── theta <-> PlasmaParams ─────────────────────────────────────────────────────────
 
 
 def _argon_ion(registry: ParameterRegistry) -> Species:
@@ -634,20 +465,6 @@ def _to_plasma_params(
     )
 
 
-# ─── the OES instrument, and the two EEDFs it can be built with ────────────────────
-#
-# doc 05 §7.1's EEDF-form mismatch — see the module docstring's account of the route
-# actually taken and the one deliberately not taken (`KappaEedf`).
-
-#: `generalised_eedf`'s own closed-form relation between its `mean_energy_ev` parameter
-#: and a Maxwellian temperature, `<eps> = (3/2) k T_e` — the same convenience conversion
-#: `MaxwellianEedf` and `KappaEedf` each make for their own families (see their module's
-#: own docstring on why an `EedfProvider` is handed a temperature at all: it is what
-#: `PlasmaState.field("T_e")` carries, whether or not the local distribution is truly
-#: Maxwellian). Duplicated here rather than imported because the source is `analytic.py`'s
-#: private `_THREE_HALVES`, and this module's own convention (see `_H_L_DEFAULT` in the
-#: test file) is that a small independently-sourced duplicate is cheaper than a new public
-#: export for one constant.
 _MEAN_ENERGY_PER_T_E: Final[float] = 1.5
 
 
@@ -771,9 +588,6 @@ def _acquisition_window(registry: ParameterRegistry) -> AcquisitionWindow:
     )
 
 
-# ─── the reduced (n_0, T_e) prior ───────────────────────────────────────────────────
-
-
 @dataclass(frozen=True, slots=True)
 class _ReducedMedian:
     """What `maximum_a_posteriori`'s default start needs — mirrors `ControlPrior.median`."""
@@ -841,9 +655,6 @@ def _theta_from_unconstrained(u: FloatArray, *, reference: ControlParameters) ->
     return reference.replace(n_0=n0, T_e=te)
 
 
-# ─── the draw of the sealed truth ───────────────────────────────────────────────────
-
-
 def _draw_true_theta(*, seed: int, reference: ControlParameters) -> ControlParameters:
     """The ground truth — doc 07 §3 step 1, "draw a ground-truth state x* from the scenario".
 
@@ -874,9 +685,6 @@ def _fixed_spatial_grid(
     reference_params = _to_plasma_params(reference, species=species, registry=registry)
     thickness = solver.thickness(reference_params)
     return SpatialGrid.uniform(length=thickness * _DOMAIN_SHEATHS, n_points=_N_SPATIAL_POINTS)
-
-
-# ─── the report ──────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -910,9 +718,6 @@ class ClosedLoopReport:
     credible_level: float
     posterior: LaplacePosterior | None
     truth_within_interval: bool | None
-
-
-# ─── the loop itself ─────────────────────────────────────────────────────────────
 
 
 def _t0_log_likelihood(measured: FloatArray, predicted: FloatArray) -> float:
@@ -1032,14 +837,8 @@ def _generate_truth(
     return _resample_onto_grid(native_state, observation_grid), gamma_e
 
 
-#: Grid points per axis for the discrepancy sweep. Five in each of ``n_0`` and ``T_e`` gives
-#: 25 L0/L1 comparisons at 65 ms per L1 Newton solve (measured) — under two seconds.
 _DISCREPANCY_GRID: Final[int] = 5
 
-#: Multiplicative span, either side of the RP-1 reference, that the discrepancy is estimated
-#: over. Matches the range the sealed truth is drawn from, so the correction covers the
-#: region the posterior can plausibly explore; estimating at a single point would understate
-#: it everywhere else.
 _DISCREPANCY_SPAN: Final[tuple[float, float]] = (0.85, 1.2)
 
 
@@ -1139,8 +938,6 @@ def _gamma_e_interval(
     except PosteriorNotPositiveDefiniteError:
         return None, None
 
-    # Stream.SAMPLER (doc 10 §5) so these draws stay put when anything else in the run
-    # consumes a different number of randoms — doc 00 E3's bit-for-bit requirement.
     draws = posterior.sample(generator(seed, Stream.SAMPLER), _POSTERIOR_SAMPLES)
     fluxes = np.array(
         [
@@ -1230,25 +1027,19 @@ def _run(
         inversion_solver, reference=reference, species=species, registry=registry
     )
 
-    # ── step 1: draw the ground truth ──────────────────────────────────────────
     true_theta = _draw_true_theta(seed=seed, reference=reference)
     true_params = _to_plasma_params(true_theta, species=species, registry=registry)
     true_state, truth_gamma_e = _generate_truth(
         true_params, truth_solver=resolved_truth_solver, observation_grid=grid
     )
 
-    # ── step 2: run the forward chain -> synthetic measurement ────────────────
     truth_instrument.set_noise_enabled(noise)
     if not resolved_imperfect_calibration:
-        # doc 04 §7.3 permits the true calibration "for verification"; T0 is exactly that,
-        # and CalibrationState.TRUE on the resulting Measurement records that it was used.
         truth_instrument.use_true_calibration()
     measurement = truth_instrument.observe(true_state, window)
 
-    # ── step 3: seal the truth ─────────────────────────────────────────────────
     sealed = SealedTruth(value=truth_gamma_e, name="Gamma_E")
 
-    # ── step 4: run the inversion on the (sealed) measurement ─────────────────
     prior = _reduced_prior()
 
     resolved_discrepancy: DiscrepancyModel = discrepancy or NoDiscrepancy()
@@ -1266,17 +1057,6 @@ def _run(
             )
         return _t0_log_likelihood(measurement.values, predicted.values)
 
-    # The discrepancy vector is computed ONCE, at a plug-in point, and then held fixed.
-    #
-    # Letting it track the trial prediction — the obvious spelling, and the one that was
-    # written first — makes the likelihood's own covariance a function of theta. The
-    # log-determinant then carries a term log(1 + f^2 sum(y_hat)) which varies strongly with
-    # overall scale, and its curvature *adds* information about n_0. Measured on T2: the
-    # posterior curvature went from 1.4e5 to 2.1e5 — the discrepancy term made the posterior
-    # TIGHTER, exactly backwards. That is the standard mean-variance coupling artefact of a
-    # heteroscedastic Gaussian, and the standard remedy is the plug-in estimate used here:
-    # model discrepancy is a property of the model error, established a priori, not a
-    # quantity to be re-derived at every trial theta.
     fixed_coherent: FloatArray | None = None
     if noise and not isinstance(resolved_discrepancy, NoDiscrepancy):
         plug_in = maximum_a_posteriori(
@@ -1284,8 +1064,6 @@ def _run(
         )
         basis = getattr(resolved_discrepancy, "basis", None)
         if basis is not None:
-            # An empirical discrepancy already carries the observed error *directions*; its
-            # covariance is absolute, so no plug-in prediction is needed and none is used.
             fixed_coherent = np.asarray(basis, dtype=np.float64)
         else:
             fixed_coherent = np.sqrt(
@@ -1293,8 +1071,6 @@ def _run(
             )
 
     def log_likelihood(u: FloatArray) -> float:
-        # sqrt of the discrepancy variance: the instrument takes a coherent standard
-        # deviation, because the rank-one form is what keeps it O(n) over 1024 pixels.
         return _log_likelihood_with(u, fixed_coherent)
 
     result = maximum_a_posteriori(log_likelihood=log_likelihood, prior=prior)
@@ -1307,10 +1083,6 @@ def _run(
         )
     )
 
-    # ── step 4b: the interval on Gamma_E, by pushing posterior draws through it ──
-    # Gamma_E is a non-linear function of several parameters, so the endpoint-transform
-    # shortcut that ionlens.inverse.laplace uses for a *marginal* does not apply. Sampling is
-    # the honest route, and `ion_energy_flux` is closed form so it costs nothing.
     posterior, gamma_e_interval = _gamma_e_interval(
         result,
         log_likelihood=log_likelihood,
@@ -1323,7 +1095,6 @@ def _run(
         credible_level=credible_level,
     )
 
-    # ── step 5: unseal, by committing the estimate at its tier ────────────────
     tier = tier_of_configuration(
         same_model=isinstance(resolved_truth_solver, AnalyticSheathSolver),
         noise=noise,
@@ -1331,7 +1102,6 @@ def _run(
     )
     sealed.commit_estimate(estimate_gamma_e, tier=tier)
 
-    # ── step 6: emit the report ────────────────────────────────────────────────
     return ClosedLoopReport(
         tier=sealed.tier,
         gamma_e_true_w_per_m2=float(sealed.value),
@@ -1344,10 +1114,6 @@ def _run(
         gamma_e_interval_w_per_m2=gamma_e_interval,
         credible_level=credible_level,
         posterior=posterior,
-        # Read after commit_estimate, so the seal is respected: this is the one question
-        # that decides whether a large relative error is an honest wide interval or an
-        # overconfident claim, and leaving it to be eyeballed off a table is how it stops
-        # being checked.
         truth_within_interval=(
             None
             if gamma_e_interval is None

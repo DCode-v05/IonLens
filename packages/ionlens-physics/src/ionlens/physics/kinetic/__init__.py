@@ -12,8 +12,6 @@ table, and note that ADR-011 is why the distinction is taken seriously here.
 
 from ionlens.physics.kinetic.precision import enable_double_precision, is_double_precision
 
-# Before anything else. JAX defaults to float32 and this kernel is not correct in it —
-# see precision.py for why that is a correctness statement rather than a preference.
 enable_double_precision()
 
 from ionlens.physics.kinetic.boundary import (  # noqa: E402  — must follow the x64 switch

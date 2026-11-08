@@ -43,11 +43,9 @@ class TestTheRegistryEntries:
 
 class TestLevel:
     def test_degeneracy_is_two_j_plus_one(self) -> None:
-        # 3d 4F_7/2 as doc 02 §5.3 designates it.
         assert Level(j=3.5, orbital=3.0, spin=1.5).degeneracy == 8
 
     def test_a_half_integer_j_with_integer_l_and_s_is_rejected(self) -> None:
-        # J = L + S must be reachable by vector addition: J - (L + S) is an integer.
         with pytest.raises(ValueError, match="cannot couple"):
             Level(j=3.5, orbital=3.0, spin=1.0)
 
@@ -71,7 +69,6 @@ class TestProbeTransition:
         assert magnitude_in(transition.pump_frequency, "Hz") == pytest.approx(expected, rel=1e-12)
 
     def test_the_pump_frequency_is_448_terahertz(self) -> None:
-        # A sanity anchor a reader can check by hand: 3e8 / 6.686e-7.
         assert magnitude_in(ProbeTransition.from_registry().pump_frequency, "THz") == pytest.approx(
             448.4, rel=1e-3
         )
@@ -79,7 +76,6 @@ class TestProbeTransition:
     def test_the_degeneracies_follow_the_doc_02_term_symbols(self) -> None:
         transition = ProbeTransition.from_registry()
 
-        # 3d 4F_7/2 -> g = 8; 4p 4D_5/2 -> g = 6.
         assert transition.lower.degeneracy == 8
         assert transition.upper.degeneracy == 6
 
@@ -106,7 +102,6 @@ class TestProbeTransition:
         assert magnitude_in(transition.relaxation_rate, "1/s") == pytest.approx(expected)
 
     def test_homogeneous_widths_add_as_lorentzians(self) -> None:
-        # Lorentzian FWHMs add linearly under convolution, unlike Gaussian ones.
         transition = ProbeTransition.from_registry()
         registry = default_registry()
 
@@ -138,8 +133,6 @@ class TestSaturationIntensity:
         )
 
     def test_it_is_of_order_a_hundred_watts_per_square_metre(self) -> None:
-        # 2 pi^2 h c A / (3 lambda^3) with A = 3.14e7 and lambda = 668.6 nm is ~137 W/m^2:
-        # a number a reader can bound by hand, and the anchor for the doc 07 F-13 sweep.
         intensity = float(
             magnitude_in(ProbeTransition.from_registry().saturation_intensity, "W/m**2")
         )

@@ -49,15 +49,10 @@ from ionlens.validation.convergence import (
 )
 from ionlens.validation.manufactured import poisson_manufactured
 
-#: A sheath-scaled manufactured problem: 1 mm of domain at the doc 01 §2.1 bias of 250 V.
 LENGTH = 1.0e-3
 AMPLITUDE = 250.0
 MODES = 3
 
-#: Coarse-to-fine cell counts. Four levels, a factor of two apart, chosen so the coarsest
-#: cannot resolve the third harmonic and the finest stays far above the round-off floor
-#: (the P1 error at 320 cells is ~1e-3 of the amplitude, against a machine epsilon of
-#: 3e-14 on 250 V).
 CELL_COUNTS = (40, 80, 160, 320)
 
 
@@ -65,8 +60,6 @@ def _uniform(n_cells: int) -> SpatialGrid:
     return SpatialGrid.uniform(length=Q_(LENGTH, "m"), n_points=n_cells + 1)
 
 
-#: Widest-to-narrowest cell ratio held fixed across the graded study. See the module
-#: docstring: a fixed *per-cell* stretch would change the mesh's shape between levels.
 GRADED_TOTAL_RATIO = 8.0
 
 
@@ -120,8 +113,6 @@ class TestManufacturedSolutionIsWhatItClaims:
         exact = problem.exact(z)
         second = (exact[2:] - 2.0 * exact[1:-1] + exact[:-2]) / h**2
         source = problem.source(z[1:-1])
-        # A second difference is second-order accurate, so the comparison is made to the
-        # accuracy the difference itself has and not to the accuracy sympy has.
         assert -eps0 * second == pytest.approx(source, rel=1e-4, abs=1e-6 * np.abs(source).max())
 
 

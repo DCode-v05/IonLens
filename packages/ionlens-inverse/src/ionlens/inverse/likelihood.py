@@ -112,28 +112,14 @@ __all__ = [
 
 _REGISTRY: Final = default_registry()
 
-#: ``log(2π)``, the Gaussian normalisation. Structure, not measurement.
 _LOG_TWO_PI: Final[float] = math.log(2.0 * math.pi)
 
-#: doc 05 §3.1: "Gaussian for bright lines above ~100 pe. Explicit switch at a configured
-#: threshold." The threshold is configurable per channel; this is the registered default.
 OES_GAUSSIAN_SWITCH_COUNTS: Final[float] = float(
     _REGISTRY.value_in("inverse.oes_gaussian_switch", "dimensionless")
 )
 
-#: Relative tolerance for the covariance symmetry check.
-#:
-#: Not a physical magnitude, and named here because doc 08 §5's rule carves out no
-#: exception for numbers whose author was confident they did not matter. Zero would be
-#: wrong: a covariance assembled as a sum of outer products is symmetric in exact
-#: arithmetic and symmetric to a few ulp in floating point, so an exact test would reject
-#: matrices that are correct. A few ulp is what this admits and no more.
 _SYMMETRY_RTOL: Final[float] = 1e-12
 
-#: Tolerance within which a float count is accepted as an integer. Counts arrive as
-#: ``float64`` (see :mod:`ionlens.core.state.measurement`), where every integer up to ``2^53``
-#: is exact — so anything failing this is a genuinely fractional value and not a rounding
-#: artefact of the storage layer.
 _COUNT_TOLERANCE: Final[float] = 0.0
 
 
@@ -145,9 +131,6 @@ class ChannelMismatchError(ValueError):
     they were "the same instant" is, in doc 05's words, "straightforwardly false", and the
     agreement it produced would be meaningless.
     """
-
-
-# ─── array helpers ───────────────────────────────────────────────────────────────
 
 
 def _paired(
@@ -182,9 +165,6 @@ def _checked_sigma(sigma: ArrayLike, *, shape: tuple[int, ...]) -> NDArray[np.fl
             "measurement with no error, which no channel in doc 02 has"
         )
     return s
-
-
-# ─── doc 05 §3.1 — the four families ─────────────────────────────────────────────
 
 
 def poisson_log_likelihood(counts: ArrayLike, expected: ArrayLike) -> float:
@@ -224,7 +204,6 @@ def poisson_log_likelihood(counts: ArrayLike, expected: ArrayLike) -> float:
 
     positive = rate > 0.0
     if not np.all(positive):
-        # A zero rate is certain to produce zero counts and cannot produce any.
         impossible = (~positive) & (k > 0.0)
         if np.any(impossible):
             return -math.inf
@@ -340,9 +319,6 @@ def switched_poisson_gaussian_log_likelihood(
     return total
 
 
-# ─── doc 05 §3.3 — robustness to outliers ────────────────────────────────────────
-
-
 def student_t_log_likelihood(
     observed: ArrayLike, predicted: ArrayLike, sigma: ArrayLike, *, dof: float
 ) -> float:
@@ -425,9 +401,6 @@ def _log_weight(weight: float) -> float:
     return math.log(weight) if weight > 0.0 else -math.inf
 
 
-# ─── covariance construction — doc 05 §3.1, doc 06 §3 and §4 ─────────────────────
-
-
 def diagonal_covariance(sigma: ArrayLike) -> NDArray[np.float64]:
     """``diag(sigma²)`` — the uncorrelated term of doc 06 §4 (photon statistics, term 8)."""
     s = np.asarray(sigma, dtype=float).ravel()
@@ -501,9 +474,6 @@ def shared_systematic_covariance(
     return (relative_sigma * relative_sigma) * np.outer(mu, mu)
 
 
-# ─── doc 01 IF-6 — the detection gate ────────────────────────────────────────────
-
-
 def detection_mask(predicted: ArrayLike, *, floor: float) -> NDArray[np.bool_]:
     """Which samples are above the channel's detection floor — doc 01 IF-6.
 
@@ -521,9 +491,6 @@ def detection_mask(predicted: ArrayLike, *, floor: float) -> NDArray[np.bool_]:
     if not math.isfinite(floor) or floor < 0.0:
         raise ValueError(f"a detection floor cannot be negative or non-finite, got {floor}")
     return np.asarray(mu >= floor)
-
-
-# ─── the channels ────────────────────────────────────────────────────────────────
 
 
 @runtime_checkable
@@ -708,9 +675,6 @@ class MixtureChannel:
             outlier_fraction=self.outlier_fraction,
             outlier_scale=self.outlier_scale,
         )
-
-
-# ─── doc 05 §3.2 — the asynchronous sum ──────────────────────────────────────────
 
 
 def total_log_likelihood(

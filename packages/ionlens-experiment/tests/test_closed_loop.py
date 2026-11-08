@@ -65,18 +65,10 @@ from ionlens.physics.eedf.analytic import (
 from ionlens.physics.eedf.grid import EnergyGrid
 from ionlens.validation.sealed import InverseCrimeError, Tier, TierMismatchError
 
-#: Two seeds, so the reproducibility test is not vacuously comparing an object to itself.
 _SEED_A = 0
 _SEED_B = 1
 
-#: Whether dolfinx (FEniCSx) is importable in this environment. T2's truth solver, L1's
-#: FluidSheathSolver, depends on it; tests that need a real T2 run skip cleanly when it is
-#: absent (this development machine), and one test below exercises the opposite case —
-#: that run_t2 fails loudly and specifically when dolfinx is missing — only when it applies.
 _DOLFINX_AVAILABLE = importlib.util.find_spec("dolfinx") is not None
-
-
-# ─── T0 — the blocking gate ───────────────────────────────────────────────────────
 
 
 class TestT0Consistency:
@@ -91,10 +83,6 @@ class TestT0Consistency:
         report = run_t0(seed=_SEED_A)
 
         assert report.tier is Tier.T0
-        # This is the T0 gate itself, not a duplicate of it: assert_t0_consistency raises
-        # AssertionError and names doc 05 §7.2 explicitly if it fails, which is a much
-        # louder and more specific failure than a bare `assert relative_error < tol` would
-        # produce in CI output.
         report.sealed.assert_t0_consistency(tolerance=T0_RELATIVE_TOLERANCE)
 
     def test_map_engine_reports_convergence(self) -> None:
@@ -121,8 +109,6 @@ class TestT0Consistency:
         """
         report = run_t0(seed=_SEED_A)
         assert report.sealed.is_committed
-        # Committing a second estimate against an already-committed seal is the "revise it
-        # after the truth became readable" crime doc 05 §7's docstring names by name.
         with pytest.raises(InverseCrimeError):
             report.sealed.commit_estimate(0.0, tier=Tier.T0)
 
@@ -153,9 +139,6 @@ class TestT0Consistency:
         first = run_t0(seed=_SEED_A)
         second = run_t0(seed=_SEED_B)
         assert first.gamma_e_true_w_per_m2 != second.gamma_e_true_w_per_m2
-
-
-# ─── T1 — same model, with noise ───────────────────────────────────────────────────
 
 
 class TestT1OptimisticBound:
@@ -196,9 +179,6 @@ class TestT1OptimisticBound:
         assert first.T_e_hat_ev == second.T_e_hat_ev
 
 
-# ─── T2 — mismatched models, noise, imperfect calibration ─────────────────────────
-
-
 class TestT2RequiresDolfinx:
     """L1's ``FluidSheathSolver`` is the truth-generating model doc 05 §7.1 needs, and it
     depends on ``dolfinx`` (FEniCSx). This machine does not have it installed, so this is
@@ -226,8 +206,6 @@ class TestT2ProducesACertifiedResult:
         assert report.tier is Tier.T2
         assert np.isfinite(report.relative_error)
         assert report.relative_error >= 0.0
-        # Doesn't raise: T2 satisfies its own bar, certified by tier_of_configuration
-        # rather than hand-labelled by this module (doc 11 §9 item 4's task brief).
         report.sealed.assert_at_least(Tier.T2)
 
     @pytest.mark.skipif(not _DOLFINX_AVAILABLE, reason="requires dolfinx (FEniCSx)")
@@ -238,9 +216,6 @@ class TestT2ProducesACertifiedResult:
         report = run_t2(seed=_SEED_A)
         with pytest.raises(TierMismatchError):
             report.sealed.assert_t0_consistency(tolerance=1.0)
-
-
-# ─── the refactor's regression guard: T0/T1 must be unchanged by the new parameters ──
 
 
 class TestRefactorPreservesT0AndT1:
@@ -283,9 +258,6 @@ class TestRefactorPreservesT0AndT1:
         assert defaulted.tier is explicit.tier is Tier.T1
 
 
-# ─── _gamma_e_at_wall: doc 03 §6's "same functional", read off two return shapes ──
-
-
 class TestGammaEAtWall:
     """L0's ``.flux(state)`` returns a bare pint ``Quantity``; L1's returns an
     :class:`IonEnergyFlux`. Both must reduce to the same kind of float so ``_run`` does
@@ -309,9 +281,6 @@ class TestGammaEAtWall:
         )
 
         assert _gamma_e_at_wall(flux) == pytest.approx(6577.0)
-
-
-# ─── _resample_onto_grid: the grid discipline T2's own solve/observe split needs ──
 
 
 def _linear_state(*, grid: SpatialGrid, params: PlasmaParams) -> PlasmaState:
@@ -356,7 +325,7 @@ class TestResampleOntoGrid:
         assert resampled.grid is target
         np.testing.assert_allclose(resampled.field("n_e").values, 1.0e15 + 1.0e14 * target.z_m)
         np.testing.assert_allclose(resampled.field("Phi").values, 10.0 * target.z_m)
-        del species  # constructed only to keep params realistic; unused directly
+        del species
 
     def test_rejects_a_target_grid_reaching_past_the_native_domain(self) -> None:
         registry = default_registry()
@@ -367,7 +336,7 @@ class TestResampleOntoGrid:
 
         with pytest.raises(ValueError, match="native"):
             _resample_onto_grid(state, target)
-        del registry  # imported for parity with the other tests in this module
+        del registry
 
     def test_the_resampled_state_still_satisfies_the_plasma_state_contract(self) -> None:
         params = _plasma_params(ControlParameters.reference())
@@ -379,9 +348,6 @@ class TestResampleOntoGrid:
 
         assert isinstance(resampled, PlasmaState)
         assert resampled.grid.n_points == 7
-
-
-# ─── _generate_truth: the L0 branch, testable without dolfinx ─────────────────────
 
 
 class TestGenerateTruthWithAnalyticSolver:
@@ -408,9 +374,6 @@ class TestGenerateTruthWithAnalyticSolver:
         )
         assert gamma_e == pytest.approx(expected)
         del species
-
-
-# ─── the EEDF mismatch: doc 05 §7.1, and the route actually taken ──────────────────
 
 
 class TestGeneralisedEedfProvider:
@@ -442,8 +405,6 @@ class TestGeneralisedEedfProvider:
         np.testing.assert_allclose(actual, expected)
 
     def test_maxwellian_and_druyvesteyn_disagree_at_the_same_t_e(self) -> None:
-        # The point of the whole exercise: doc 05 §7.1 needs a second *shape*, not a
-        # relabelled Maxwellian at the same T_e.
         grid = EnergyGrid.linear(max_ev=60.0, n_cells=100)
         maxwellian = _GeneralisedEedf(grid=grid, kappa=MAXWELLIAN_KAPPA)
         druyvesteyn = _GeneralisedEedf(grid=grid, kappa=DRUYVESTEYN_KAPPA)
@@ -479,9 +440,6 @@ def test_t2_truth_eedf_factory_returns_the_druyvesteyn_shape() -> None:
 
     assert isinstance(provider, _GeneralisedEedf)
     assert provider.kappa == DRUYVESTEYN_KAPPA
-
-
-# ─── the honesty check: why the recovered vector is 2-dimensional, not 8 ──────────
 
 
 def test_gamma_e_is_insensitive_to_the_fixed_control_parameters() -> None:
@@ -542,10 +500,7 @@ def test_gamma_e_does_depend_on_the_recovered_parameters() -> None:
         assert magnitude_in(perturbed, "W/m**2") != magnitude_in(baseline, "W/m**2")
 
 
-# ─── local helpers, independent of the harness under test ─────────────────────────
-
-_H_L_DEFAULT = 0.61  # doc 03 §2.1 / registry `sheath.h_l`; only used to keep this file's
-# own physics check independent of ionlens.physics.analytic.sheath's own default plumbing.
+_H_L_DEFAULT = 0.61
 
 
 def _plasma_params(theta: ControlParameters) -> PlasmaParams:
@@ -579,9 +534,6 @@ def test_closed_loop_report_is_the_documented_type() -> None:
     assert isinstance(report, ClosedLoopReport)
 
 
-# ── the credible interval on Gamma_E ────────────────────────────────────────────
-
-
 @functools.cache
 def _t0_report() -> ClosedLoopReport:
     """One T0 run, memoised — the loop is ~35 s and several tests read the same one."""
@@ -609,12 +561,6 @@ class TestGammaECarriesACredibleInterval:
 
     @pytest.mark.physics
     def test_the_interval_is_asymmetric_because_gamma_e_is_non_linear_in_theta(self) -> None:
-        # Gamma_E ~ n_0 sqrt(T_e) is a non-linear function of several parameters, so no
-        # endpoint-transform shortcut applies to it (ionlens.inverse.laplace's module docstring
-        # spells out when one does). The interval must therefore come from *sampling* the
-        # posterior and pushing each draw through the same functional. A symmetric interval
-        # would be the tell-tale of a delta-method linearisation applied where it does not
-        # belong.
         report = _t0_report()
         assert report.gamma_e_interval_w_per_m2 is not None
         low, high = report.gamma_e_interval_w_per_m2
@@ -638,8 +584,6 @@ class TestGammaECarriesACredibleInterval:
 
     @pytest.mark.physics
     def test_the_interval_is_reproducible_from_the_seed(self) -> None:
-        # doc 00 E3. The posterior draws come from Stream.SAMPLER, so they must not shift
-        # when anything else in the run draws a different number of randoms.
         first = _run(noise=False, seed=_SEED_A)
         second = _run(noise=False, seed=_SEED_A)
 
@@ -649,9 +593,6 @@ class TestGammaECarriesACredibleInterval:
     def test_whether_the_truth_is_covered_is_reported_rather_than_left_to_the_reader(
         self,
     ) -> None:
-        # The question that decides whether a large relative error is an honest wide
-        # interval or an overconfident claim. Leaving it to be eyeballed off two numbers in
-        # a table is how it stops being checked.
         report = _t0_report()
 
         assert report.truth_within_interval is not None
@@ -660,8 +601,6 @@ class TestGammaECarriesACredibleInterval:
 
     @pytest.mark.physics
     def test_the_posterior_carries_its_unvalidated_label(self) -> None:
-        # ADR-012: the Laplace validity label must travel with the number, not live in a
-        # document that gets dropped.
         report = _t0_report()
 
         assert report.posterior is not None

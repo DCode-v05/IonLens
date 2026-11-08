@@ -137,16 +137,11 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-# ── geometry and laser — doc 02 §7.2 TS-O1, TS-L1 ───────────────────────────────────
 
-#: 90 degree collection, doc 02 §4.2 check 1: laser at P6 (135 deg), collection at P8
-#: (225 deg). TS-O1.
 SCATTERING_ANGLE_DEG: Final[float] = 90.0
 
-#: Nd:YAG fundamental — TS-L1.
 LASER_WAVELENGTH_NM: Final[float] = 532.0
 
-# ── SI magnitudes of the shared constants, for the hot loops below (doc 08 §5) ──────
 
 _ELECTRON_MASS_KG: Final[float] = float(magnitude_in(ELECTRON_MASS, "kg"))
 _BOLTZMANN_J_PER_K: Final[float] = float(magnitude_in(BOLTZMANN, "J/K"))
@@ -155,17 +150,8 @@ _ELEMENTARY_CHARGE_C: Final[float] = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _VACUUM_PERMITTIVITY_F_PER_M: Final[float] = float(magnitude_in(VACUUM_PERMITTIVITY, "F/m"))
 LASER_WAVELENGTH_M: Final[float] = float(magnitude_in(Q_(LASER_WAVELENGTH_NM, "nm"), "m"))
 
-#: ``sin(theta/2)`` at the fixed 90 degree geometry — doc 04 §4.1's ``k`` and doc 04
-#: §4.2's ``Delta_lambda_1/e`` both carry exactly this factor.
 SIN_HALF_SCATTERING_ANGLE: Final[float] = math.sin(math.radians(SCATTERING_ANGLE_DEG) / 2.0)
 
-#: ``alpha`` below this is treated as unambiguously incoherent. TS-2 states the
-#: requirement as ``alpha << 1`` without pinning a number; doc 04 §4.1's own worked
-#: example (``alpha`` = 0.0015 at RP-1) sits nearly three orders of magnitude below the
-#: nominal coherent/incoherent crossover at ``alpha`` ~ 1 (Salpeter 1960; Evans &
-#: Katzenstein 1969), so a factor of ten below that crossover is a conservative bound
-#: that still leaves the RP-1 case comfortable margin while catching a genuinely
-#: marginal regime rather than only a badly violated one.
 INCOHERENT_REGIME_MAXIMUM_ALPHA: Final[float] = 0.1
 
 
@@ -301,15 +287,9 @@ def relativistic_weighting_factor(delta_lambda_nm: FloatArray) -> FloatArray:
     between this implementation and Selden's specific published parametrisation.
     """
     xi = np.asarray(delta_lambda_nm, dtype=np.float64) / LASER_WAVELENGTH_NM
-    # 1 + xi = (1 - s) / (1 + s)  =>  s = -xi / (2 + xi).
     denominator = 2.0 + xi
     doppler_parameter = -xi / denominator
-    # |d(v_parallel/c) / d(xi)| = 2 sin(theta/2)^-1 / (2+xi)^2, peak-normalised against
-    # its own value at xi=0 (denominator=2) so the Jacobian factor is (2/denominator)^2.
     jacobian_weight = (2.0 / denominator) ** 2
-    # Electrons moving toward the detector (doppler_parameter > 0) are preferentially
-    # weighted, which is what turns the otherwise near-cancelling Jacobian into the
-    # blue-shifted asymmetry doc 04 §4.2 describes.
     doppler_boost = (1.0 + doppler_parameter) / (1.0 - doppler_parameter) ** 3
     return jacobian_weight * doppler_boost
 

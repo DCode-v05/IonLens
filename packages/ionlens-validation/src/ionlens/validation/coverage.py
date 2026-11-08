@@ -86,10 +86,6 @@ __all__ = [
 type FloatArray = NDArray[np.float64]
 type LogLikelihood = Callable[[NDArray[np.float64]], float]
 
-#: Fraction of cases that may fail before the coverage number is refused rather than
-#: reported. One in ten: enough headroom that a handful of genuinely degenerate draws out of
-#: 400 do not abort a run, and tight enough that the surviving ensemble is still recognisably
-#: the intended one. Above it, survivorship bias dominates whatever the point estimate says.
 MAXIMUM_FAILURE_FRACTION: Final[float] = 0.1
 
 
@@ -186,8 +182,6 @@ def run_coverage_ensemble(
             n_singular += 1
             continue
         mean, std = outcome
-        # The single point at which the truth is read, and it is after the posterior
-        # exists. Everything above this line ran without it.
         truth = np.asarray(case.truth_unconstrained, dtype=np.float64)
         pit_values.append(gaussian_pit(truth, mean=mean, std=std))
 

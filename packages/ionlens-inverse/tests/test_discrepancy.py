@@ -73,8 +73,6 @@ from ionlens.inverse.discrepancy import (
 
 class TestNoDiscrepancyIsExactlyInert:
     def test_it_adds_no_variance(self) -> None:
-        # T0 and T1 use the correct model and their intervals already cover. Any change to
-        # them is a regression, so the default must be exactly zero rather than small.
         prediction = np.array([10.0, 200.0, 3000.0])
 
         variance = NoDiscrepancy().variance(prediction)
@@ -90,17 +88,12 @@ class TestNoDiscrepancyIsExactlyInert:
         np.testing.assert_array_equal(total, noise)
 
     def test_it_satisfies_the_protocol(self) -> None:
-        # doc 00 §5.1 E1: a discrepancy model is a plugin. The protocol is what makes a new
-        # one addable without touching the inference engines.
         assert isinstance(NoDiscrepancy(), DiscrepancyModel)
         assert isinstance(FractionalDiscrepancy(fraction=0.1), DiscrepancyModel)
 
 
 class TestFractionalDiscrepancy:
     def test_the_variance_is_the_fraction_times_the_prediction_squared(self) -> None:
-        # Multiplicative rather than additive: a structural error in a forward model scales
-        # with the signal. An absolute floor would dominate the faint channels and vanish on
-        # the bright ones, which is backwards for a spectrum spanning orders of magnitude.
         prediction = np.array([100.0, 400.0])
 
         variance = FractionalDiscrepancy(fraction=0.05).variance(prediction)
@@ -108,9 +101,6 @@ class TestFractionalDiscrepancy:
         np.testing.assert_allclose(variance, (0.05 * prediction) ** 2)
 
     def test_a_per_channel_fraction_is_honoured(self) -> None:
-        # Discrepancy is not uniform across a spectrum: a line the model gets structurally
-        # wrong deserves more inflation than one it gets right, and collapsing them to a
-        # scalar would throw away the only information that makes this better than a fudge.
         prediction = np.array([100.0, 100.0])
         fraction = np.array([0.01, 0.5])
 
@@ -123,9 +113,6 @@ class TestFractionalDiscrepancy:
             FractionalDiscrepancy(fraction=-0.1)
 
     def test_the_total_variance_adds_in_quadrature(self) -> None:
-        # Independent error sources add in variance, not in standard deviation. Adding the
-        # sigmas would over-inflate by up to a factor of two and would look approximately
-        # right, which is the worst kind of wrong.
         noise = np.array([9.0])
         prediction = np.array([100.0])
 
@@ -138,8 +125,6 @@ class TestFractionalDiscrepancy:
 
 class TestEstimatingTheDiscrepancyFromTheModelHierarchy:
     def test_it_recovers_a_known_fractional_difference(self) -> None:
-        # Two toy models differing by a known 10 % everywhere. The estimator must return
-        # 0.1, or every inflated interval downstream is scaled wrong.
         def low(theta: np.ndarray) -> np.ndarray:
             return np.array([theta[0], 2.0 * theta[0]])
 
@@ -155,8 +140,6 @@ class TestEstimatingTheDiscrepancyFromTheModelHierarchy:
         np.testing.assert_allclose(estimate.fraction, [0.1, 0.1], rtol=1e-8)
 
     def test_it_estimates_per_channel_rather_than_pooling(self) -> None:
-        # A model can be structurally fine on one line and badly wrong on another; pooling
-        # would under-inflate the bad channel and over-inflate the good one.
         def low(theta: np.ndarray) -> np.ndarray:
             return np.array([1.0, 1.0]) * theta[0]
 
@@ -172,8 +155,6 @@ class TestEstimatingTheDiscrepancyFromTheModelHierarchy:
         np.testing.assert_allclose(estimate.fraction, [0.02, 0.5], rtol=1e-8)
 
     def test_identical_models_give_zero_discrepancy(self) -> None:
-        # The T0/T1 case, and the sanity check that the estimator is not manufacturing
-        # inflation out of nothing.
         def model(theta: np.ndarray) -> np.ndarray:
             return np.array([theta[0], theta[0] ** 2])
 
@@ -213,9 +194,6 @@ class TestItActuallyFixesTheCoverageFailure:
         design = np.full(12, 1.0)
         truth = 2.0
         noise_sigma = 0.05
-        # The model predicts `design * u`. The data carry an extra structural offset the
-        # model has no parameter for — this is exactly what "wrong model" means. Note it is
-        # the SAME offset in every channel: structural error is coherent, not random.
         observed = design * truth + bias
 
         prediction_scale = design * truth
@@ -236,7 +214,6 @@ class TestItActuallyFixesTheCoverageFailure:
         return mean, float(1.0 / np.sqrt(precision)), truth
 
     def test_without_a_discrepancy_term_the_interval_excludes_the_truth(self) -> None:
-        # The T2 failure reproduced in a case where every number is checkable by hand.
         mean, std, truth = self._posterior(bias=0.5, discrepancy=NoDiscrepancy())
 
         assert abs(mean - truth) > 4.0 * std, (
@@ -244,8 +221,6 @@ class TestItActuallyFixesTheCoverageFailure:
         )
 
     def test_with_a_matched_discrepancy_term_the_interval_covers_the_truth(self) -> None:
-        # The fix. The structural offset is 0.5 on a signal of 2.0, i.e. 25 %; a discrepancy
-        # term of that size widens the posterior until the truth is inside it.
         mean, std, truth = self._posterior(
             bias=0.5, discrepancy=FractionalDiscrepancy(fraction=0.25)
         )
@@ -253,10 +228,6 @@ class TestItActuallyFixesTheCoverageFailure:
         assert abs(mean - truth) < 2.0 * std
 
     def test_the_estimate_is_still_biased_which_is_reported_not_hidden(self) -> None:
-        # The honesty check. Inflating the variance does NOT move the point estimate — the
-        # bias is identical with and without the discrepancy term. Anyone reading "we added
-        # a discrepancy term" as an accuracy improvement is reading it wrong, and this test
-        # is where that misreading is contradicted.
         without, _, truth = self._posterior(bias=0.5, discrepancy=NoDiscrepancy())
         with_term, _, _ = self._posterior(
             bias=0.5, discrepancy=FractionalDiscrepancy(fraction=0.25)
@@ -274,11 +245,6 @@ class TestItActuallyFixesTheCoverageFailure:
         assert widths == sorted(widths)
 
     def test_treating_a_coherent_discrepancy_as_independent_noise_under_inflates(self) -> None:
-        # The defect that was in this module's first implementation, kept as a regression
-        # test because it is the subtle one. Structural error is the same offset in every
-        # channel; entered on the diagonal it averages down like 1/sqrt(N) exactly as noise
-        # does, and the interval comes out sqrt(12) = 3.46x too narrow — still excluding the
-        # truth, while looking like a fix had been applied.
         term = FractionalDiscrepancy(fraction=0.25)
         _, correlated_std, truth = self._posterior(bias=0.5, discrepancy=term)
         mean, diagonal_std, _ = self._posterior(bias=0.5, discrepancy=term, diagonal_only=True)
@@ -287,9 +253,6 @@ class TestItActuallyFixesTheCoverageFailure:
         assert abs(mean - truth) > 2.0 * diagonal_std, "the diagonal treatment still misses"
 
     def test_lowering_coherence_narrows_the_interval(self) -> None:
-        # Coherence is the knob that decides how much of the structural error is systematic.
-        # It must be explicit and it must matter, so that setting it low is a visible
-        # modelling claim rather than an accidental default.
         stds = [
             self._posterior(
                 bias=0.5, discrepancy=FractionalDiscrepancy(fraction=0.25, coherence=c)

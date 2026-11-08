@@ -147,9 +147,6 @@ def cache(tmp_path: Path) -> Path:
     return tmp_path
 
 
-# ── the catalogue ───────────────────────────────────────────────────────────────
-
-
 class TestTheCatalogue:
     """doc 09 §2. What the framework knows how to consume, and on what terms."""
 
@@ -157,9 +154,6 @@ class TestTheCatalogue:
         assert set(DATASETS) == set(DatasetId)
 
     def test_three_independent_electron_sets_are_registered(self) -> None:
-        # doc 09 §2.1: "Three independent electron sets are retained deliberately."
-        # The spread between them is a budgeted error term (doc 06 §4, term 2), which it
-        # cannot be if the framework only knows how to load one.
         assert len(ElectronDatabase) == 3
         assert {db.dataset_id for db in ElectronDatabase} <= set(DATASETS)
 
@@ -167,16 +161,12 @@ class TestTheCatalogue:
         assert {db.value for db in ElectronDatabase} == {"phelps", "biagi", "ist-lisbon"}
 
     def test_the_ion_set_is_separate_from_the_electron_sets(self) -> None:
-        # doc 03 §4.5 needs Ar+/Ar charge exchange, which no electron database carries.
         assert DatasetId.LXCAT_PHELPS_ION not in {db.dataset_id for db in ElectronDatabase}
 
     def test_every_dataset_is_a_standard_evaluated_database(self) -> None:
-        # doc 09 §1: MEASURED is "from a standard evaluated database, with version and
-        # access date". Anything here that were not would be an ASSUMED-class defect.
         assert all(spec.provenance_class is ProvenanceClass.MEASURED for spec in DATASETS.values())
 
     def test_raw_lxcat_tables_may_not_be_redistributed(self) -> None:
-        # doc 09 §5, and the reason this package ships a loader rather than a data file.
         for database in ElectronDatabase:
             assert not DATASETS[database.dataset_id].licence.redistribute_raw
 
@@ -252,9 +242,6 @@ class TestTheCatalogue:
             DATASETS[DatasetId.LXCAT_PHELPS] = DATASETS[DatasetId.LXCAT_BIAGI]  # type: ignore[index]
 
 
-# ── the recorded version ────────────────────────────────────────────────────────
-
-
 class TestDatasetVersion:
     def test_the_digest_is_the_sha256_of_the_bytes_as_fetched(self) -> None:
         payload = b"whatever the upstream sent"
@@ -273,8 +260,6 @@ class TestDatasetVersion:
         assert DatasetVersion.from_dict(version.to_dict()) == version
 
     def test_a_naive_access_time_is_rejected(self) -> None:
-        # doc 09 §1 requires an access date. One with no offset cannot be ordered against
-        # a record written on another machine, which is the only reason to keep it.
         with pytest.raises(ValueError, match="timezone"):
             DatasetVersion.of(
                 DATASETS[DatasetId.LXCAT_PHELPS],
@@ -295,8 +280,6 @@ class TestDatasetVersion:
             )
 
     def test_an_empty_upstream_version_is_rejected(self) -> None:
-        # doc 09 §1: MEASURED means "with version and access date". A blank version label
-        # makes the class a claim the record cannot support.
         with pytest.raises(ValueError, match="upstream_version"):
             DatasetVersion.of(
                 DATASETS[DatasetId.LXCAT_PHELPS], b"x", upstream_version="", accessed_utc=ACCESSED
@@ -328,9 +311,6 @@ class TestDatasetVersion:
             DatasetVersion.from_dict({**record, "n_bytes": "many"})
 
 
-# ── the lock, and failing loudly ────────────────────────────────────────────────
-
-
 class TestTheVersionLock:
     def test_it_round_trips_through_a_file(self, tmp_path: Path) -> None:
         lock = _populate(tmp_path)
@@ -348,9 +328,6 @@ class TestTheVersionLock:
         assert lock.verify(DatasetId.LXCAT_PHELPS, payload).n_bytes == len(payload)
 
     def test_changed_upstream_data_fails_loudly(self, tmp_path: Path) -> None:
-        # doc 09 §5, verbatim: "fails loudly if the upstream data has changed". Silence
-        # here would mean a rerun of an archived manifest quietly used a different
-        # cross-section table from the one the archived result was computed with.
         lock = _populate(tmp_path, only=(DatasetId.LXCAT_PHELPS,))
 
         with pytest.raises(UpstreamDataChangedError) as excinfo:
@@ -387,9 +364,6 @@ class TestTheVersionLock:
         assert len(extended) == 2
 
     def test_the_lock_file_carries_a_digest_of_itself(self, tmp_path: Path) -> None:
-        # Integrated with ionlens.core.provenance.manifest_sha256, which is the same
-        # canonical hash the run identity of doc 08 §7 is built from. A lock that can be
-        # edited undetectably is not a lock.
         _populate(tmp_path, only=(DatasetId.LXCAT_PHELPS,))
         document = json.loads((tmp_path / LOCK_FILENAME).read_text(encoding="utf-8"))
 
@@ -432,16 +406,10 @@ class TestTheVersionLock:
         assert DatasetLock.read(cache / LOCK_FILENAME) != "not a lock"
 
 
-# ── fetching, which is the only step that would touch a network ─────────────────
-
-
 class TestFetching:
     def test_the_downloader_is_injected_and_is_the_only_thing_that_leaves_the_process(
         self, tmp_path: Path
     ) -> None:
-        # There is no default downloader. A loader with a hard-wired urlopen cannot be
-        # tested offline, and doc 09 §5 puts the fetch in a setup script rather than in
-        # the import path precisely so that everything else stays testable without it.
         requested: list[str] = []
 
         def download(url: str) -> bytes:
@@ -479,7 +447,6 @@ class TestFetching:
         assert version.accessed_utc.tzinfo is not None
 
     def test_an_empty_download_is_rejected_rather_than_recorded(self, tmp_path: Path) -> None:
-        # A proxy error page or a truncated transfer hashes just as well as real data.
         with pytest.raises(ValueError, match="empty"):
             fetch_dataset(
                 DATASETS[DatasetId.LXCAT_PHELPS],
@@ -489,9 +456,6 @@ class TestFetching:
             )
 
     def test_it_refuses_to_write_third_party_data_into_the_installed_package(self) -> None:
-        # This is doc 09 §5 as an executable rule. Caching inside the package directory
-        # is how bulk third-party data ends up inside a wheel, which for LXCat and
-        # OpenADAS is a licence breach and for all of them is against the architecture.
         inside = Path(dataset_module.__file__).parent
 
         with pytest.raises(BundledDataError, match="doc 09"):
@@ -501,9 +465,6 @@ class TestFetching:
                 destination=inside,
                 upstream_version="v1",
             )
-
-
-# ── the store ───────────────────────────────────────────────────────────────────
 
 
 class TestTheStore:
@@ -554,9 +515,6 @@ class TestTheStore:
         assert str(cache.resolve()) in repr(store)
 
     def test_all_three_electron_sets_are_reachable_in_one_loop(self, cache: Path) -> None:
-        # doc 09 §2.1 wants the inference run under all three and the spread reported.
-        # If that needs three hand-written call sites it will be done once and then not
-        # again, which is how a budgeted error term becomes an unstated risk.
         store = AtomicDataStore.open(cache)
 
         databases = [database for database, _ in store.each_electron_set()]
@@ -587,9 +545,6 @@ class TestTheStore:
         assert store.touched == ()
 
 
-# ── the citation ledger ─────────────────────────────────────────────────────────
-
-
 class TestTheCitationLedger:
     """doc 09 §6: cite what the run touched, not a static list."""
 
@@ -610,7 +565,6 @@ class TestTheCitationLedger:
         assert store.touched == (DatasetId.LXCAT_PHELPS,)
 
     def test_a_run_that_used_only_phelps_does_not_cite_biagi(self, cache: Path) -> None:
-        # doc 09 §6, verbatim: "A run that used only the Phelps set does not cite Biagi."
         store = AtomicDataStore.open(cache)
         store.electron_cross_sections(ElectronDatabase.PHELPS)
 
@@ -630,8 +584,6 @@ class TestTheCitationLedger:
         assert version.sha256[:12] in entries
 
     def test_the_lxcat_required_wording_survives_into_the_entry(self, cache: Path) -> None:
-        # doc 09 §2.1: LXCat is free but "citation of the specific database is required",
-        # and the database states the wording it wants.
         store = AtomicDataStore.open(cache)
         store.electron_cross_sections(ElectronDatabase.BIAGI)
 
@@ -648,8 +600,6 @@ class TestTheCitationLedger:
         assert store.bibliography() == first
 
     def test_the_whole_catalogue_can_be_written_as_the_accumulated_ledger(self) -> None:
-        # doc 09 §6: refs/CITATIONS.bib accumulates every source; the report emits the
-        # subset. Both come from the same renderer so they cannot disagree.
         entries = bibliography(DATASETS.values())
 
         assert entries.count("@misc{") == len(DATASETS)
@@ -684,9 +634,6 @@ class TestTheCitationLedger:
 
 class TestTheLicenceModel:
     def test_a_licence_that_permits_raw_but_not_derived_redistribution_is_rejected(self) -> None:
-        # Every licence in doc 09 §5 that permits the raw tables also permits anything
-        # derived from them. The reverse combination is not a licence anyone grants, and
-        # accepting it would let a typo produce a rule the code would then enforce.
         with pytest.raises(ValueError, match="derived"):
             Licence(
                 name="nonsense",

@@ -63,15 +63,10 @@ from ionlens.physics.analytic import (
 
 __all__ = ["SOLVER_NAME", "AnalyticSheathForwardSolver", "ManifestSolver"]
 
-#: The dotted name a manifest writes in ``forward.solver`` — doc 08 §6, doc 08 §10.
 SOLVER_NAME: Final[str] = "ionlens.physics.analytic.sheath"
 
-#: Position of the wall — doc 02 §2. An origin, not a measured length.
 _WALL_POSITION_M: Final[float] = 0.0
 
-#: The configuration keys this solver owns. Every other key is a mistake worth naming:
-#: doc 08 §6's own forward block carries ``mesh`` and ``n_ppc``, which belong to the PIC
-#: solver, and pointing this one at that manifest should say so rather than run.
 _CONFIG_KEYS: Final[tuple[str, ...]] = (
     "model",
     "h_l",
@@ -112,7 +107,6 @@ class ManifestSolver(Protocol):
         ...
 
 
-#: doc 00 C2: every algorithm has a citation, and L0 is not exempt for being simple.
 _CITATIONS: Final[tuple[Citation, ...]] = (
     Citation(
         key="langmuir1913",
@@ -146,7 +140,6 @@ class AnalyticSheathForwardSolver:
 
     solver: AnalyticSheathSolver = field(default_factory=AnalyticSheathSolver)
 
-    # ── the contract ────────────────────────────────────────────────────────────
 
     def configure(self, cfg: SolverConfig) -> None:
         """Apply the ``forward:`` block, minus ``solver``.

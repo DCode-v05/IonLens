@@ -83,15 +83,10 @@ __all__ = [
     "unverified_claims",
 ]
 
-#: A requirement identifier from doc 01, in the canonical spelling of that document.
 RequirementId: TypeAlias = str
 
-#: A verification-test or benchmark identifier from docs 03, 04, 06 and 07.
 EvidenceId: TypeAlias = str
 
-#: The decorated target of :func:`satisfies` and :func:`verified_by`. Both decorators
-#: return their argument unchanged, so the type variable exists only to carry the target's
-#: type through the decoration — the pre-PEP-695 spelling of ``def satisfies[T]``.
 T = TypeVar("T")
 
 
@@ -120,7 +115,6 @@ class _Family:
     source: str
 
 
-#: Requirement families — doc 01 §2.4 (envelope), §5.1-5.4 (per instrument), §5.5 (system).
 REQUIREMENT_FAMILIES: Final[Mapping[str, str]] = MappingProxyType(
     {
         "R-SPAT": "doc 01 §2.4 — spatial resolution",
@@ -136,7 +130,6 @@ REQUIREMENT_FAMILIES: Final[Mapping[str, str]] = MappingProxyType(
     }
 )
 
-#: Evidence families — verification tests, scenario benchmarks and ablations.
 EVIDENCE_FAMILIES: Final[Mapping[str, str]] = MappingProxyType(
     {
         "V": "verification tests — doc 03 §7, doc 04 §8, doc 06 §7, doc 07 §2",
@@ -153,8 +146,6 @@ _EVIDENCE_WIDTHS: Final[Mapping[str, _Family]] = MappingProxyType(
     {prefix: _Family(width=2, source=source) for prefix, source in EVIDENCE_FAMILIES.items()}
 )
 
-#: ``PREFIX-number``, uppercase, with the prefix itself allowed to be hyphenated so that
-#: ``R-SPAT-1`` parses as the family ``R-SPAT`` and not as the family ``R``.
 _ID_PATTERN: Final[re.Pattern[str]] = re.compile(r"([A-Z][A-Z-]*[A-Z]|[A-Z])-([0-9]{1,3})")
 
 
@@ -265,7 +256,6 @@ class _Record:
     evidence: set[str] = field(default_factory=set)
 
 
-#: Every annotation seen in this process, keyed by fully-qualified target name.
 _INDEX: Final[dict[str, _Record]] = {}
 
 

@@ -33,21 +33,15 @@ from ionlens.instruments.interferometry.phase import (
 
 _R_E_M = float(magnitude_in(CLASSICAL_ELECTRON_RADIUS, "m"))
 
-#: RP-1, the reference operating point of doc 01 §2.4 / doc 03 §3.3 regime B.
 _RP1_N_E_PER_M3 = 1.0e17
 _RP1_PRESSURE_MTORR = 5.0
 _RP1_GAS_TEMPERATURE_K = 300.0
 
-#: Loschmidt-style neutral density at RP-1's 5 mTorr, 300 K, from the ideal gas law —
-#: computed independently of ``ionlens.core.state.PlasmaParams.n_g`` so this test module does
-#: not depend on it.
 _RP1_N_NEUTRAL_PER_M3 = (5.0e-3 * 133.322) / (1.380649e-23 * 300.0)
 
 
 class TestCriticalDensity:
     def test_matches_the_hand_verified_value_at_10_6_microns(self) -> None:
-        # n_c = eps0 m_e omega^2 / e^2, omega = 2 pi c / lambda, hand-computed to
-        # 9.923e24 m^-3 from CODATA constants before this function existed.
         n_c = critical_density_per_m3(CO2_WAVELENGTH_M)
 
         assert n_c == pytest.approx(9.923e24, rel=1.0e-3)
@@ -59,8 +53,6 @@ class TestCriticalDensity:
 
 class TestRefractiveIndex:
     def test_the_linear_expansion_matches_the_exact_form_at_rp1(self) -> None:
-        # n_e/n_c ~ 1e-8 at RP-1, so sqrt(1-x) ~ 1-x/2 to within x^2/8 ~ 1e-17 -
-        # negligible next to the ~1e-4 rad phase resolution this channel operates at.
         exact = refractive_index(_RP1_N_E_PER_M3, CO2_WAVELENGTH_M)
         linear = refractive_index_linearized(_RP1_N_E_PER_M3, CO2_WAVELENGTH_M)
 
@@ -78,9 +70,6 @@ class TestRefractiveIndex:
 
 class TestElectronPhaseShift:
     def test_matches_the_hand_verified_rp1_value_over_the_400mm_chord(self) -> None:
-        # r_e * lambda * n_e * L, hand-computed to 1.1948e-3 rad = 1.1948 mrad, about
-        # 12x the 0.1 mrad phase resolution - doc 01 Section 5.4's "roughly 3x above the
-        # noise" recomputed on doc 02 Section 3.1's wider 400 mm chamber.
         phase = electron_phase_shift_rad(_RP1_N_E_PER_M3, CO2_WAVELENGTH_M, CHAMBER_DIAMETER_M)
 
         assert phase == pytest.approx(1.1948e-3, rel=1.0e-3)
@@ -92,8 +81,6 @@ class TestElectronPhaseShift:
         assert high == pytest.approx(2.0 * low, rel=1.0e-9)
 
     def test_matches_the_raw_constant_formula(self) -> None:
-        # Cross-check against r_e * lambda * n_e * L assembled from CODATA directly in
-        # this test, independent of the module's own internal constant.
         expected = _R_E_M * CO2_WAVELENGTH_M * _RP1_N_E_PER_M3 * CHAMBER_DIAMETER_M
 
         assert electron_phase_shift_rad(
@@ -103,8 +90,6 @@ class TestElectronPhaseShift:
 
 class TestDetectionFloor:
     def test_matches_doc02_floor_over_the_400mm_chord(self) -> None:
-        # doc 02 Section 8.2: IF-P1's 0.1 mrad resolution over the 400 mm chamber-diameter
-        # chord gives 8.4e15 m^-3; hand-verified to 8.370e15.
         floor = detection_floor_n_e_per_m3(
             phase_resolution_rad=PHASE_RESOLUTION_RAD,
             wavelength_m=CO2_WAVELENGTH_M,
@@ -114,8 +99,6 @@ class TestDetectionFloor:
         assert floor == pytest.approx(8.370e15, rel=1.0e-3)
 
     def test_matches_doc01_floor_over_the_100mm_chord(self) -> None:
-        # doc 01 Section 5.4's IF-6, before the chamber was widened: 3.3e16 m^-3 over a
-        # 0.1 m chord; hand-verified to 3.348e16.
         floor = detection_floor_n_e_per_m3(
             phase_resolution_rad=PHASE_RESOLUTION_RAD,
             wavelength_m=CO2_WAVELENGTH_M,
@@ -136,7 +119,6 @@ class TestDetectionFloor:
             chord_length_m=0.4,
         )
 
-        # 4x the chord gives 4x the phase per unit density, so 1/4 the density floor.
         assert short == pytest.approx(4.0 * long, rel=1.0e-9)
 
 
@@ -148,11 +130,6 @@ class TestNeutralPhaseShift:
         )
 
     def test_matches_the_dilute_gas_refractivity_at_stp_within_the_literature_range(self) -> None:
-        # Cross-check: at STP (Loschmidt density 2.6868e25 m^-3), the dilute-gas relation
-        # n-1 = 2 pi N alpha' with Dalgarno & Kingston's argon polarizability should
-        # reproduce the well-known visible-light refractivity of argon at STP, ~2.7-2.9e-4
-        # (Peck & Fisher 1964 give ~2.80e-4 in the visible). This is a check on the
-        # magnitude of the constant, not on this module's own arithmetic.
         loschmidt_per_m3 = 2.6868e25
         refractivity = 2.0 * math.pi * loschmidt_per_m3 * ARGON_STATIC_POLARIZABILITY_VOLUME_M3
 

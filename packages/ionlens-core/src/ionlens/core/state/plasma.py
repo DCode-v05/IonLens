@@ -24,10 +24,6 @@ from ionlens.core.units import UREG, DimensionalityError
 
 __all__ = ["REQUIRED_FIELDS", "PlasmaState"]
 
-#: The fields doc 03 §5.2 names as the emulated set, with the dimensionality each must
-#: have. A potential expressed in metres type-checks perfectly and is nonsense; catching
-#: it at construction is the difference between a loud error and a silent 1e19 in a
-#: synthetic spectrum three layers downstream.
 REQUIRED_FIELDS: Mapping[str, str] = MappingProxyType(
     {
         "n_e": "m**-3",
@@ -62,8 +58,6 @@ class PlasmaState:
     fidelity: Fidelity
 
     def __post_init__(self) -> None:
-        # Copy before freezing: the caller's dict is theirs to keep mutating, and a
-        # state that aliased it would change contents after every validation had passed.
         frozen = MappingProxyType(dict(self.fields))
         object.__setattr__(self, "fields", frozen)
 
@@ -71,7 +65,6 @@ class PlasmaState:
         self._check_required_fields_present_and_dimensional()
         self._check_distribution()
 
-    # ── validation ──────────────────────────────────────────────────────────────
 
     def _check_fields_are_self_consistent(self) -> None:
         for key, field in self.fields.items():
@@ -130,7 +123,6 @@ class PlasmaState:
                 f"{self.params.species.name}"
             )
 
-    # ── access ──────────────────────────────────────────────────────────────────
 
     def field(self, name: str) -> ScalarField:
         """One field by name, with an error that says what *is* available.

@@ -85,11 +85,6 @@ def load_manifest(path: Path, *, overrides: Sequence[str] = ()) -> Manifest:
             raise ValueError(f"{path.name}: overrides produced something that is not a manifest")
         merged = combined
 
-    # ``resolve=True`` collapses interpolations, so the archived document is the one that
-    # ran rather than one that would have to be re-resolved to be understood.
-    # ``throw_on_missing`` refuses a `???` placeholder: doc 08 §6 has no notion of a
-    # manifest that is only partly specified, and a missing value reaching a solver as
-    # OmegaConf's sentinel would be a run configured by a placeholder.
     container = OmegaConf.to_container(merged, resolve=True, throw_on_missing=True)
     if not isinstance(container, dict):  # pragma: no cover - DictConfig yields a dict
         raise ValueError(f"{path.name}: a manifest is a mapping, got {type(container).__name__}")

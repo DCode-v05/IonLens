@@ -50,12 +50,8 @@ _K_B: Final[float] = float(magnitude_in(BOLTZMANN, "J/K"))
 
 _REGISTRY = default_registry()
 
-#: ``dt <= TIMESTEP_SAFETY / omega_pe``. doc 03 §4.3 gives 0.2; the registry owns it so the
-#: sensitivity study of doc 06 can sweep it rather than a reader trusting it.
 TIMESTEP_SAFETY: Final[float] = float(_REGISTRY.value_in("pic.timestep_safety", "dimensionless"))
 
-#: doc 03 §4.3's statistical-noise floor. The registry default is 1 000, ten times this;
-#: this is the point below which the run is refused outright rather than merely coarse.
 MINIMUM_PARTICLES_PER_CELL: Final[float] = 100.0
 
 

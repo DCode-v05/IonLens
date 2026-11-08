@@ -120,29 +120,15 @@ __all__ = ["INSTRUMENT_ID", "LifInstrument", "RunConditions"]
 
 type FloatArray = NDArray[np.float64]
 
-#: The doc 08 §7 artifact group this channel writes to.
 INSTRUMENT_ID: str = "lif"
 
-#: Units of what :meth:`LifInstrument.forward` returns — see :mod:`ionlens.instruments.lif.scan`
-#: for why it is an upper-state density and not a radiance.
 OBSERVABLE_UNITS: str = "m**-3"
 
-#: The calibration standards :meth:`LifInstrument.calibrate` requires, as doc 02 §11 names
-#: the chains they come from.
 FREQUENCY_AXIS_STANDARD: str = "lif_frequency_axis"
 RELATIVE_SCALE_STANDARD: str = "lif_relative_scale"
 
-#: Above this the run is reported as saturated and its lineshape as distorted (doc 04 §3.4).
-#: Ten percent: the power-broadened width is then 5 % wider than the natural one, which is
-#: where the distortion stops being smaller than the doc 06 §4 systematics it competes with.
 SATURATION_REPORTING_THRESHOLD: float = 0.1
 
-#: Multiple of the mean ion speed that must fit inside the tuning window for the channel to
-#: be declared informative.
-#:
-#: Three, so that the thermal spread either side of the drift is included rather than only
-#: its centre. A gate on the mean alone would call a distribution visible when half of it
-#: had already run off the end of the scan.
 INFORMATIVE_SPEED_MARGIN: float = 3.0
 
 
@@ -267,7 +253,6 @@ class LifInstrument:
         self._registry = registry if registry is not None else default_registry()
         self._settings: _Settings | None = None
 
-    # ── the doc 08 §4 contract ──────────────────────────────────────────────────
 
     def configure(self, cfg: InstrumentConfig) -> None:
         """Apply one entry of the manifest's ``instruments:`` list — doc 08 §6.
@@ -441,9 +426,6 @@ class LifInstrument:
 
         scale = 1.0
         if settings.apply_calibration_error:
-            # One draw, applied to every sample: doc 06 §4.1's correlated calibration
-            # error, which does not average down. Per-sample scatter here would be the
-            # detector's, and the detector is F4's (doc 04 §1).
             rng = np.random.default_rng(settings.seed)
             scale = float(rng.normal(1.0, settings.scale_uncertainty))
 
@@ -532,9 +514,6 @@ class LifInstrument:
 
         predicted = np.asarray(pred.values, dtype=np.float64)
 
-        # Assemble the coherent directions. Calibration first, because it is a property of
-        # the instrument rather than of the model being scored; the Woodbury form is
-        # invariant to row order, so this is for readability only.
         rows: list[FloatArray] = []
         if calibration_uncertainty and obs.calibration is not CalibrationState.TRUE:
             rows.append(
@@ -553,9 +532,6 @@ class LifInstrument:
                 - np.sum(np.log(obs.uncertainty * math.sqrt(2.0 * math.pi)))
             )
 
-        # No variance floor here, unlike OES: a zero uncertainty was already refused above,
-        # by doc 01 IF-6's rule that an uninformative channel is expressed by not forming
-        # its term at all rather than by forming a degenerate one.
         return coherent_gaussian_log_prob(
             residual=(np.asarray(obs.values, dtype=np.float64) - predicted).reshape(-1),
             variance=(np.asarray(obs.uncertainty, dtype=np.float64) ** 2).reshape(-1),
@@ -625,7 +601,6 @@ class LifInstrument:
             ),
         )
 
-    # ── what doc 04 §3.4 requires every run to report ───────────────────────────
 
     def run_conditions(self) -> RunConditions:
         """The saturation state of this configuration — doc 04 §3.4, doc 07 F-13."""
@@ -667,7 +642,6 @@ class LifInstrument:
         settings = self._require_configured()
         return settings.scan.velocities(transition=settings.transition, laser=settings.laser)
 
-    # ── internals ───────────────────────────────────────────────────────────────
 
     def _require_configured(self) -> _Settings:
         if self._settings is None:

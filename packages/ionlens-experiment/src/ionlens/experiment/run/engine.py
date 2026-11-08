@@ -55,7 +55,6 @@ __all__ = [
     "execute",
 ]
 
-#: The artifacts the framework can produce today.
 IMPLEMENTED_ARTIFACTS: Final[frozenset[ArtifactRequest]] = frozenset(
     {ArtifactRequest.PLASMA_STATE, ArtifactRequest.METRICS}
 )
@@ -63,10 +62,8 @@ IMPLEMENTED_ARTIFACTS: Final[frozenset[ArtifactRequest]] = frozenset(
 PLASMA_STATE_FILENAME: Final[str] = "plasma_state.h5"
 METRICS_FILENAME: Final[str] = "metrics.parquet"
 
-#: Where the flux functional is evaluated — the wall, doc 02 §2.
 _WALL_POSITION_M: Final[float] = 0.0
 
-#: doc 03 §2.3's ``Gamma_E`` and doc 01 §1.2's decomposition of it, as stored units.
 _ENERGY_FLUX_UNITS: Final[str] = "W/m**2"
 _PARTICLE_FLUX_UNITS: Final[str] = "1/(m**2*s)"
 _IMPACT_ENERGY_UNITS: Final[str] = "eV"
@@ -97,9 +94,6 @@ def _missing_stages(manifest: Manifest) -> list[str]:
     missing: list[str] = []
 
     if any(instrument.enabled for instrument in manifest.instruments):
-        # A *disabled* channel is not a stage. doc 07 §5.2's ablation matrix switches
-        # exactly this flag, and a manifest that ablates every channel is a legitimate
-        # forward-only run rather than a request for the instrument layer.
         missing.append("instruments (doc 04 — WBS 2.4-2.10)")
     if manifest.noise is not None:
         missing.append("noise (doc 04 §7.2 — WBS 2.10)")
@@ -165,8 +159,6 @@ def _run_forward(manifest: Manifest, params: PlasmaParams, solver: ManifestSolve
     """Configure, solve and apply the doc 03 §6 flux functional."""
     solver.configure(manifest.forward.config)
 
-    # ``None``: doc 08 §6's forward block carries no time grid, and L0/L1 are steady.
-    # See ionlens.experiment.solvers for why the contract had to widen to allow it.
     state = solver.solve(params, None)
     flux = solver.flux(state, _WALL_POSITION_M)
     metadata = solver.metadata()

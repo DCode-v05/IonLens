@@ -93,8 +93,6 @@ class TestWhereUnstatedParametersComeFrom:
     def test_the_eedf_shape_parameter_is_a_stated_convention_not_a_registry_entry(
         self, documented_manifest: Any
     ) -> None:
-        # doc 05 §2.1 gives kappa a *prior*, not a nominal, so there is nothing in the
-        # registry to read. The default is therefore a modelling statement and says so.
         resolved = resolve_plasma(documented_manifest.plasma)
         assert resolved.sources["kappa"].startswith("convention:")
         assert resolved.params.kappa == pytest.approx(1.0)

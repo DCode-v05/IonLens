@@ -124,7 +124,6 @@ __all__ = [
     "SheathSolution",
 ]
 
-#: A field sampled on the spatial grid, in SI magnitudes.
 FloatArray: TypeAlias = NDArray[np.float64]
 
 _REGISTRY: Final = default_registry()
@@ -132,52 +131,20 @@ _REGISTRY: Final = default_registry()
 _E_C: Final[float] = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _M_E_KG: Final[float] = float(magnitude_in(ELECTRON_MASS, "kg"))
 
-#: ``delta`` in doc 03 §2.1's sheath-edge definition ``(n_i - n_e) / n_i = delta``.
-#: Registered as ``sheath.edge_tolerance``, and doc 03 §2.1 names it as "precisely the
-#: sort of hidden convention that doc 00 C4 exists to forbid".
 SHEATH_EDGE_TOLERANCE: Final[float] = float(
     _REGISTRY.value_in("sheath.edge_tolerance", "dimensionless")
 )
 
-#: Mean initial energy of an ion-induced secondary electron leaving the wall.
-#:
-#: **This value is not in the parameter registry and should be.** doc 03 §3.3 requires
-#: secondary emission and registers the *yield* (``sheath.gamma_se_W``) but not the
-#: emission energy, and the emission energy is needed as soon as the secondaries are
-#: modelled as a beam rather than as a boundary current: born exactly at rest at the wall
-#: they would have zero velocity and infinite density there. Ion-induced (potential)
-#: emission from a clean metal produces electrons with a roughly Maxwellian distribution
-#: peaking near 2 eV and almost independent of the impact energy — Hagstrum (1954),
-#: Phys. Rev. 96, 336. Named here so it is greppable and reviewable, and flagged so that
-#: it is promoted to ``sheath.E_se`` when ``ionlens-core`` is next touched.
 SECONDARY_EMISSION_ENERGY: Final[Quantity] = Q_(2.0, "eV")
 
-#: How far above the Bohm speed ions are injected at the bulk boundary.
-#:
-#: doc 03 §2.1 states the Bohm criterion as ``u_s >= c_s`` and doc 03 §3.3 applies it at
-#: equality. Exactly at equality the quasineutral presheath is *sonic*: the reduced
-#: system is ``w'(w^2 - 1) = 0`` (see :mod:`ionlens.physics.fluid.scaling`), so the inflow
-#: characteristic is stationary and the linearised problem is singular there. Injecting a
-#: tenth of a percent supersonically restores strict hyperbolicity and is the standard
-#: regularisation of the classical sheath-matching problem.
-#:
-#: It is not free, and the cost is stated rather than hidden: the ion flux, and therefore
-#: ``Gamma_E``, is high by exactly this fraction against L0. At the default that is
-#: 0.1 %, against a doc 03 §7 V-03 tolerance of 5 % and a doc 01 R-ACC-5 budget of 20 %.
 DEFAULT_BOHM_MARGIN: Final[float] = 1e-3
 
-#: Newton iteration cap per continuation step.
 DEFAULT_MAX_ITERATIONS: Final[int] = 60
 
-#: Newton relaxation (damping) factor.
 DEFAULT_RELAXATION: Final[float] = 1.0
 
-#: Ratio between successive continuation steps. 1.4 was the largest that reached RP-1's
-#: ``V_w / T_e = 83`` without the adaptive halving of :func:`_continue_to` having to
-#: intervene; 2.0 does not.
 DEFAULT_CONTINUATION_FACTOR: Final[float] = 1.4
 
-#: Component indices in the mixed space.
 _NU, _W, _PHI = 0, 1, 2
 
 
@@ -289,7 +256,6 @@ class FluidSheathSolver:
                 f"got {self.edge_tolerance}"
             )
 
-    # ── configuration ───────────────────────────────────────────────────────────
 
     def fidelity(self) -> Fidelity:
         return Fidelity.L1
@@ -382,7 +348,7 @@ class FluidSheathSolver:
         re-derived, which is exactly what :class:`~ionlens.core.protocols.forward.CostBasis`
         exists to make visible.
         """
-        del cfg  # The estimate does not yet depend on the configuration.
+        del cfg
         return CostEstimate.estimated(
             wall_clock=Q_(1.0, "s"),
             device=Device.CPU,
@@ -419,7 +385,6 @@ class FluidSheathSolver:
             ),
         )
 
-    # ── the mesh ────────────────────────────────────────────────────────────────
 
     def scaling(self, params: PlasmaParams) -> SheathScaling:
         return SheathScaling.from_params(params, h_l=self.h_l, gamma_i=self.gamma_i)
@@ -452,7 +417,6 @@ class FluidSheathSolver:
             stretch=self.stretch,
         )
 
-    # ── the solve ───────────────────────────────────────────────────────────────
 
     def solve(
         self,
@@ -513,9 +477,6 @@ class FluidSheathSolver:
                 "n_i": _field("n_i", n_i, "m**-3"),
                 "n_se": _field("n_se", n_se, "m**-3"),
                 "Phi": _field("Phi", potential, "V"),
-                # Isothermal, both species: doc 03 §3.1 makes the electron energy
-                # equation optional and this implementation does not solve it. Stated as
-                # a field rather than left implicit.
                 "T_e": _field("T_e", np.full(mesh_grid.n_points, scaling.potential), "eV"),
                 "T_i": _field(
                     "T_i",
@@ -537,7 +498,6 @@ class FluidSheathSolver:
             continuation_steps=fields.continuation_steps,
         )
 
-    # ── the quantity of interest ────────────────────────────────────────────────
 
     def flux(self, state: PlasmaState, z: float = 0.0) -> IonEnergyFlux:
         """``Gamma_E`` at ``z`` — doc 03 §6, from the fluid moments.
@@ -583,9 +543,6 @@ class FluidSheathSolver:
     def _injected_flux(self) -> float:
         """``|nu w|`` at the bulk boundary — see :data:`DEFAULT_BOHM_MARGIN`."""
         return 1.0 + self.bohm_margin
-
-
-# ── the assembled state ─────────────────────────────────────────────────────────
 
 
 def _secondary_density(
@@ -635,9 +592,6 @@ def _sheath_edge(grid: SpatialGrid, n_i: FloatArray, n_e: FloatArray, tolerance:
             "wants at least ten sheath thicknesses."
         )
 
-    # Linear interpolation onto the crossing, so the answer is not quantised by the mesh
-    # — which would make the V-04 mesh-independence study measure the mesh rather than
-    # the solution.
     lower, upper = departure[outermost], departure[outermost + 1]
     span = grid.z_m[outermost + 1] - grid.z_m[outermost]
     fraction = 0.0 if lower == upper else (lower - tolerance) / (lower - upper)

@@ -137,8 +137,6 @@ class TestChordMapping:
         assert observable.units == PHASE_UNITS
 
     def test_distinct_chords_at_distinct_z_see_distinct_phases(self) -> None:
-        # The test profile increases with z, so a chord anchored near the wall must read
-        # a smaller phase than one further into the bulk.
         observable = _configured().forward(_state(), _WINDOW)
 
         assert observable.values[0] < observable.values[-1]
@@ -213,8 +211,6 @@ class TestObserveSharesTheForwardPath:
         )
 
     def test_observe_before_calibrate_with_noise_enabled_is_refused(self) -> None:
-        # doc 04 §7.3: noise on simulates a real measurement, and there is nothing to
-        # apply until a calibration measurement has produced an estimated response.
         with pytest.raises(RuntimeError, match="calibrate"):
             _configured().observe(_state(), _WINDOW)
 
@@ -240,8 +236,6 @@ class TestCalibrate:
         assert observed.is_inverse_crime
 
     def test_use_true_calibration_still_lets_noise_off_match_forward_exactly(self) -> None:
-        # doc 04 §9's exact-equality requirement, with the inverse crime committed on
-        # purpose (doc 04 §7.3) rather than by accident.
         state = _state()
         instrument = _configured(noise=False)
         instrument.use_true_calibration()
@@ -337,8 +331,6 @@ class TestTheDetectionGate:
         assert not _configured().is_informative(_params(n_0=1.0e14))
 
     def test_a_plasma_exactly_at_the_floor_is_informative(self) -> None:
-        # DetectionFloor.admits is >=; doc 01 IF-6 declares the blind region strictly
-        # below the floor, so the boundary itself is informative.
         instrument = _configured()
         floor = instrument.metadata().detection_floor.threshold
 
@@ -349,8 +341,6 @@ class TestTheDetectionGate:
         default_floor = _configured().metadata().detection_floor.threshold
         short_chord_floor = _configured(chord_length_m=0.1).metadata().detection_floor.threshold
 
-        # A quarter of the chord length raises the floor by 4x (doc 02 Section 8.2's
-        # "the 400 mm chamber diameter improves the interferometry detection floor by 4x").
         assert float(short_chord_floor.magnitude) == pytest.approx(
             4.0 * float(default_floor.magnitude), rel=1.0e-9
         )
@@ -408,9 +398,6 @@ class TestFringeJumpRateIsConfigurable:
         predicted = instrument.forward(state, _WINDOW)
         observed = instrument.observe(state, _WINDOW)
 
-        # With the rate at certainty every chord gets a jump; even after the (much
-        # smaller) vibration and detector noise is added on top, the residual must stay
-        # close to a whole 2*pi.
         residual = observed.values - predicted.values
         assert np.all(np.abs(np.abs(residual) - 2.0 * math.pi) < 1.0)
 
@@ -444,8 +431,6 @@ class TestCalibrationScaleDoesNotAverageDown:
         def expected_next() -> np.ndarray:
             common = float(detector_rng.normal(0.0, sigma_common)) if sigma_common > 0.0 else 0.0
             independent = detector_rng.normal(0.0, sigma_independent, size=predicted.size)
-            # sample_fringe_jumps draws exactly one array from the same stream, even at
-            # rate=0.0 - reproduce that consumption so the two streams stay in lock-step.
             detector_rng.random(predicted.size)
             return scale * predicted + common + independent
 
@@ -467,9 +452,6 @@ class TestVibrationModelIsReadFromTheRegistry:
     """
 
     def test_zeroing_the_common_mode_fraction_changes_the_reported_uncertainty(self) -> None:
-        # Away from the reference window (1 ms), the combined uncertainty is not pinned
-        # to PHASE_RESOLUTION_RAD by construction (module docstring), so a fraction of
-        # 0.0 (no vibration term at any duration) and the shipped 0.9 must disagree here.
         long_window = AcquisitionWindow.absolute(start=Q_(0.0, "s"), duration=Q_(1.0, "s"))
         state = _state()
 
@@ -492,9 +474,6 @@ class TestVibrationModelIsReadFromTheRegistry:
         np.testing.assert_allclose(zeroed_uncertainty, PHASE_RESOLUTION_RAD)
 
     def test_the_likelihood_covariance_reflects_a_moved_resonance_frequency(self) -> None:
-        # A longer window than the reference one lets the resonance frequency actually
-        # move the vibration term's magnitude (module docstring: only the *shape*
-        # integral, which the resonance frequency parametrises, depends on duration).
         long_window = AcquisitionWindow.absolute(start=Q_(0.0, "s"), duration=Q_(1.0, "s"))
         default_sigma = interferometry_noise.vibration_phase_std_rad(long_window.duration_s)
 
@@ -545,15 +524,9 @@ class TestCalibrationUncertaintyLikelihood:
         explicit_default = instrument.likelihood(observed, predicted, calibration_uncertainty=False)
         omitted_default = instrument.likelihood(observed, predicted)
 
-        # Exact equality, not allclose: this is the regression baseline the amendment must
-        # not perturb for any existing caller that never passes the new keyword.
         assert explicit_default == omitted_default
 
     def test_calibration_uncertainty_without_calibrate_is_refused(self) -> None:
-        # noise=False: forward()/observe() agree with no calibration chain at all, but
-        # scoring the calibration coherently needs the standard's registered uncertainty,
-        # which only calibrate() records — see the method's own docstring for why there is
-        # no registry entry to fall back to instead.
         instrument = _configured(noise=False)
         observed = instrument.observe(_state(), _WINDOW)
         predicted = observed.as_observable()
@@ -562,9 +535,6 @@ class TestCalibrationUncertaintyLikelihood:
             instrument.likelihood(observed, predicted, calibration_uncertainty=True)
 
     def test_calibration_uncertainty_is_a_noop_for_a_true_calibration_measurement(self) -> None:
-        # No calibrate() call anywhere in this test: use_true_calibration() alone must be
-        # enough, because doc 04 §7.3's verification runs have no calibration error to
-        # score, and the gate is on the measurement's own CalibrationState.
         instrument = _configured()
         instrument.use_true_calibration()
         observed = instrument.observe(_state(), _WINDOW)
@@ -593,10 +563,6 @@ class TestCalibrationUncertaintyLikelihood:
     def test_calibration_uncertainty_matches_the_shared_coherent_kernel_computed_independently(
         self,
     ) -> None:
-        # Not just "differs in the right direction" — this is the k=2 Woodbury result,
-        # reconstructed here from the public ionlens.instruments.coherent building blocks and
-        # compared to what the method itself returned, so the method's internal composition
-        # cannot silently disagree with the shared kernel it claims to be built from.
         from ionlens.instruments.coherent import (
             coherent_gaussian_log_prob,
             fractional_calibration_row,
@@ -700,8 +666,6 @@ class TestCoherentModelDiscrepancy:
             units=predicted.units,
             window=predicted.window,
         )
-        # A rank-3 discrepancy basis, non-trivial and not proportional to the (rank-one)
-        # vibration direction, so this cannot pass merely by reproducing the k=1 case.
         discrepancy = rng.normal(scale=2.0e-5, size=(3, n))
 
         result = instrument.likelihood(observed, predicted, coherent_discrepancy=discrepancy)
@@ -752,8 +716,6 @@ class TestCoherentModelDiscrepancy:
         sigma_common = interferometry_noise.vibration_phase_std_rad(_WINDOW.duration_s)
         d = np.full(n, sigma_independent**2)
         v = np.full(n, sigma_common)
-        # _references()'s standard is registered at 2 % relative uncertainty (see that
-        # helper above).
         calibration_row = fractional_calibration_row(predicted.values, relative_uncertainty=0.02)
         dense_covariance = (
             np.diag(d)

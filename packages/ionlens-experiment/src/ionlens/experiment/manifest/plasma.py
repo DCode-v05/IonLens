@@ -42,23 +42,10 @@ from ionlens.experiment.manifest.schema import BiasMode, PlasmaSpec
 
 __all__ = ["MAXWELLIAN_KAPPA", "ResolvedPlasma", "resolve_plasma"]
 
-#: The EEDF shape parameter at the Maxwellian limit — doc 05 §2.1's ``kappa = 1``.
-#:
-#: Named rather than inlined because doc 08 §5's rule does not carve out an exception for
-#: a number whose author was confident it did not matter, and because a reader of the run
-#: record has to be able to find where ``convention:maxwellian-eedf`` is defined.
 MAXWELLIAN_KAPPA: Final[float] = 1.0
 
-#: Bias phase when the manifest does not set one. Zero *is* the definition of the phase
-#: origin rather than a measured value, which is why its source is recorded as a
-#: convention and not as a registry lookup.
 _PHASE_ORIGIN_RAD: Final[float] = 0.0
 
-#: How the manifest's ``gas`` names a species, and where its mass comes from.
-#:
-#: Categorical, so it is code and not a registry entry — :mod:`ionlens.core.params` is
-#: explicit that the registry holds numbers and that "argon" has no uncertainty, no sweep
-#: range and no units. The *mass* is a number and does come from the registry.
 _GAS_SPECIES: Final[Mapping[str, tuple[str, str]]] = MappingProxyType(
     {
         "argon": ("Ar+", "species.Ar.mass"),
@@ -66,17 +53,12 @@ _GAS_SPECIES: Final[Mapping[str, tuple[str, str]]] = MappingProxyType(
     }
 )
 
-#: Charge number of a singly-ionised species. An integer count, not a magnitude.
 _SINGLY_IONISED: Final[int] = 1
 
-#: Registry entry each unstated control parameter resolves from.
 _REGISTRY_DEFAULTS: Final[Mapping[str, str]] = MappingProxyType(
     {
         "T_i": "RP1.T_i",
         "T_g": "RP1.T_g",
-        # doc 03 §3.3: not optional. The entry is tungsten-specific because that is the
-        # electrode doc 02 §3 specifies; a manifest for another wall material states its
-        # own yield until the registry grows an entry per material.
         "gamma_se": "sheath.gamma_se_W",
         "rf_frequency": "RP1.rf_frequency",
     }
@@ -178,8 +160,6 @@ def resolve_plasma(
             plasma.bias.frequency, field="rf_frequency", registry=catalogue
         )
     else:
-        # Absent means DC (doc 02 §3.3). Recorded as a manifest statement, because the
-        # manifest did state it: `mode: dc` is a choice, not an omission.
         sources["rf_frequency"] = "manifest"
 
     if plasma.bias.phase is None:
@@ -189,8 +169,6 @@ def resolve_plasma(
         rf_phase = plasma.bias.phase
         sources["rf_phase"] = "manifest"
 
-    # The four the manifest is required to state. Listed rather than inferred, so that a
-    # field added to PlasmaParams without a source here fails the run record's own check.
     for stated_field in ("n_0", "T_e", "pressure", "bias"):
         sources[stated_field] = "manifest"
 

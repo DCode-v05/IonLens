@@ -64,13 +64,8 @@ __all__ = [
     "line_emissivity",
 ]
 
-#: ``h c`` in joule-metres. One product, unwrapped once, from CODATA via
-#: :mod:`ionlens.core.constants` — doc 09 §2.5 calls a hand-entered fundamental constant "a
-#: plausible, undetectable and catastrophic error", and this one scales every radiance in
-#: the package.
 _HC_J_M: Final[float] = float(magnitude_in(PLANCK * SPEED_OF_LIGHT, "J * m"))
 
-#: Metres in a nanometre — see the note in :mod:`ionlens.instruments.oes.escape`.
 _METRES_PER_NM: Final[float] = float(magnitude_in(Q_(1.0, "nm"), "m"))
 
 

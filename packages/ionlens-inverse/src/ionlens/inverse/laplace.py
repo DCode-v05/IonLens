@@ -86,21 +86,8 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: Central-difference step for the **second** derivative, and deliberately not the ``1e-6``
-#: :mod:`ionlens.inverse.map` uses for the first. A central first difference balances truncation
-#: against roundoff at ``eps^(1/3) ~ 6e-6``; a second difference divides by ``h^2`` instead
-#: of ``h`` and balances at ``eps^(1/4) ~ 1.2e-4``. Reusing the gradient's step here would
-#: amplify roundoff by two orders of magnitude, and the symptom — a Hessian that is noisy
-#: rather than wrong — is one that looks like a hard problem instead of like a bug. The
-#: coordinates are O(1) in unconstrained space by construction, so one absolute step is
-#: appropriate and there is no scale to chase.
 _HESSIAN_STEP: Final[float] = 1e-4
 
-#: Smallest curvature, relative to the best-constrained direction, that is still reported as
-#: a measurement rather than refused as a null-space direction. At this ratio the marginal
-#: standard deviation along that direction is ``sqrt(1/1e-9) ~ 3e4`` times the tightest one:
-#: an "error bar" spanning four and a half orders of magnitude more than the data resolves
-#: is doc 05 §6's null space, and calling it an uncertainty would be a category error.
 _MINIMUM_RELATIVE_CURVATURE: Final[float] = 1e-9
 
 
@@ -299,9 +286,6 @@ def laplace_posterior(
         raise ValueError("the MAP point contains non-finite entries; there is no mode there")
 
     hessian = _hessian(point, log_likelihood=log_likelihood, prior=prior, step=step)
-    # Symmetrise before the eigendecomposition. The mixed differences are symmetric in
-    # exact arithmetic and differ in the last bits in practice; `eigvalsh` would silently
-    # read only one triangle, so averaging is both cheaper and more honest than choosing.
     hessian = 0.5 * (hessian + hessian.T)
     curvature = np.linalg.eigvalsh(hessian)
     _require_positive_definite(hessian, curvature)

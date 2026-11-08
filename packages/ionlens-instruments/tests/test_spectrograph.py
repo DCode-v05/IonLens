@@ -39,9 +39,6 @@ def grating() -> Grating:
     )
 
 
-# ── dispersion ──────────────────────────────────────────────────────────────────
-
-
 @pytest.mark.physics
 def test_reciprocal_dispersion_matches_the_oes_s3_specification(
     spectrograph: Spectrograph,
@@ -65,9 +62,6 @@ def test_angular_dispersion_matches_a_numerical_derivative(grating: Grating) -> 
     """
     incidence = 0.36
     step = 1e-6
-    # Near the grating setting, and necessarily so: at 20.6 deg incidence a 1800 gr/mm
-    # grating cannot diffract beyond ~570 nm in first order, and the 1024-pixel detector
-    # only spans 8 nm anyway. Each line of doc 02 §6.3 gets its own grating setting.
     for wavelength_nm in (470.0, 500.0, 530.0, 560.0):
         analytic = grating.angular_dispersion_per_nm(wavelength_nm, incidence_angle_rad=incidence)
         numerical = (
@@ -115,9 +109,6 @@ def test_a_wavelength_the_grating_cannot_reach_is_refused(grating: Grating) -> N
 def test_a_grating_needs_a_positive_order() -> None:
     with pytest.raises(ValueError, match="order"):
         Grating(groove_density_per_mm=1800.0, order=0)
-
-
-# ── the instrument function ─────────────────────────────────────────────────────
 
 
 def _measure_fwhm(spectrograph: Spectrograph, wavelength_nm: float) -> float:
@@ -218,9 +209,6 @@ def test_the_instrument_function_broadens_towards_the_blue(
     assert spectrograph.instrument_fwhm_nm(434.81) > spectrograph.instrument_fwhm_nm(811.53)
 
 
-# ── the detector axis ───────────────────────────────────────────────────────────
-
-
 @pytest.mark.physics
 def test_the_wavelength_axis_is_uniform_and_centred(spectrograph: Spectrograph) -> None:
     axis = spectrograph.wavelength_axis(centre_nm=750.39)
@@ -243,10 +231,6 @@ def test_a_synthesised_spectrum_conserves_line_flux(spectrograph: Spectrograph) 
         axis, wavelengths_nm=(centre,), amplitudes=(1.0,), intrinsic_fwhm_nm=(1.6e-3,)
     )
     step = float(axis[1] - axis[0])
-    # 1e-3 and not 1e-6: the detector spans +-4.1 nm and the Lorentzian wings of the
-    # instrument function put 2.6e-4 of the line outside it. That loss is physical — a real
-    # frame does not see the far wings either — so the tolerance states it rather than
-    # hiding it behind a wider axis.
     assert float(np.sum(spectrum) * step) == pytest.approx(1.0, rel=1e-3)
 
 

@@ -53,8 +53,6 @@ from ionlens.core.storage import (
 )
 from ionlens.core.units import Q_
 
-#: The nine fields doc 08 §7 names, plus the lock *source* the record adds so that a
-#: reader can tell a resolved lock from a scan of what happened to be importable.
 _DOC_08_7_FIELDS = frozenset(
     {
         "manifest_sha256",
@@ -154,7 +152,6 @@ class _Archived(Protocol):
 _Write: TypeAlias = Callable[[Path, Provenance], object]
 _Read: TypeAlias = Callable[[Path], _Archived]
 
-#: ``(label, write, read)`` for every artifact doc 08 §7 tabulates.
 _WRITERS: tuple[tuple[str, _Write, _Read], ...] = (
     (
         "plasma_state.h5",
@@ -185,8 +182,6 @@ class TestTheFieldListCannotDrift:
     def test_the_record_still_carries_exactly_the_fields_doc_08_7_names(
         self, record: Provenance
     ) -> None:
-        # If a tenth field is added to Provenance, this fails and whoever added it has to
-        # decide, explicitly, whether artifacts must carry it too.
         assert set(record.to_dict()) >= _DOC_08_7_FIELDS
         assert set(record.to_dict()) - _DOC_08_7_FIELDS == {"environment_lock_source"}
 
@@ -215,8 +210,6 @@ class TestEveryArtifactEmbedsItsProvenance:
         write: _Write,
         read: _Read,
     ) -> None:
-        # doc 13 §2 records solver_versions as a mapping because a reproducibility check
-        # asks "which PETSc", not "does this string contain 3.20".
         write(tmp_path / filename, record)
 
         recovered = read(tmp_path / filename).provenance
@@ -231,8 +224,6 @@ class TestEveryArtifactEmbedsItsProvenance:
         write: _Write,
         read: _Read,
     ) -> None:
-        # doc 05 §7.2 makes reporting one tier as another a project defect, so the tier
-        # is never allowed to degrade into an unvalidated free-text label.
         write(tmp_path / filename, record)
 
         recovered = read(tmp_path / filename).provenance
@@ -248,10 +239,6 @@ class TestEveryArtifactEmbedsItsProvenance:
         write: _Write,
         read: _Read,
     ) -> None:
-        # HDF5 hands back ``np.bool_`` and ``np.int64``. Neither is an instance of the
-        # Python type Provenance validates against, so an unnormalised read would either
-        # raise on every artifact or — worse, if the validation were relaxed — put a
-        # NumPy scalar into a YAML sidecar that no other tool can load.
         write(tmp_path / filename, record)
 
         recovered = read(tmp_path / filename).provenance
@@ -268,8 +255,5 @@ class TestEveryArtifactEmbedsItsProvenance:
         write: _Write,
         read: _Read,
     ) -> None:
-        # doc 00 E4 requires embedded provenance on every figure. Every figure comes from
-        # an artifact, so an artifact that may be written without provenance is a figure
-        # that will be published without it.
         with pytest.raises(MissingProvenanceError):
             write(tmp_path / filename, None)  # type: ignore[arg-type]

@@ -82,19 +82,14 @@ __all__ = [
     "fetch_dataset",
 ]
 
-#: The lock lives beside the data it describes, so that moving a cache moves both.
 LOCK_FILENAME: Final[str] = "atomic-datasets.lock.json"
 
 _LOCK_SCHEMA: Final[str] = "ionlens.atomic.datasets/1"
 
 _SHA256_PATTERN: Final[re.Pattern[str]] = re.compile(r"[0-9a-f]{64}")
 
-#: How much of a digest a citation carries. Enough to identify the fetch in a
-#: bibliography without turning the entry into a wall of hex; the full digest is in the
-#: lock, which is what a reproduction actually reads.
 _DIGEST_PREFIX: Final[int] = 12
 
-#: The installed ``ionlens`` package. Nothing third-party may be cached inside it.
 _PACKAGE_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 
 
@@ -121,28 +116,18 @@ class DatasetId(StrEnum):
     ``cross_sections: lxcat.biagi`` and gets back a checked member.
     """
 
-    #: doc 09 §2.1 — e + Ar elastic, excitation, ionisation.
     LXCAT_PHELPS = "lxcat.phelps"
 
-    #: doc 09 §2.1 — e + Ar full set from Magboltz v8.9.
     LXCAT_BIAGI = "lxcat.biagi"
 
-    #: doc 09 §2.1 — e + Ar, independently evaluated.
     LXCAT_IST_LISBON = "lxcat.ist-lisbon"
 
-    #: doc 09 §2.1 — Ar+ + Ar elastic and charge exchange. Doc 03 §4.5 makes this the
-    #: single most consequential dataset in the project.
     LXCAT_PHELPS_ION = "lxcat.phelps-ion"
 
-    #: doc 09 §2.2 — Ar I / Ar II wavelengths, levels, ``A_ul`` and statistical weights.
     NIST_ASD_ARGON = "nist.asd.argon"
 
-    #: doc 09 §2.2 — ionisation/recombination coefficients. Registered for provenance and
-    #: citation; the ADF reader belongs with the CR model that consumes it (doc 08 §2
-    #: "CR model assembly: Build").
     OPENADAS_ADF11_ARGON = "openadas.adf11.argon"
 
-    #: doc 09 §2.2 — photon emissivity coefficients. Registered, as above.
     OPENADAS_ADF15_ARGON = "openadas.adf15.argon"
 
 
@@ -179,9 +164,6 @@ _ELECTRON_DATASETS: Final[Mapping[ElectronDatabase, DatasetId]] = MappingProxyTy
 )
 
 
-# ── licences ────────────────────────────────────────────────────────────────────
-
-
 @dataclass(frozen=True, slots=True)
 class Licence:
     """The doc 09 §5 redistribution table, as data.
@@ -209,8 +191,6 @@ class Licence:
             )
 
 
-#: doc 09 §2.1 and §5. "Derived rate coefficients: yes with attribution. **Do not
-#: redistribute raw tables**."
 LXCAT_LICENCE: Final[Licence] = Licence(
     name="LXCat",
     terms="Free; citation of the specific database required",
@@ -218,7 +198,6 @@ LXCAT_LICENCE: Final[Licence] = Licence(
     redistribute_derived=True,
 )
 
-#: doc 09 §2.2 and §5. US Government work.
 NIST_LICENCE: Final[Licence] = Licence(
     name="NIST ASD",
     terms="US Government work — public domain; citation requested",
@@ -226,18 +205,12 @@ NIST_LICENCE: Final[Licence] = Licence(
     redistribute_derived=True,
 )
 
-#: doc 09 §2.2 and §5. "**Do not redistribute raw ADF files**; derived quantities
-#: acceptable." Doc 09 §5 draws the commercial consequence: a product cannot ship these,
-#: which is why the data-access layer is swappable from the outset.
 OPENADAS_LICENCE: Final[Licence] = Licence(
     name="OpenADAS",
     terms="Free registration; academic use",
     redistribute_raw=False,
     redistribute_derived=True,
 )
-
-
-# ── the register ────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -344,7 +317,6 @@ def _lxcat(
     )
 
 
-#: Every dataset the atomic layer knows how to name, cite and verify — doc 09 §2.
 DATASETS: Final[Mapping[DatasetId, DatasetSpec]] = MappingProxyType(
     {
         DatasetId.LXCAT_PHELPS: _lxcat(
@@ -437,9 +409,6 @@ def bibliography(
     return "".join(
         spec.bibtex(None if versions is None else versions.get(spec.dataset_id)) for spec in ordered
     )
-
-
-# ── the recorded version ────────────────────────────────────────────────────────
 
 
 def _utc_now() -> datetime:
@@ -557,9 +526,6 @@ class DatasetVersion:
             accessed_utc=datetime.fromisoformat(text("accessed_utc")),
             n_bytes=n_bytes,
         )
-
-
-# ── the lock ────────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -687,9 +653,6 @@ class DatasetLock:
 
     def __repr__(self) -> str:
         return f"DatasetLock({len(self)} datasets: {', '.join(d.value for d in self.ids())})"
-
-
-# ── fetching ────────────────────────────────────────────────────────────────────
 
 
 def checked_cache_root(root: Path) -> Path:

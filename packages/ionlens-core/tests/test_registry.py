@@ -26,8 +26,6 @@ from ionlens.core.registry import (
     register,
 )
 
-# Entry-point targets used as stand-in plugins. They point at the standard library so the
-# tests exercise the real import machinery without shipping a fixture package.
 _REAL = "json:JSONDecoder"
 _ALSO_REAL = "json:JSONEncoder"
 _MISSING_MODULE = "ionlens_plugin_nobody_installed:Solver"
@@ -64,28 +62,21 @@ def _stub_entry_points(monkeypatch: pytest.MonkeyPatch, *entries: EntryPoint) ->
 
 class TestPluginGroups:
     def test_names_the_two_groups_doc_08_writes_out(self) -> None:
-        # doc 08 §10 shows these two literal table names in a third-party pyproject.toml.
-        # They are part of the published extension contract and cannot be renamed.
         assert PluginGroup.SOLVERS.value == "ionlens.solvers"
         assert PluginGroup.INSTRUMENTS.value == "ionlens.instruments"
 
     def test_names_the_two_groups_the_protocols_imply(self) -> None:
-        # doc 08 §4 gives InverseEngine and NoiseModel the same protocol treatment as
-        # ForwardSolver and Instrument, and doc 00 E1 requires all four to be plugins.
         assert PluginGroup.ENGINES.value == "ionlens.engines"
         assert PluginGroup.NOISE.value == "ionlens.noise"
 
     def test_accepts_a_plain_string_for_a_known_group(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # A manifest is data (doc 08 §1 principle 4); it yields strings, not enum members.
         _stub_entry_points(monkeypatch, _ep("pic1d3v", _REAL, PluginGroup.SOLVERS))
 
         assert available("ionlens.solvers") == ("pic1d3v",)
 
     def test_rejects_an_unknown_group_and_lists_the_real_ones(self) -> None:
-        # A typo'd group would otherwise report "nothing installed" for every plugin in
-        # it, which reads as a packaging problem and sends the user to the wrong place.
         with pytest.raises(ValueError, match=r"ionlens\.solvers.*ionlens\.instruments"):
             available("ionlens.solver")
 
@@ -118,9 +109,6 @@ class TestAvailable:
         assert available(PluginGroup.NOISE) == ()
 
     def test_does_not_import_the_plugins_it_lists(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # doc 08 §10's promise is that installing a package makes it visible. If listing
-        # imported every plugin, one broken package would hide all the working ones — and
-        # the user would be told their solver does not exist when it does.
         _stub_entry_points(
             monkeypatch,
             _ep("broken", _MISSING_MODULE, PluginGroup.SOLVERS),
@@ -147,8 +135,6 @@ class TestLoad:
         assert load(PluginGroup.SOLVERS, "pic1d3v") is json.JSONDecoder
 
     def test_unknown_name_reports_what_is_installed(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # The single most likely user-facing failure is a manifest naming a solver that is
-        # not installed. "KeyError: 'pic1d3v'" tells the user nothing they did not know.
         _stub_entry_points(
             monkeypatch,
             _ep("analytic", _REAL, PluginGroup.SOLVERS),
@@ -173,8 +159,6 @@ class TestLoad:
     def test_a_broken_plugin_raises_naming_the_plugin_and_the_group(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # Skipping it would let a manifest run with a *different* solver than it names,
-        # which doc 00 E3 forbids: the run would no longer be defined by the manifest.
         _stub_entry_points(monkeypatch, _ep("pic1d3v", _MISSING_MODULE, PluginGroup.SOLVERS))
 
         with pytest.raises(PluginLoadError) as caught:
@@ -198,8 +182,6 @@ class TestLoad:
     def test_an_importable_module_missing_the_named_object_also_raises(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # The other half of "broken": the distribution installed, but its entry point
-        # points at something the module does not define — a stale declaration.
         _stub_entry_points(monkeypatch, _ep("pic1d3v", _MISSING_ATTRIBUTE, PluginGroup.SOLVERS))
 
         with pytest.raises(PluginLoadError, match="pic1d3v"):
@@ -233,8 +215,6 @@ class TestDiscover:
         }
 
     def test_scans_the_metadata_once_per_group(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Metadata scanning walks every installed distribution. A manifest resolves the
-        # same group repeatedly, so the scan is memoised.
         queried = _stub_entry_points(monkeypatch, _ep("decoder", _REAL, PluginGroup.SOLVERS))
 
         first = discover(PluginGroup.SOLVERS)
@@ -246,8 +226,6 @@ class TestDiscover:
     def test_returns_a_mapping_the_caller_cannot_mutate(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # The memo is shared. A caller who could write to it would be editing what every
-        # later manifest resolves, from anywhere in the process.
         _stub_entry_points(monkeypatch, _ep("decoder", _REAL, PluginGroup.SOLVERS))
 
         found = discover(PluginGroup.SOLVERS)
@@ -307,8 +285,6 @@ class TestProgrammaticRegistration:
     def test_registering_after_a_discovery_invalidates_the_memo(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # Otherwise a test that registers a stand-in would silently get whatever an
-        # earlier call had already resolved.
         _stub_entry_points(monkeypatch)
         assert dict(discover(PluginGroup.SOLVERS)) == {}
         stand_in = object()
@@ -333,9 +309,6 @@ class TestConflictingDeclarations:
     def test_two_distributions_claiming_one_name_is_an_error_not_a_coin_flip(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # Whichever distribution the metadata scan happened to reach first would decide
-        # what the manifest ran, and the answer could change on reinstall. doc 00 E3
-        # requires the manifest plus the code version to determine the run.
         _stub_entry_points(
             monkeypatch,
             _ep("pic1d3v", _REAL, PluginGroup.SOLVERS),
@@ -350,8 +323,6 @@ class TestConflictingDeclarations:
         assert _ALSO_REAL in message
 
     def test_the_same_declaration_twice_is_harmless(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        # Two metadata directories for one distribution resolve to the same object, so
-        # there is nothing ambiguous to reject.
         _stub_entry_points(
             monkeypatch,
             _ep("pic1d3v", _REAL, PluginGroup.SOLVERS),
@@ -363,8 +334,6 @@ class TestConflictingDeclarations:
 
 class TestErrorTaxonomy:
     def test_every_registry_failure_is_catchable_as_one_kind(self) -> None:
-        # A manifest runner wants a single `except` around plugin resolution that
-        # distinguishes "your manifest is wrong" from "your install is broken".
         assert issubclass(PluginNotFoundError, registry.PluginError)
         assert issubclass(PluginLoadError, registry.PluginError)
         assert issubclass(PluginConflictError, registry.PluginError)

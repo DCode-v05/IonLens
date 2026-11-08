@@ -79,12 +79,6 @@ _PHASE_BINS_ATTRIBUTE: Final[str] = "n_phase_bins"
 
 _RECORD_PREFIX: Final[str] = "record_"
 
-#: Digits in a record's group name.
-#:
-#: Six, so that the names of a channel's records sort lexicographically in the order they
-#: were written for any acquisition this project can produce — doc 02 §10.1's longest is a
-#: few thousand observations. Read order does not rely on it (see :func:`_record_index`),
-#: but a file that reads sensibly in ``h5ls`` is worth four characters.
 _RECORD_DIGITS: Final[int] = 6
 
 
@@ -106,9 +100,6 @@ def _write_window(parent: h5py.Group, window: AcquisitionWindow) -> None:
     write_quantity(group, "duration", window.duration)
 
     if window.accumulation is not None:
-        # doc 02 §10.3: the wall-clock span of a phase-locked accumulation is what
-        # benchmark B-09 needs to quantify drift-induced smearing, and it is not
-        # recoverable from the gate width.
         write_quantity(group, "accumulation", window.accumulation)
 
     if window.phase_grid is not None and window.phase_bin is not None:
@@ -141,8 +132,6 @@ def _write_record(parent: h5py.Group, index: int, measurement: Measurement) -> N
     group = parent.create_group(f"{_RECORD_PREFIX}{index:0{_RECORD_DIGITS}d}")
     write_array(group, _VALUES_DATASET, measurement.values, units=measurement.units)
     write_array(group, _UNCERTAINTY_DATASET, measurement.uncertainty, units=measurement.units)
-    # doc 04 §7.3 calls correcting with the true calibration an inverse crime. A file that
-    # lost the flag would let a crime-committing run be archived as an honest one.
     group.attrs[_CALIBRATION_ATTRIBUTE] = measurement.calibration.value
     _write_window(group, measurement.window)
 

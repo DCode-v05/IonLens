@@ -102,13 +102,8 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-#: Convergence criterion on the escape-factor fixed point: the largest relative change in
-#: any escape factor between successive iterations.
 DEFAULT_RELATIVE_TOLERANCE: Final[float] = 1e-10
 
-#: Iteration budget for that fixed point. Generous relative to the two or three iterations
-#: a converging case takes, because a case that needs many is a case worth seeing fail
-#: loudly rather than one worth cutting short.
 DEFAULT_MAX_ITERATIONS: Final[int] = 100
 
 
@@ -233,7 +228,6 @@ class CollisionalRadiativeModel:
 
         object.__setattr__(self, "wall_loss_per_s", MappingProxyType(dict(self.wall_loss_per_s)))
 
-    # ── the solve ───────────────────────────────────────────────────────────────
 
     def solve(
         self,
@@ -316,7 +310,6 @@ class CollisionalRadiativeModel:
             residual=float(residual),
         )
 
-    # ── assembly ────────────────────────────────────────────────────────────────
 
     def _rate_coefficients(self, f0: FloatArray) -> dict[tuple[str, str], tuple[float, float]]:
         """``(K_lu, K_ul)`` per channel, keyed by ``(lower, upper)``.
@@ -359,9 +352,6 @@ class CollisionalRadiativeModel:
         for (lower, upper), (excitation, de_excitation) in rates.items():
             upper_index = index[upper]
             if lower == ground:
-                # Excitation out of the fixed ground state is a source; de-excitation back
-                # into it is a loss with no matrix partner, because the ground state is not
-                # an unknown.
                 source[upper_index] += n_e * n_g * excitation
                 matrix[upper_index, upper_index] -= n_e * de_excitation
                 continue

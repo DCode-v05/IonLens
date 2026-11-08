@@ -36,8 +36,6 @@ from ionlens.physics.fluid import (
     max_cell_size_within,
 )
 
-#: RP-1 scales — doc 01 §2.2 and ADR-007. ``lambda_D`` at the sheath-edge density and the
-#: self-consistent Child-Langmuir thickness that goes with it.
 LAMBDA_D = Q_(52.13e-6, "m")
 SHEATH = Q_(1.140e-3, "m")
 DOMAIN = Q_(20.0, "mm")

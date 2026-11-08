@@ -65,8 +65,6 @@ class TestScalarFieldTimeDependence:
         assert field.is_steady is True
 
     def test_a_time_dependent_field_is_indexed_time_first(self, grid: SpatialGrid) -> None:
-        # (n_t, n_z), not (n_z, n_t). Fixed once here because a transposed field is a
-        # silent, shape-compatible disaster whenever n_t happens to equal n_z.
         time = TimeGrid.uniform(duration=Q_(73.7, "ns"), n_points=3)
         field = ScalarField(
             name="n_e", values=np.zeros((3, 5)), units="m**-3", grid=grid, time=time
@@ -155,9 +153,6 @@ class TestVelocityDistributionConstruction:
             )
 
     def test_rejects_negative_values(self, grid: SpatialGrid, argon: Species) -> None:
-        # A distribution function is a density in phase space. A negative entry is not a
-        # small numerical wobble to tolerate; it means whatever produced it is wrong,
-        # and every moment computed from it afterwards is meaningless.
         values = np.zeros((grid.n_points, 3))
         values[0, 1] = -1.0
 
@@ -190,11 +185,6 @@ class TestVelocityDistributionMoments:
     def test_particle_flux_toward_the_wall_is_positive_for_ions_moving_inward(
         self, grid: SpatialGrid, argon: Species
     ) -> None:
-        # doc 02 §2 fixes the sign: flux toward the wall is positive, and the wall is at
-        # z = 0 with z positive into the plasma — so ions arriving at the wall have
-        # v_z < 0. Doc 02 §2 calls sign errors in flux quantities "common, silent and
-        # catastrophic", which is why this convention gets its own named accessor
-        # rather than an inline minus somewhere downstream.
         ivdf = _drifting_beam(grid, argon, density=1e17, drift=-3000.0, spread=1.0)
 
         flux = ivdf.particle_flux_toward_wall_per_m2_s()
@@ -218,8 +208,6 @@ class TestVelocityDistributionMoments:
     def test_mean_velocity_of_an_empty_distribution_is_zero_not_nan(
         self, grid: SpatialGrid, argon: Species
     ) -> None:
-        # A zero-density cell is physical (nothing has arrived yet in a transient), and
-        # a NaN propagating out of 0/0 would poison every downstream aggregate silently.
         ivdf = VelocityDistribution(
             grid=grid,
             v_m_per_s=np.linspace(-1.0, 1.0, 3),
@@ -239,9 +227,6 @@ class TestVelocityDistributionMoments:
     def test_at_the_wall_returns_the_first_grid_point(
         self, grid: SpatialGrid, argon: Species
     ) -> None:
-        # doc 03 §5.2 emulates f_i(v_z; z=0) specifically: the IEDF at the wall is the
-        # deliverable, so reaching it must not require the caller to remember that the
-        # wall is index 0 rather than index -1.
         ivdf = _drifting_beam(grid, argon, density=1e17, drift=-3000.0, spread=200.0)
 
         np.testing.assert_allclose(ivdf.at_wall(), ivdf.values[0, :])

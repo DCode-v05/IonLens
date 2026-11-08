@@ -58,19 +58,10 @@ __all__ = [
     "WindowMode",
 ]
 
-#: How an instrument identifies itself in an artifact group (doc 08 §7: "one group per
-#: instrument"). A bare string rather than an enum, because doc 00 E1 requires new
-#: instruments to be plugins discovered at runtime — a closed enum would need editing in
-#: the core every time one is added, which is the coupling that requirement forbids.
 InstrumentId: TypeAlias = str
 
-#: The origin of the shared latent time base of doc 05 §3.2. A phase-locked window is
-#: defined by its bin, not by when the accumulation happened to begin, so it defaults its
-#: start here rather than demanding a timestamp the caller does not have.
 _ORIGIN: Quantity = Q_(0.0, "s")
 
-#: Sort position for an observation with no phase bin. Ordering is a bookkeeping concern,
-#: so this is a sentinel index and not a physical quantity.
 _UNBINNED = -1
 
 
@@ -217,7 +208,6 @@ class AcquisitionWindow:
     accumulation: Quantity | None = None
 
     def __post_init__(self) -> None:
-        # Dimensionality assertion only: any instant on the latent time base is reachable.
         magnitude_in(self.start, "s")
 
         if float(magnitude_in(self.duration, "s")) <= 0.0:
@@ -264,7 +254,6 @@ class AcquisitionWindow:
                 "accumulates"
             )
 
-    # ── constructors ────────────────────────────────────────────────────────────
 
     @classmethod
     def absolute(cls, *, start: Quantity, duration: Quantity) -> AcquisitionWindow:
@@ -316,7 +305,6 @@ class AcquisitionWindow:
         """
         return cls.absolute(start=Q_(float(grid.t_s[0]), "s"), duration=grid.duration)
 
-    # ── views ───────────────────────────────────────────────────────────────────
 
     @property
     def mode(self) -> WindowMode:
@@ -373,7 +361,6 @@ class AcquisitionWindow:
         """
         return self.duration_s / float(magnitude_in(self.wall_clock_span, "s"))
 
-    # ── SI magnitudes for hot loops (doc 08 §5) ─────────────────────────────────
 
     @property
     def start_s(self) -> float:
@@ -603,7 +590,6 @@ class MeasurementSet:
         """
         return cls(measurements=tuple(measurements))
 
-    # ── the doc 05 §3.2 sum ─────────────────────────────────────────────────────
 
     def __iter__(self) -> Iterator[Measurement]:
         return iter(self.measurements)
@@ -626,9 +612,6 @@ class MeasurementSet:
     @property
     def instrument_ids(self) -> tuple[InstrumentId, ...]:
         """Every channel present, once each, in deterministic order."""
-        # The records are already sorted by instrument id, so first-seen order is sorted
-        # order; `dict.fromkeys` deduplicates without a set, whose iteration order would
-        # reintroduce exactly the non-determinism doc 00 E3 forbids.
         return tuple(dict.fromkeys(m.instrument_id for m in self.measurements))
 
     def by_instrument(self, instrument_id: InstrumentId) -> tuple[Measurement, ...]:
@@ -643,7 +626,6 @@ class MeasurementSet:
         """
         return {name: self.by_instrument(name) for name in self.instrument_ids}
 
-    # ── degraded configurations (doc 02 §13) ────────────────────────────────────
 
     def without_instrument(self, instrument_id: InstrumentId) -> MeasurementSet:
         """A new set with one channel removed — doc 02 §13 F-01 and F-02.

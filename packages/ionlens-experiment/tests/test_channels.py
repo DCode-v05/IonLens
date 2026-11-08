@@ -43,15 +43,6 @@ from ionlens.inverse.fusion import JointLikelihood
 from ionlens.inverse.parameters import ControlParameters
 from ionlens.physics.analytic.sheath import AnalyticSheathSolver
 
-#: Wall bias the channel tests run at, in volts.
-#:
-#: **Not RP-1's -250 V, and the difference is the finding this file exists to record.** A
-#: 250 V sheath accelerates argon to 34.9 km/s, past the 25.8 km/s the laser's 20 GHz
-#: mode-hop-free range can reach (doc 01 §5.1, doc 14 RS-03), so `LifInstrument.
-#: is_informative` refuses the channel outright there and every test about what LIF adds
-#: would be vacuously testing an excluded channel. -100 V is inside the reachable window
-#: with margin; `TestTheTuningRangeBlocker` pins the RP-1 behaviour separately rather than
-#: letting this choice quietly hide it.
 _REACHABLE_BIAS_V = -100.0
 
 _SEED = 7
@@ -129,10 +120,6 @@ class TestTheChannelSet:
     def test_the_channel_names_match_what_the_instruments_stamp_on_their_output(
         self, channels: ChannelSet, truth_state: PlasmaState
     ) -> None:
-        # OES's identifier is private in its own package and duplicated in channels.py;
-        # this is the check that keeps the duplicate honest. The other three bind their
-        # names to the instrument's own exported constant, and this checks that too rather
-        # than trusting the binding.
         observations = channels.observe(truth_state)
 
         for name in CHANNEL_NAMES:
@@ -154,8 +141,6 @@ class TestTheChannelSet:
     def test_ablation_by_name_leaves_a_likelihood_that_still_scores(
         self, channels: ChannelSet, truth_state: PlasmaState
     ) -> None:
-        # doc 11 §9 item 6's primitive: dropping a channel must yield something that runs,
-        # not something that raises, or the ablation sweep has nothing to report.
         joint = _joint_and_truth(channels, truth_state)
 
         without_lif = joint.without(LIF_CHANNEL)
@@ -167,9 +152,6 @@ class TestTheChannelSet:
     def test_the_two_channels_integrate_for_genuinely_different_times(
         self, channels: ChannelSet
     ) -> None:
-        # The module docstring's acquisition-window section states the assumption that
-        # makes fusing these defensible; this pins the fact that they *are* different, so
-        # the assumption cannot quietly become vacuous.
         oes_s = float(magnitude_in(channels.oes_window.duration, "s"))
         lif_s = float(magnitude_in(channels.lif_window.duration, "s"))
 
@@ -183,21 +165,12 @@ class TestTheChannelSet:
         observations = channels.observe(truth_state)
         del observations[LIF_CHANNEL]
 
-        # Matched on the explanation, not just on KeyError: a bare dict lookup raises
-        # KeyError too, so asserting the type alone would pass whether or not the guard
-        # exists. (Found by mutation: deleting the guard left this test green.)
         with pytest.raises(KeyError, match="no observation supplied for lif"):
             channels.joint(observations)
 
     def test_the_four_channels_integrate_for_genuinely_different_times(
         self, channels: ChannelSet
     ) -> None:
-        # The module docstring's acquisition-window section states the assumption that
-        # makes fusing these defensible — the plasma is steady over the longest window.
-        # Connecting Thomson stretched that span from a factor of 159 to eleven orders of
-        # magnitude (2 ns against a multi-hundred-second accumulation), so the assumption
-        # is doing far more work than it was, and this pins the fact rather than letting
-        # it be discovered later.
         oes_s = float(magnitude_in(channels.oes_window.duration, "s"))
         thomson_s = float(magnitude_in(channels.thomson_window.duration, "s"))
 
@@ -225,10 +198,6 @@ class TestTheReconstructedIvdf:
         )
 
     def test_the_drift_is_toward_the_wall(self, truth_state: PlasmaState) -> None:
-        # doc 02 §2's sign convention: the wall is at z = 0 and an ion reaching it has
-        # v_z < 0, while the u_i field a sheath solver emits is a positive speed. Getting
-        # this backwards puts the LIF line on the wrong side of centre and still returns a
-        # plausible scan.
         reconstructed = reconstruct_ivdf(truth_state)
 
         assert reconstructed.ion_distribution is not None
@@ -242,7 +211,6 @@ class TestTheReconstructedIvdf:
     def test_a_state_that_already_resolves_f_i_is_returned_untouched(
         self, truth_state: PlasmaState
     ) -> None:
-        # A computed distribution always beats an assumed one; L2 states carry theirs.
         once = reconstruct_ivdf(truth_state)
 
         assert reconstruct_ivdf(once) is once
@@ -282,33 +250,12 @@ class TestWhatLifAddsThatOesCannotSee:
         hotter = lif.log_prob(_state(theta.replace(T_i=theta.T_i * 1.5)))
         colder = lif.log_prob(_state(theta.replace(T_i=theta.T_i / 1.5)))
 
-        # A factor of 1.5 in T_i is a factor of 1.22 in line width. Both directions must
-        # be worse than the truth, and by a margin that could not be noise: 100 log units
-        # is 200 in chi-squared over 201 scan points. Observed here is ~7.9e3 either way.
         assert at_truth - hotter > 100.0
         assert at_truth - colder > 100.0
 
     def test_both_channels_constrain_the_degeneracy_direction(
         self, channels: ChannelSet, truth_state: PlasmaState
     ) -> None:
-        # ``T_i`` proves LIF sees *something* OES cannot. The combination the project is
-        # actually stuck on, though, is ``Gamma_i ~ n_0 sqrt(T_e)``. This walks along that
-        # curve — ``n_0 -> k n_0``, ``T_e -> T_e / k^2``, which leaves the product exactly
-        # fixed — and asks each channel how much it minds.
-        #
-        # THIS TEST USED TO ASSERT ``lif_penalty > oes_penalty``, AND THAT IS NOW FALSE.
-        # The reason is a result rather than a regression: adding a second emission line
-        # took OES's penalty along this ridge from 2.445e3 to 2.287e4, a factor of 9.35,
-        # and it now exceeds LIF's unchanged 5.257e3. The old ranking held only while OES
-        # observed a single line, where the ridge was visible to it just as an overall
-        # brightness change. Two lines make it a *shape* change, which is a far stronger
-        # signal — and shape is also what survives a calibration error, which is the whole
-        # reason the second line was added.
-        #
-        # So the assertion is now the one that is actually load-bearing: both channels
-        # constrain the ridge substantially. LIF's unique contribution does not rest on
-        # winning this comparison — it rests on the ion temperature being bit-for-bit
-        # invisible to OES, which the test above pins directly.
         theta = _operating_theta()
         observations = channels.observe(truth_state)
         joint = channels.joint(observations)
@@ -320,7 +267,6 @@ class TestWhatLifAddsThatOesCannotSee:
         oes_penalty = oes.log_prob(_state(theta)) - oes.log_prob(along_ridge)
         lif_penalty = lif.log_prob(_state(theta)) - lif.log_prob(along_ridge)
 
-        # 100 log units is 200 in chi-squared — far beyond anything noise could produce.
         assert oes_penalty > 100.0
         assert lif_penalty > 100.0
 
@@ -365,9 +311,6 @@ class TestTheTuningRange:
         assert channels.lif.is_informative(reachable)
 
     def test_at_rp1_every_channel_now_contributes(self, channels: ChannelSet) -> None:
-        # The result the whole exercise was for: a genuine two-channel fusion at RP-1's own
-        # operating point, with nothing excluded. doc 01 IF-6's naming discipline still
-        # applies — `excluded` being empty is a checked claim, not an assumption.
         rp1_state = _reference_state()
         joint = channels.joint(channels.observe(rp1_state))
 
@@ -380,23 +323,10 @@ class TestTheTuningRange:
     def test_the_measurement_volume_is_pinned_and_does_not_move_with_theta(
         self, channels: ChannelSet
     ) -> None:
-        # The guard that matters most now that the gate has opened.
-        #
-        # `LifInstrument._resolve_z_index` defaults to the sheath-edge node *of the state
-        # it is handed*, and that node moves with theta — measured across the region a MAP
-        # search explores it comes out 3, 2 or 1. A measurement volume that relocates with
-        # the trial parameters is a theta-dependent observation location, which is the same
-        # class of inverse crime `closed_loop.py`'s module docstring documents for the
-        # spatial grid, where it produced a 15-20 % error and reported `converged=True`.
-        #
-        # `build_channels` therefore passes an explicit `lif_z_index` and pins the volume.
-        # This test fails if that is ever "simplified" away.
         theta = _operating_theta()
         sparse = _state(theta)
         dense = _state(theta.replace(n_0=theta.n_0 * 2.0))
 
-        # Sanity: these two states genuinely disagree about where the sheath edge is, so
-        # the assertion below is not vacuous.
         tolerance = float(default_registry().value_in("sheath.edge_tolerance", "dimensionless"))
         assert _sheath_edge_index(sparse, tolerance=tolerance) != _sheath_edge_index(
             dense, tolerance=tolerance
@@ -433,26 +363,18 @@ class TestThomsonIsExcludedRatherThanCrashingWhenTheSheathSwallowsItsVolume:
             for T_e in np.geomspace(1.0, 10.0, 5):
                 state = _state(theta.replace(n_0=float(n_0), T_e=float(T_e)))
 
-                # The assertion is that this call does not raise. A ThomsonBlindWindowError
-                # escaping here is precisely the failure the gate exists to prevent, and
-                # letting it propagate is what makes this test able to fail.
                 detail = joint.detail(state)
 
                 assert math.isfinite(detail.log_prob)
                 if THOMSON_CHANNEL in detail.excluded:
                     excluded_somewhere = True
 
-        # Not vacuous: if the gate never excluded anything, this test would be passing
-        # because the region is easy rather than because the gate works.
         assert excluded_somewhere, (
             "no theta in the swept region excluded Thomson, so this test is not exercising "
             "the gate it was written for"
         )
 
     def test_the_gate_is_what_is_doing_it_rather_than_luck(self, channels: ChannelSet) -> None:
-        # Pin the mechanism, not just the symptom: at a theta whose sheath is thicker than
-        # the pinned position the channel must report itself blind, and at RP-1 — where the
-        # sheath is a small fraction of the domain — it must not.
         registry = default_registry()
         species = _argon_ion(registry)
         swallowed = _to_plasma_params(
@@ -462,8 +384,6 @@ class TestThomsonIsExcludedRatherThanCrashingWhenTheSheathSwallowsItsVolume:
 
         assert not channels.thomson.inversion.is_informative(swallowed)
         assert channels.thomson.inversion.is_informative(healthy)
-        # The instrument's own floor would have admitted the swallowed state, which is what
-        # makes the campaign-level half of the gate necessary rather than redundant.
         assert channels.thomson.inversion.instrument.is_informative(swallowed)
 
 
@@ -483,11 +403,6 @@ class TestDiscrepancyReachesEachChannel:
     """
 
     def test_an_unrecognised_channel_name_is_refused(self) -> None:
-        # A typo'd key would otherwise apply no discrepancy to any channel and look
-        # identical to the feature doing nothing — doc 00 §5.1 S4's failure mode in a new
-        # guise. Matched on the bad name itself, not just the exception type: a bare
-        # ValueError could come from anywhere in build_channels and would pass whether or
-        # not the guard fires on the right condition.
         with pytest.raises(ValueError, match="oes_typo"):
             build_channels(
                 reference_state=_reference_state(),
@@ -512,11 +427,6 @@ class TestDiscrepancyReachesEachChannel:
     def test_a_discrepancy_on_one_channel_changes_only_that_channels_contribution(
         self, name: str, channels: ChannelSet, truth_state: PlasmaState
     ) -> None:
-        # Thomson is excluded from this parametrisation and tested separately below: its
-        # Poisson likelihood refuses a coherent discrepancy at RP-1's photon-starved
-        # channels rather than silently approximating past the count floor (see
-        # ThomsonInstrument.likelihood's own docstring), so a uniform test across all four
-        # channels would fail for a reason this class exists to document, not to hide.
         observations = channels.observe(truth_state)
         values = np.abs(np.asarray(observations[name].values))
         discrepancy_value = 0.02 * values + 1.0e-12
@@ -533,9 +443,6 @@ class TestDiscrepancyReachesEachChannel:
         assert math.isfinite(with_term)
         assert with_term != without_term
 
-        # Every other channel's own contribution must be untouched: a discrepancy pinned
-        # on one wrapper reaching a sibling wrapper would be a much worse bug than one
-        # doing nothing.
         for other in CHANNEL_NAMES:
             if other == name:
                 continue

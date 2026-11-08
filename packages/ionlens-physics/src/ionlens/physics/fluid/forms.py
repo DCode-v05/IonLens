@@ -78,33 +78,18 @@ __all__ = [
     "ufl_fitted_diffusivity",
 ]
 
-#: A field sampled on a grid, in SI magnitudes.
 FloatArray: TypeAlias = NDArray[np.float64]
 
-#: A source term, evaluated on an array of positions in metres.
 SourceTerm: TypeAlias = Callable[[FloatArray], FloatArray]
 
-#: How many degrees above the solution space a manufactured or physical source term is
-#: represented in. Two is enough that the source's own representation error is ``O(h^4)``
-#: against an ``O(h^2)`` solution error, so the order study measures the discretisation
-#: of the *operator* rather than of its right-hand side.
 DEFAULT_SOURCE_DEGREE_OFFSET: Final[int] = 2
 
-#: Relative tolerance on the Newton increment. Tight, because every gate below is a
-#: physics tolerance in the percent range and an iteration error anywhere near it would
-#: be indistinguishable from a discretisation error.
 DEFAULT_NEWTON_RTOL: Final[float] = 1e-11
 
-#: Absolute floor on the Newton residual, so a problem whose residual is already at
-#: round-off does not iterate to the maximum count against noise.
 DEFAULT_NEWTON_ATOL: Final[float] = 1e-14
 
-#: Smallest Peclet argument the fitted diffusivity forms, to keep ``coth`` finite at a
-#: stagnation point. See :func:`ufl_fitted_diffusivity`.
 _MIN_PECLET_ARGUMENT: Final[float] = 1e-12
 
-#: Slack allowed when checking that an evaluation point is inside the grid, in metres.
-#: A Gauss point computed from the grid's own coordinates can land a few ulp outside it.
 _POSITION_TOLERANCE: Final[float] = 1e-15
 
 
@@ -150,10 +135,6 @@ def ufl_fitted_diffusivity(
     if diffusivity == 0.0:
         return half_flux
 
-    # Clamped from above because coth is one to double precision past
-    # COTH_UNITY_ARGUMENT, and from below because coth diverges at zero — which is
-    # reached wherever the velocity vanishes, and where the correct answer is the
-    # physical diffusivity that the outer maximum then supplies.
     argument = ufl.max_value(
         ufl.min_value(half_flux / diffusivity, COTH_UNITY_ARGUMENT), _MIN_PECLET_ARGUMENT
     )

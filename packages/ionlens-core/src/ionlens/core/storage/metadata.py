@@ -62,24 +62,12 @@ __all__ = [
     "require_provenance",
 ]
 
-#: Version of the on-disk layout this package writes.
-#:
-#: doc 13 §5 retains manifests, provenance and reduced artifacts *forever*, which means a
-#: file written today will be opened by code that does not exist yet. A version stamp is
-#: the cheapest thing that lets that code tell "a layout I do not understand" from "a
-#: corrupt file", and the difference matters when the alternative is a silent misread.
 ARTIFACT_FORMAT_VERSION: Final[int] = 1
 
-#: Attribute naming the layout version.
 STORAGE_FORMAT_ATTRIBUTE: Final[str] = "ionlens_storage_format"
 
-#: Attribute naming which of doc 08 §7's artifacts a file holds.
 ARTIFACT_KIND_ATTRIBUTE: Final[str] = "ionlens_artifact_kind"
 
-#: Fields of the embedded block, in the order doc 08 §7 lists them.
-#:
-#: Checked against :meth:`Provenance.to_dict` at import, so a field added to the record
-#: cannot leave the storage layer silently writing the old set.
 PROVENANCE_FIELDS: Final[tuple[str, ...]] = (
     "manifest_sha256",
     "git_commit",
@@ -93,7 +81,6 @@ PROVENANCE_FIELDS: Final[tuple[str, ...]] = (
     "tier",
 )
 
-#: Provenance fields with no scalar spelling, stored as JSON in a single string attribute.
 _JSON_FIELDS: Final[frozenset[str]] = frozenset({"solver_versions"})
 
 
@@ -156,8 +143,6 @@ def provenance_attributes(record: Provenance) -> dict[str, str | bool | int]:
     for key in PROVENANCE_FIELDS:
         value = flat[key]
         if isinstance(value, dict):
-            # The only nested field. Sorted keys so that one record produces one byte
-            # sequence, whichever order the mapping happened to be built in.
             attributes[key] = json.dumps(value, sort_keys=True)
         else:
             attributes[key] = value
@@ -242,9 +227,6 @@ def check_artifact_kind(attributes: Mapping[str, object], expected: ArtifactKind
     )
 
 
-# The record and the storage layer must agree on the field set, and the only way to be
-# sure of that is to ask the record. Checked at import so a mismatch fails on the first
-# use of the package rather than on the first artifact nobody can read back.
 if set(PROVENANCE_FIELDS) != set(
     Provenance.__dataclass_fields__
 ):  # pragma: no cover - a guard against future drift

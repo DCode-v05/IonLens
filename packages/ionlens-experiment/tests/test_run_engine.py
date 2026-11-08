@@ -159,8 +159,6 @@ class TestFailure:
     def test_a_failed_run_is_recorded_rather_than_silently_dropped(
         self, store: RunStore, runnable_document: dict[str, Any]
     ) -> None:
-        # doc 10 §6: "a quarantined case is never silently dropped from statistics".
-        # The single-run form of that rule is that the directory and the record survive.
         from ionlens.core.protocols.config import SolverConfig
         from ionlens.experiment.solvers import AnalyticSheathForwardSolver
 

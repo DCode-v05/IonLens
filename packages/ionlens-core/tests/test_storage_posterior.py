@@ -90,9 +90,6 @@ class TestArchivalIsEssAware:
     def test_the_stride_is_the_one_the_posterior_itself_computes(
         self, tmp_path: Path, record: Provenance
     ) -> None:
-        # ADR-005: the stride must come from the ESS floor, not from a constant chosen
-        # for file size. `Posterior.max_safe_stride` already implements that rule, and
-        # the writer must not grow a second, differently-biased copy of it.
         posterior = _posterior()
 
         write_posterior(tmp_path / "post.zarr", posterior, provenance=record)
@@ -115,8 +112,6 @@ class TestArchivalIsEssAware:
     def test_the_archived_posterior_still_clears_the_ess_floor(
         self, tmp_path: Path, record: Provenance
     ) -> None:
-        # Gate G-V3 is checked on whatever is in the archive, so what is in the archive
-        # has to be able to pass it.
         write_posterior(tmp_path / "post.zarr", _posterior(), provenance=record)
 
         archived = read_posterior(tmp_path / "post.zarr")
@@ -126,14 +121,10 @@ class TestArchivalIsEssAware:
     def test_a_posterior_already_below_the_floor_is_refused_rather_than_thinned(
         self, tmp_path: Path, record: Provenance
     ) -> None:
-        # No stride restores an ESS that was never there. Writing it anyway would put an
-        # unusable posterior in an archive that is retained forever (doc 13 §5).
         with pytest.raises(ValueError, match="ESS"):
             write_posterior(tmp_path / "post.zarr", _posterior(ess=100.0), provenance=record)
 
     def test_a_short_chain_is_archived_whole(self, tmp_path: Path, record: Provenance) -> None:
-        # When no thinning is affordable the stride is 1 and nothing is dropped; ADR-005
-        # is a budget, not an obligation to discard.
         rng = np.random.default_rng(1)
         short = _posterior(ess=420.0, samples=rng.standard_normal((_N_CHAINS, 120, 2)) * np.pi)
 
@@ -148,10 +139,6 @@ class TestSummariesComeFromTheFullChains:
     def test_the_mean_is_the_full_chain_mean_not_the_thinned_one(
         self, tmp_path: Path, record: Provenance
     ) -> None:
-        # ADR-005 keeps "full summary statistics" precisely because thinning loses tail
-        # resolution. Summaries recomputed from the retained draws would reproduce the
-        # loss they exist to compensate for, and would agree with the archive well enough
-        # that nothing would flag it.
         stride = _posterior().max_safe_stride()
         spiked = np.zeros((_N_CHAINS, _N_DRAWS, len(_NAMES)))
         spiked[:, ::stride, :] = 1.0
@@ -180,9 +167,6 @@ class TestSummariesComeFromTheFullChains:
     def test_the_full_run_diagnostics_are_preserved_beside_the_thinned_ones(
         self, tmp_path: Path, record: Provenance
     ) -> None:
-        # The thinned posterior reports the ESS it actually has, which is the honest
-        # number to gate on. The full-run ESS is what says whether the chains were long
-        # enough in the first place, and only the summary can still answer that.
         posterior = _posterior()
 
         write_posterior(tmp_path / "post.zarr", posterior, provenance=record)
@@ -195,8 +179,6 @@ class TestSummariesComeFromTheFullChains:
     def test_derived_quantities_are_summarised_and_thinned_alongside(
         self, tmp_path: Path, record: Provenance
     ) -> None:
-        # doc 05 §10 requires Gamma_E in every emitted posterior, and it is a profile,
-        # not a scalar — so the summary has to hold arrays, not just numbers.
         rng = np.random.default_rng(3)
         profile = rng.standard_normal((_N_CHAINS, _N_DRAWS, 5)) * np.pi
         posterior = _posterior(derived={"Gamma_E": profile})
@@ -221,8 +203,6 @@ class TestPosteriorRoundTrip:
         assert read_posterior(tmp_path / "post.zarr").posterior == expected
 
     def test_the_parameter_levels_survive(self, tmp_path: Path, record: Provenance) -> None:
-        # doc 05 §10 requires the theta_c / theta_n / theta_f split in the emitted
-        # artifact: it separates the answer from the systematics that had to be inferred.
         write_posterior(tmp_path / "post.zarr", _posterior(), provenance=record)
 
         archived = read_posterior(tmp_path / "post.zarr")
@@ -243,14 +223,10 @@ class TestPosteriorRoundTrip:
 
 class TestPosteriorOnDisk:
     def test_the_sample_array_is_chunked(self, tmp_path: Path, record: Provenance) -> None:
-        # doc 08 §7 chose Zarr for chains that are "large, appended incrementally".
-        # Chunking along the draw axis, one chain per chunk, is what makes that possible.
         write_posterior(tmp_path / "post.zarr", _posterior(), provenance=record)
 
         group = zarr.open_group(store=tmp_path / "post.zarr", mode="r")
         samples = group["samples"]
-        # `zarr.Group.__getitem__` may return a sub-group; narrowing here rather than
-        # ignoring keeps the assertion honest about what it is measuring.
         assert isinstance(samples, zarr.Array)
 
         assert samples.chunks[0] == 1

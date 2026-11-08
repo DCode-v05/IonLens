@@ -51,29 +51,17 @@ __all__ = [
     "solve_system",
 ]
 
-#: A field sampled on the spatial grid, in SI magnitudes.
 FloatArray: TypeAlias = np.typing.NDArray[np.float64]
 
 _E_C = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _M_E_KG = float(magnitude_in(ELECTRON_MASS, "kg"))
 
-#: Where the bias continuation of :func:`_continue_to` starts, in units of the electron
-#: temperature. A quarter of a ``T_e`` is inside the basin of attraction of the L0 seed at
-#: every operating point tried; see that function for why a continuation is needed at all.
 CONTINUATION_START: Final[float] = 0.25
 
-#: Smallest continuation step, as a fraction of the bias already reached. Below this the
-#: solve gives up rather than grinding: a step this small that still will not converge is
-#: a solver problem, not a step-size problem, and saying so is more useful than a very
-#: slow failure.
 MIN_CONTINUATION_STEP: Final[float] = 1e-3
 
-#: Largest ``e Phi / k T_e`` the Boltzmann relation is evaluated at before clamping.
-#: ``exp(8)`` is three thousand times the reference density — far outside anything a
-#: converging solve visits, and far inside the ``exp(709)`` that overflows a float64.
 MAX_BOLTZMANN_EXPONENT: Final[float] = 8.0
 
-#: Component indices in the mixed space.
 _NU, _W, _PHI = 0, 1, 2
 
 
@@ -106,23 +94,9 @@ def solve_system(
     cell = ufl.CellDiameter(domain)
     injected = solver._injected_flux()
 
-    # The wall potential is a Constant rather than a literal so that the continuation
-    # schedule below can walk it up to the target without recompiling the form. FEniCSx
-    # compiles each variational form to C on first use, and a form rebuilt once per
-    # continuation step would spend more time in the compiler than in the solver.
     start = min(CONTINUATION_START, scaling.normalised_bias(params))
     wall_bias = fem.Constant(domain, PETSc.ScalarType(-start))
 
-    # doc 03 §3.4's exponential fitting. The ion continuity and momentum equations carry
-    # no diffusive flux of their own — the ion pressure lives in the momentum source, not
-    # in a transport coefficient — so the fitted diffusivity is evaluated at zero
-    # physical diffusivity and returns its Pe -> infinity limit, |a| h / 2. That limit is
-    # what makes the scheme monotone across the sheath front; the finite-Peclet branch is
-    # exercised by the collisional drift-diffusion form in ionlens.physics.fluid.coupled and
-    # by verification test V-02.
-    #
-    # The signed velocity is passed, not its magnitude. ufl_fitted_diffusivity takes the
-    # absolute value itself, and UFL 2024.2 recurses without bound on ``abs(abs(x))``.
     fitted = ufl_fitted_diffusivity(velocity=w, diffusivity=0.0, cell_size=cell)
 
     facets = wall_facet_tags(domain, length=length)
@@ -134,15 +108,12 @@ def solve_system(
         solver, params, scaling, phi, wall_bias=wall_bias, injected=injected
     )
 
-    # Continuity: (nu w)' = sigma, in flux form with the wall outflow left natural.
     continuity = (
         fitted * ufl.grad(nu)[0] * ufl.grad(q)[0] - nu * w * ufl.grad(q)[0]
     ) * ufl.dx - nu * w * q * ds(WALL_FACET)
     if source is not None:
         continuity -= source * q * ufl.dx
 
-    # Momentum: (nu w^2)' = -Theta nu phi' - c_p nu' - nu w |w| / lambda, in conservation
-    # form exactly as doc 03 §3.1 writes it.
     momentum = (
         fitted * ufl.grad(nu * w)[0] * ufl.grad(r)[0]
         - nu * w * w * ufl.grad(r)[0]
@@ -154,11 +125,6 @@ def solve_system(
         * r
     ) * ufl.dx - nu * w * w * r * ds(WALL_FACET)
 
-    # exp is clamped from above. phi is non-positive on any physical solution, but an
-    # intermediate Newton iterate is under no such obligation, and exp of a few hundred is
-    # an inf that turns the whole residual into NaN — from which no iteration recovers.
-    # The clamp sits far outside the physical range, so it never binds on a converging
-    # solve and only ever converts a divergence into a recoverable one.
     electrons = ufl.exp(ufl.min_value(phi, MAX_BOLTZMANN_EXPONENT))
 
     poisson = (
@@ -364,9 +330,6 @@ def _ufl_secondary_density(
         return ufl.as_ufl(0.0)
 
     emission = float(magnitude_in(solver.secondary_emission_energy, "J"))
-    # max_value guards the square root: an intermediate Newton iterate may put phi below
-    # the wall potential, which is unphysical and would otherwise produce a NaN residual
-    # that no line search can recover from.
     drop = ufl.max_value(phi - wall_bias, 0.0)
     velocity = ufl.sqrt(2.0 * (emission + _E_C * scaling.potential * drop) / _M_E_KG)
     return params.gamma_se * injected * scaling.speed / velocity

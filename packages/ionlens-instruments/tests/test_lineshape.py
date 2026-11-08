@@ -24,8 +24,6 @@ from ionlens.instruments.oes.lineshape import (
     voigt_profile,
 )
 
-# ── Doppler ─────────────────────────────────────────────────────────────────────
-
 
 @pytest.mark.physics
 def test_doppler_width_matches_the_textbook_coefficient() -> None:
@@ -63,9 +61,6 @@ def test_doppler_width_rejects_a_non_positive_temperature() -> None:
         doppler_fwhm_nm(wavelength_nm=750.39, temperature_k=0.0, mass_u=39.948)
 
 
-# ── natural ─────────────────────────────────────────────────────────────────────
-
-
 @pytest.mark.physics
 def test_natural_width_is_the_upper_level_lifetime_in_wavelength() -> None:
     """``Delta nu = sum(A) / 2 pi``, converted by ``Delta lambda = lambda^2 Delta nu / c``.
@@ -86,9 +81,6 @@ def test_natural_width_is_linear_in_the_decay_rate() -> None:
     assert natural_fwhm_nm(wavelength_nm=500.0, total_a_per_s=3e8) == pytest.approx(3.0 * base)
 
 
-# ── Voigt ───────────────────────────────────────────────────────────────────────
-
-
 def _measured_fwhm(gaussian_fwhm: float, lorentz_fwhm: float) -> float:
     """FWHM of the profile, measured off a fine sampling of it."""
     span = 40.0 * max(gaussian_fwhm, lorentz_fwhm)
@@ -96,8 +88,6 @@ def _measured_fwhm(gaussian_fwhm: float, lorentz_fwhm: float) -> float:
     y = voigt_profile(x, gaussian_fwhm=gaussian_fwhm, lorentz_fwhm=lorentz_fwhm)
     half = 0.5 * float(y.max())
     above = np.flatnonzero(y >= half)
-    # Linear interpolation onto the half-maximum crossing, so the answer is not limited
-    # to the sample spacing.
     left = np.interp(half, [y[above[0] - 1], y[above[0]]], [x[above[0] - 1], x[above[0]]])
     right = np.interp(half, [y[above[-1] + 1], y[above[-1]]], [x[above[-1] + 1], x[above[-1]]])
     return float(right - left)

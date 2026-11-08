@@ -63,39 +63,24 @@ __all__ = [
     "parse_lxcat",
 ]
 
-#: A tabulated column, in SI magnitudes.
 FloatArray: TypeAlias = NDArray[np.float64]
 
-#: Relative agreement demanded between the two places LXCat states a threshold — the
-#: bare number under the reaction and the ``E = ... eV`` of the ``PARAM.:`` line. Files
-#: quote both to at least four significant figures, so anything looser than this would
-#: accept a genuinely edited file and anything tighter would trip on the rounding.
 THRESHOLD_CONSISTENCY_TOLERANCE: Final[float] = 1e-3
 
-#: The fewest points a table can have and still be interpolable.
 _MINIMUM_TABLE_POINTS: Final[int] = 2
 
-#: How many whitespace-separated numbers a data row carries.
 _COLUMNS_PER_ROW: Final[int] = 2
 
-#: The shortest run of dashes LXCat uses to delimit a data block.
 _MINIMUM_RULER_LENGTH: Final[int] = 3
 
 _ARROW: Final[str] = "->"
 
-#: Reactants and products are separated by a plus **surrounded by whitespace**. The bare
-#: character also spells the charge of an ion.
 _SPECIES_SEPARATOR: Final[re.Pattern[str]] = re.compile(r"\s+\+\s+")
 
-#: An all-capitals header field at the start of a line. Deliberately strict: a lowercase
-#: continuation line carrying a colon (a journal reference, say) must not be mistaken for
-#: a new field and silently discard the line it belongs to.
 _FIELD: Final[re.Pattern[str]] = re.compile(r"^(?P<key>[A-Z][A-Z0-9_.\- ]*?)\s*:\s*(?P<value>.*)$")
 
-#: The threshold as ``PARAM.:`` states it.
 _PARAM_THRESHOLD: Final[re.Pattern[str]] = re.compile(r"\bE\s*=\s*([0-9.eE+-]+)\s*eV")
 
-#: The declared column units. Both are checked; see the module docstring.
 _COLUMNS: Final[re.Pattern[str]] = re.compile(
     r"^\s*Energy\s*\((?P<energy>[^)]*)\)\s*\|\s*Cross\s+section\s*\((?P<sigma>[^)]*)\)\s*$",
     re.IGNORECASE,
@@ -123,28 +108,16 @@ class ProcessType(StrEnum):
     switches off a channel names it as a string and gets back a checked member.
     """
 
-    #: Ion elastic scattering, and electron elastic where a database publishes it.
     ELASTIC = "ELASTIC"
 
-    #: Momentum-transfer cross section. **Not interchangeable with ELASTIC** outside a
-    #: two-term Boltzmann solve: it is the elastic cross section weighted by
-    #: ``1 - cos(theta)``, so a Monte-Carlo collision routine that sampled it as an
-    #: elastic cross section would get both the rate and the scattering angle wrong.
-    #: LXCat's Phelps argon set publishes this rather than ELASTIC.
     EFFECTIVE = "EFFECTIVE"
 
-    #: Electron-impact excitation. One block per upper level.
     EXCITATION = "EXCITATION"
 
-    #: Electron-impact ionisation.
     IONIZATION = "IONIZATION"
 
-    #: Electron attachment. Absent from argon; present in any electronegative admixture,
-    #: and cheaper to recognise than to discover missing later.
     ATTACHMENT = "ATTACHMENT"
 
-    #: ``Ar+ + Ar -> Ar + Ar+``. Doc 03 §4.5: "the single most important collision for
-    #: this project".
     CHARGE_EXCHANGE = "CHARGE EXCHANGE"
 
     @property
@@ -172,23 +145,14 @@ _MOMENTUM_TRANSFER_PROCESSES: Final[frozenset[ProcessType]] = frozenset(
     {ProcessType.ELASTIC, ProcessType.EFFECTIVE}
 )
 
-#: What doc 03 §4.5 requires of an electron database.
-#:
-#: Momentum transfer is deliberately absent: doc 03 §4.5 asks for "electron elastic" and
-#: the databases disagree about whether that is published as ELASTIC or as EFFECTIVE, so
-#: the requirement is expressed by :meth:`CrossSectionSet.momentum_transfer` instead of
-#: by a membership test that Phelps would fail and Biagi would pass.
 REQUIRED_ELECTRON_PROCESSES: Final[frozenset[ProcessType]] = frozenset(
     {ProcessType.EXCITATION, ProcessType.IONIZATION}
 )
 
-#: What doc 03 §4.5 requires of the ion database.
 REQUIRED_ION_PROCESSES: Final[frozenset[ProcessType]] = frozenset(
     {ProcessType.ELASTIC, ProcessType.CHARGE_EXCHANGE}
 )
 
-#: The tail of a ``PROCESS:`` line, mapped to the keyword it must agree with. Both
-#: spellings of "ionisation" appear in the wild.
 _PROCESS_LABELS: Final[Mapping[str, ProcessType]] = MappingProxyType(
     {
         "ELASTIC": ProcessType.ELASTIC,
@@ -200,9 +164,6 @@ _PROCESS_LABELS: Final[Mapping[str, ProcessType]] = MappingProxyType(
         "CHARGE EXCHANGE": ProcessType.CHARGE_EXCHANGE,
     }
 )
-
-
-# ── the data ────────────────────────────────────────────────────────────────────
 
 
 def _tabulated(values: NDArray[np.float64], *, what: str) -> FloatArray:
@@ -432,9 +393,6 @@ class CrossSectionSet:
         return f"CrossSectionSet({self.database!r}, {len(self)} sections: {processes})"
 
 
-# ── parsing ─────────────────────────────────────────────────────────────────────
-
-
 @dataclass(frozen=True, slots=True, eq=False)
 class _Block:
     """One ``KEYWORD ... ----- data ----- `` block, before it is interpreted."""
@@ -503,8 +461,6 @@ def _parse_block(
         index += 1
     if index >= total:
         raise LxcatParseError(f"line {start}: {process} block ends before its reaction line")
-    # The reaction shorthand under the keyword is a display label; the authoritative
-    # reactants and products come from the PROCESS: field below.
     index += 1
 
     parameter: float | None = None
@@ -610,7 +566,6 @@ def _threshold_and_mass_ratio(
             break
 
     if not block.process.has_threshold:
-        # The bare number is m/M for momentum transfer and absent otherwise.
         return None, block.parameter
 
     stated_twice = block.parameter is not None and declared is not None
@@ -676,7 +631,6 @@ def _build(block: _Block, *, database: str) -> CrossSection:
     species = fields.get(_SPECIES_KEY, "")
     projectile, _, target = (part.strip() for part in species.partition("/"))
     if not projectile or not target:
-        # Older exports omit SPECIES:. The reaction says the same thing, less directly.
         projectile = reactants[0]
         target = reactants[1] if len(reactants) > 1 else reactants[0]
 

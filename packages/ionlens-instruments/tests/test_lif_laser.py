@@ -55,17 +55,12 @@ class TestTheBeam:
 
 class TestTheGrazingGeometry:
     def test_the_projection_factor_is_sin_fifteen_degrees(self) -> None:
-        # doc 02 §4.2 check 2 and doc 04 §3.2: v_par = v_z sin(15 deg) = 0.259 v_z.
         assert Laser.from_registry().projection_factor == pytest.approx(0.259, abs=5e-4)
 
     def test_the_velocity_error_amplification_is_the_documented_3_86(self) -> None:
-        # doc 04 §3.2: "this projection factor must be inverted to recover v_z, which
-        # amplifies velocity errors by 3.86x".
         assert Laser.from_registry().velocity_amplification == pytest.approx(3.86, rel=2e-3)
 
     def test_a_beam_parallel_to_the_electrode_is_blind_and_says_so(self) -> None:
-        # doc 02 §4.2: "a beam propagating along x measures the x-component of velocity,
-        # not the z-component we need". Zero projection is a design failure, not a limit.
         with pytest.raises(ValueError, match="blind"):
             Laser.from_registry().with_grazing_angle(Q_(0.0, "deg"))
 
@@ -119,7 +114,6 @@ class TestTuningRange:
         laser = Laser.from_registry()
         transition = ProbeTransition.from_registry()
 
-        # v_z = c dnu / (nu_0 sin theta_L) = lambda dnu / sin theta_L.
         expected = 668.614e-9 * 10.0e9 / math.sin(math.radians(15.0))
 
         ceiling = tuning.velocity_ceiling(transition=transition, laser=laser)

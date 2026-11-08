@@ -55,7 +55,6 @@ type Field = Callable[[NDArray[np.float64]], NDArray[np.float64]]
 
 _EPS0: Final[float] = float(magnitude_in(VACUUM_PERMITTIVITY, "F/m"))
 
-#: Symbol for the sheath-normal coordinate, shared by every expression here.
 _Z: Final[sp.Symbol] = sp.Symbol("z", real=True)
 
 
@@ -184,8 +183,6 @@ def drift_diffusion_manufactured(
         raise ValueError(f"diffusivity must be positive, got {diffusivity}")
 
     oscillation = sum(sp.sin((k + 1) * sp.pi * _Z / length) / (k + 1) ** 2 for k in range(modes))
-    # Half the baseline as oscillation amplitude keeps n strictly positive: the harmonic
-    # sum is bounded by sum 1/k^2 < pi^2/6 < 1.645, so n >= density * (1 - 0.3 * 1.645) > 0.
     n = density * (1 + sp.Rational(3, 10) * oscillation)
     flux = drift * n - diffusivity * sp.diff(n, _Z)
     source = sp.diff(flux, _Z)

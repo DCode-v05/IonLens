@@ -60,29 +60,11 @@ __all__ = [
     "main",
 ]
 
-#: Largest numerator and denominator a float literal may have, in lowest terms, and still
-#: count as algebra rather than measurement.
-#:
-#: Sixteen covers every coefficient printed in doc 03 §2 — 1/2, 2/3, 3/4, 4/9, 9/8, 3/2,
-#: 5/2, 5/3 — and excludes 0.61 (61/100), which is the value the rule most needs to catch.
-#: Raising it towards 100 would readmit exactly the class of two-decimal empirical
-#: constant this exists to find.
-#:
-#: The **numerator** bound matters as much as the denominator, and for a reason that is
-#: not obvious: ``1e17`` is a float whose denominator is 1. Bounding only the denominator
-#: would classify the reference density of doc 01 §2.1 as algebra and wave it straight
-#: through — the single most important number in the project, missed by the rule written
-#: to catch it.
 MAX_STRUCTURAL_TERM: Final[int] = 16
 
-#: Directory names whose contents are exempt.
 _EXEMPT_DIRECTORIES: Final[frozenset[str]] = frozenset(
     {
-        # doc 08 §5 exempts "a registry file" by name; that is where the numbers live.
         "data",
-        # A test asserting Gamma_E == 6.577 kW/m^2 must contain the number it checks.
-        # Routing it through the registry would have the test and the code read the same
-        # value from the same place, where they could agree while both were wrong.
         "tests",
         ".venv",
         "__pycache__",
@@ -145,10 +127,6 @@ class _LiteralVisitor(ast.NodeVisitor):
         self.findings: list[LiteralFinding] = []
         self._depth = 0
 
-    # Module-level assignments to an UPPER_SNAKE name are the doc 08 §5 escape. The whole
-    # right-hand side is exempt, including composite forms such as
-    # `SWEEP_RANGE = (0.61, 0.86)` and `COEFF = 4.0 / 9.0 * 0.61`, because the value is
-    # named and reviewable wherever it is assembled.
     def visit_Assign(self, node: ast.Assign) -> None:
         if self._depth == 0 and _is_named_constant_target(node):
             return
@@ -174,8 +152,6 @@ class _LiteralVisitor(ast.NodeVisitor):
         self._depth -= 1
 
     def visit_Constant(self, node: ast.Constant) -> None:
-        # bool is a subclass of int and must be excluded before the numeric check, or
-        # `True` is read as the integer 1.
         if isinstance(node.value, bool) or not isinstance(node.value, float | int):
             return
         if isinstance(node.value, int) or _is_structural(node.value):
@@ -206,8 +182,6 @@ def check_source(source: str, *, path: Path) -> list[LiteralFinding]:
 def _python_sources(root: Path) -> Iterator[Path]:
     for path in sorted(root.rglob("*.py")):
         if path.name.startswith("."):
-            # AppleDouble sidecars and editor swap files are not source. See the note in
-            # ionlens.core.params.catalogue: this was found on the reference machine, not here.
             continue
         if _EXEMPT_DIRECTORIES.isdisjoint(path.relative_to(root).parts):
             yield path
@@ -225,9 +199,6 @@ def check_tree(root: Path) -> list[LiteralFinding]:
         relative = path.relative_to(root)
         findings.extend(check_source(path.read_text(encoding="utf-8"), path=relative))
     return findings
-
-
-# ── the CI gate ─────────────────────────────────────────────────────────────────
 
 
 def _report_assumed_count(baseline_path: Path, *, registry_dir: Path | None = None) -> int:

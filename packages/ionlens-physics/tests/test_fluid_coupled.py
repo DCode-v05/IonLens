@@ -78,7 +78,6 @@ FloatArray: TypeAlias = NDArray[np.float64]
 _E_C = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _EPS0 = float(magnitude_in(VACUUM_PERMITTIVITY, "F/m"))
 
-# ── the manufactured problem, at sheath scales ──────────────────────────────────
 
 LENGTH = 1.0e-3
 DENSITY = 1.0e17
@@ -94,16 +93,11 @@ problem whose exact solution overflows verifies nothing."""
 MODES = 3
 CELL_COUNTS = (40, 80, 160, 320)
 
-#: Cell Peclet number ``|u| h / (2 D)`` at the coarsest level. Chosen at one half so the
-#: whole study sits in the asymptotic regime — see the module docstring.
 COARSE_CELL_PECLET = 0.5
 DIFFUSIVITY = DRIFT * (LENGTH / CELL_COUNTS[0]) / (2.0 * COARSE_CELL_PECLET)
 
-#: Drift-dominated variant, reported rather than gated.
 DRIFT_DOMINATED_DIFFUSIVITY = DIFFUSIVITY / 100.0
 
-#: Recombination rate for the doc 03 §3.1 ``L_rec`` coupling term, sized so the term is
-#: comparable to the divergence of the ion flux rather than a perturbation on it.
 COUPLING_RATE = DRIFT / LENGTH
 
 
@@ -170,7 +164,6 @@ def _coupled_study(
         assert solution.newton.converged
         iterations.append(solution.newton.iterations)
 
-        # Gauss points, not vertices or midpoints — ionlens.physics.fluid.forms states why.
         h = float(magnitude_in(grid.min_dz, "m"))
         for field, exact, levels, scale in (
             (solution.density, n_exact, density_levels, DENSITY),
@@ -268,9 +261,6 @@ class TestCoupledContract:
             )
 
 
-# ── the claim doc 03 §3.4 makes about centred differences ───────────────────────
-
-
 class TestDriftDominatedMonotonicity:
     """doc 03 §3.4: centred differences "oscillate in the strongly-drift-dominated sheath".
 
@@ -320,9 +310,6 @@ class TestDriftDominatedMonotonicity:
         diffusivity = DRIFT * (LENGTH / n_cells) / (2.0 * self.LAYER_PECLET)
         values = self._layer(Stabilisation.EXPONENTIAL_FITTING, n_cells=n_cells)
 
-        # Written as exp(-Pe (1 - z/L)) rather than the textbook (e^{Pe z/L} - 1) /
-        # (e^{Pe} - 1): the latter is e^200 over e^200 here, which is finite but throws
-        # away most of its significant figures.
         peclet_global = DRIFT * LENGTH / diffusivity
         exact = (np.exp(-peclet_global * (1.0 - grid.z_m / LENGTH)) - np.exp(-peclet_global)) / (
             1.0 - np.exp(-peclet_global)

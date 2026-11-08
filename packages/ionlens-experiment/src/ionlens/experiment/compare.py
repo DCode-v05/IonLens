@@ -37,8 +37,6 @@ from ionlens.experiment.run.store import ARTIFACTS_DIRNAME, RunDirectory, RunSto
 
 __all__ = ["MetricDifference", "RunComparison", "ValueDifference", "compare_runs"]
 
-#: Sentinel for "this key is not in that manifest at all". ``None`` cannot serve, because
-#: ``None`` is a value a manifest can legitimately hold.
 _ABSENT: Final[object] = object()
 
 
@@ -258,8 +256,6 @@ def compare_runs(store: RunStore, left_id: str, right_id: str) -> RunComparison:
         dict(_flatten(right.read_manifest().as_document())),
     )
 
-    # ``created_utc`` is dropped: two runs are always at different times, and reporting
-    # that alongside a changed seed would bury the one that matters.
     left_provenance = {
         key: value
         for key, value in left.read_provenance().to_dict().items()

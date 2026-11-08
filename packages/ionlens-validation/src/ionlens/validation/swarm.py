@@ -80,11 +80,8 @@ __all__ = [
 type FloatArray = NDArray[np.float64]
 type CrossSection = Callable[[FloatArray], FloatArray]
 
-#: Where the transcribed tables live. Kept as data so a reviewer can diff it against the
-#: cited table without reading Python.
 _DATA_FILE: Final[Path] = Path(__file__).with_name("data") / "swarm-benchmarks.yaml"
 
-#: 1 Angstrom^2 in m^2. Both papers quote cross sections in units of 10^-20 m^2.
 _ANGSTROM_SQUARED: Final[float] = 1.0e-20
 
 
@@ -155,15 +152,10 @@ def _reid_elastic(energy_ev: FloatArray) -> FloatArray:
     return np.full_like(np.asarray(energy_ev, dtype=np.float64), 6.0 * _ANGSTROM_SQUARED)
 
 
-#: Reid ramp threshold energy, Reid (1979) eq. (23). Below it the cross-section is exactly
-#: zero — this is the model gas's *definition*, not a physical measurement, which is why it
-#: lives here as a named literature constant rather than in the parameter registry.
 _REID_THRESHOLD_EV: Final[float] = 0.2
 
-#: Lucas-Saelee ionisation slope in A^2/eV, Flynn eq. (28b).
 _LUCAS_SAELEE_IONISATION_SLOPE: Final[float] = 0.1
 
-#: Lucas-Saelee ionisation threshold energy, Flynn eq. (28b).
 _LUCAS_SAELEE_THRESHOLD_EV: Final[float] = 15.6
 
 
@@ -222,9 +214,6 @@ LUCAS_SAELEE: Final[ModelGas] = ModelGas(
         "J Lucas and H T Saelee, J. Phys. D 8 (1975) 640, as restated by "
         "Flynn et al (2024) eq. (28) with F = 1; primary source not consulted"
     ),
-    # Stated outright as 1e-3 by Flynn eq. (28). LS is not a real gas and has no
-    # molecular weight to derive a ratio from; deriving one would invent a number the
-    # model does not have.
     mass_ratio=1.0e-3,
     gas_temperature_ev=0.0,
     elastic_mtcs_m2=_lucas_saelee_elastic,

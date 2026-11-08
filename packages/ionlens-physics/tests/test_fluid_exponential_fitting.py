@@ -35,8 +35,6 @@ from ionlens.physics.fluid import (
     scharfetter_gummel_coefficients,
 )
 
-# ── the Bernoulli function ──────────────────────────────────────────────────────
-
 
 class TestBernoulli:
     """``B(x) = x / (exp(x) - 1)``, the weight Scharfetter-Gummel is built from."""
@@ -69,9 +67,6 @@ class TestBernoulli:
         """``B(-x) = B(x) + x``, the identity the two-point flux is assembled from."""
         x = np.array([-5.0, -0.3, 0.3, 5.0])
         assert bernoulli(-x) == pytest.approx(bernoulli(x) + x)
-
-
-# ── the fitted diffusivity ──────────────────────────────────────────────────────
 
 
 class TestFittedDiffusivity:
@@ -115,9 +110,6 @@ class TestFittedDiffusivity:
     def test_rejects_a_non_positive_cell_size(self) -> None:
         with pytest.raises(ValueError, match="cell_size"):
             fitted_diffusivity(velocity=1.0, diffusivity=1.0, cell_size=0.0)
-
-
-# ── the equivalence that makes this Scharfetter-Gummel ──────────────────────────
 
 
 class TestScharfetterGummelEquivalence:

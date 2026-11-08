@@ -64,21 +64,15 @@ def _run_oscillation(
     length = 0.001
     grid = UniformGrid(length_m=length, n_cells=n_cells)
     n_particles = n_cells * particles_per_cell
-    # One computational particle stands for this many electrons, chosen so the marker
-    # population reproduces the physical density exactly.
     weight = density_m3 * length / n_particles
 
-    # Uniform loading, then a sinusoidal displacement that vanishes at both walls so the
-    # Dirichlet boundaries are consistent with the perturbation.
     z0 = (jnp.arange(n_particles, dtype=jnp.float64) + 0.5) * (length / n_particles)
     displacement = amplitude_fraction * grid.dz_m * jnp.sin(jnp.pi * z0 / length)
     positions = jnp.clip(z0 + displacement, 0.0, length)
     velocities = jnp.zeros((n_particles, 3), dtype=jnp.float64)
 
-    # mass_scale is 1.0 for every real run. It exists so the negative control can perturb
-    # the one constant the closed form is most sensitive to, without monkeypatching.
     electrons = Species(name="e", charge_c=-_E, mass_kg=_M_E * mass_scale, weight=weight)
-    ion_background = density_m3 * _E  # C/m^3, uniform and fixed
+    ion_background = density_m3 * _E
 
     energies = []
     for _ in range(n_steps):
@@ -87,7 +81,6 @@ def _run_oscillation(
         )
         charge_density = ion_background - _E * electron_density
         phi = solve_poisson_dirichlet(grid, charge_density, left_v=0.0, right_v=0.0)
-        # E = -dPhi/dz, second-order interior, one-sided at the two boundary nodes.
         e_field = -jnp.gradient(phi, grid.dz_m)
         energies.append(float(jnp.sum(e_field**2)) * grid.dz_m)
 
@@ -122,8 +115,6 @@ def _dominant_frequency_rad_per_s(signal: Array, dt: float) -> float:
 class TestColdPlasmaOscillation:
     @pytest.mark.physics
     def test_the_oscillation_frequency_is_the_electron_plasma_frequency(self) -> None:
-        # The headline. omega_pe appears nowhere in fields.py or push.py, so recovering it
-        # tests the product of every constant in the chain at once.
         density = 1e16
         expected = electron_plasma_frequency_rad_per_s(density_m3=density)
 
@@ -144,9 +135,6 @@ class TestColdPlasmaOscillation:
 
     @pytest.mark.physics
     def test_the_frequency_does_not_depend_on_the_density_used_to_set_it(self) -> None:
-        # omega_pe scales as sqrt(n). Checking two densities a decade apart confirms the
-        # scaling rather than a single coincidence, which a compensating pair of errors
-        # could otherwise produce.
         ratios = []
         for density in (1e16, 1e17):
             expected = electron_plasma_frequency_rad_per_s(density_m3=density)
@@ -164,9 +152,6 @@ class TestColdPlasmaOscillation:
 
     @pytest.mark.physics
     def test_the_oscillation_amplitude_does_not_grow(self) -> None:
-        # A leapfrog on a symplectic system has bounded energy error. Growth here would be
-        # numerical heating — the failure doc 03 §4.3's dz <= lambda_D constraint exists to
-        # prevent — and it is worth catching directly rather than inferring it.
         energies, _ = _run_oscillation(
             density_m3=1e16,
             n_cells=64,
@@ -185,10 +170,6 @@ class TestColdPlasmaOscillation:
 
     @pytest.mark.physics
     def test_a_deliberately_wrong_electron_mass_fails_the_test(self) -> None:
-        # Proof the test has teeth. omega_pe goes as 1/sqrt(m), so a mass wrong by four
-        # halves the frequency — far outside the 5 % gate. A benchmark nobody has seen
-        # reject anything is not a benchmark, and ADR-011 is this project's reminder of
-        # what that costs.
         density = 1e16
         expected = electron_plasma_frequency_rad_per_s(density_m3=density)
 
@@ -205,5 +186,4 @@ class TestColdPlasmaOscillation:
         measured = _dominant_frequency_rad_per_s(energies, dt) / 2.0
 
         assert measured != pytest.approx(expected, rel=0.05)
-        # And specifically, it should be low by the factor the closed form predicts.
         assert measured == pytest.approx(expected / 2.0, rel=0.10)

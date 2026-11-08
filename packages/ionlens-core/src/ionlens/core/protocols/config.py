@@ -37,13 +37,6 @@ from typing import TypeAlias
 
 __all__ = ["Config", "ConfigValue", "InstrumentConfig", "InverseConfig", "SolverConfig"]
 
-#: Anything a manifest block may hold once loaded from YAML — doc 08 §6.
-#:
-#: Quoted because the alias is *recursive*: the right-hand side names ``ConfigValue``
-#: before the assignment binds it. PEP 695's ``type`` statement evaluates lazily and hides
-#: that; a ``TypeAlias`` assignment is evaluated eagerly, so the forward reference has to
-#: be spelled as a string. This is the standard pre-695 form and mypy resolves it
-#: identically.
 ConfigValue: TypeAlias = (
     "str | int | float | bool | Sequence[ConfigValue] | Mapping[str, ConfigValue] | None"
 )
@@ -68,8 +61,6 @@ def _frozen(value: object, *, path: str) -> ConfigValue:
         return MappingProxyType(frozen)
 
     if isinstance(value, Sequence):
-        # Tuples, so that a solver handed a list of chords cannot append to the manifest
-        # the run is meant to be reproducible from.
         return tuple(_frozen(item, path=f"{path}[{index}]") for index, item in enumerate(value))
 
     raise TypeError(
@@ -90,12 +81,9 @@ class Config:
     values: Mapping[str, ConfigValue]
 
     def __post_init__(self) -> None:
-        # Copy before freezing: the caller's dict is theirs to keep mutating, and a
-        # config aliasing it would change under a run that had already been provenanced.
         frozen = _frozen(dict(self.values), path="")
         object.__setattr__(self, "values", frozen)
 
-    # ── reading ─────────────────────────────────────────────────────────────────
 
     def __getitem__(self, key: str) -> ConfigValue:
         try:
@@ -129,7 +117,6 @@ class Config:
             f"expected {expected}"
         )
 
-    # ── typed accessors ─────────────────────────────────────────────────────────
 
     def require_str(self, key: str) -> str:
         """The string at ``key``, or a failure naming the key and what was found."""

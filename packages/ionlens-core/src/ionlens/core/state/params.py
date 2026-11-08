@@ -97,7 +97,6 @@ class PlasmaParams:
         if magnitude_in(self.pressure, "Pa") <= 0.0:
             raise ValueError(f"pressure must be positive, got {self.pressure}")
 
-        # Dimensionality assertion only: any potential is physically reachable.
         magnitude_in(self.bias, "V")
 
         if self.gamma_se < 0.0:
@@ -107,7 +106,6 @@ class PlasmaParams:
                 f"rf_frequency must be positive; use None for DC bias, got {self.rf_frequency}"
             )
 
-    # ── derived quantities ──────────────────────────────────────────────────────
 
     @property
     def bias_magnitude(self) -> Quantity:
@@ -133,7 +131,6 @@ class PlasmaParams:
         """Ion temperature expressed as an energy."""
         return self.T_i.to("eV", "boltzmann")
 
-    # ── SI magnitudes for hot loops (doc 08 §5) ─────────────────────────────────
 
     @property
     def n_0_per_m3(self) -> float:

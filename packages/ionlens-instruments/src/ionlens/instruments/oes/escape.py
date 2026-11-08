@@ -125,51 +125,23 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-# ── constants ───────────────────────────────────────────────────────────────────
 
-#: Speed of light in m/s, from CODATA via :mod:`ionlens.core.constants`. Unwrapped once.
 _C_M_PER_S: Final[float] = float(magnitude_in(SPEED_OF_LIGHT, "m / s"))
 
-#: Metres in a nanometre. A unit conversion rather than a measurement, but taken from the
-#: shared registry rather than written: doc 08 §5's rule does not carve out exceptions for
-#: numbers the author was sure about, and a stray 1e9 in an opacity is precisely the error
-#: the rule exists to catch.
 _METRES_PER_NM: Final[float] = float(magnitude_in(Q_(1.0, "nm"), "m"))
 
-#: ``psi(3) = 1 + 1/2 - gamma``, the constant in the small-``tau`` expansion of
-#: :func:`slab_escape_probability`. Computed rather than typed: it is a value of a
-#: special function, and doc 09 §2.5's rule about hand-entered constants applies to any
-#: number whose provenance is a formula.
 _PSI_3: Final[float] = float(special.digamma(3))
 
-#: Below this optical depth the closed form ``(1 - 2 E_3(tau)) / (2 tau)`` loses its
-#: leading digits to cancellation — ``E_3`` approaches exactly 1/2 — so the series
-#: expansion is used instead. At 1e-4 the two agree to eleven digits, which is where the
-#: switch is placed: high enough that the series is still converged, low enough that the
-#: closed form has not yet started to shed precision.
 SMALL_OPTICAL_DEPTH: Final[float] = 1.0e-4
 
-#: Gauss-Legendre nodes per panel in the profile integral. The panels are split so that
-#: the integrand is smooth on each (see :func:`_panelled_rule`), which is what lets this
-#: be small; doubling it moves the answer by less than 1e-10 at every opacity the tests
-#: cover, and the convergence is asserted there rather than claimed here.
 PANEL_NODES: Final[int] = 48
 
-#: How many decades of optical depth below unity the panelling continues to. The
-#: integrand is within 1e-6 of its thin-limit value below ``tau = 1e-6``, so panels
-#: further down buy nothing.
 PANEL_DECADES_BELOW_UNITY: Final[int] = 6
 
-#: How far into the Gaussian tail the Doppler profile integral runs, as an exponent:
-#: the upper limit is ``x`` such that ``exp(-x**2)`` is ``exp(-this)``. At 40 the
-#: neglected tail is 4e-18 of the profile, below double-precision relevance.
 _DOPPLER_TAIL_EXPONENT: Final[float] = 40.0
 
-#: ``2 sqrt(ln 2 / pi)`` — the line-centre value of a Doppler profile normalised in
-#: frequency and parameterised by its FWHM.
 _DOPPLER_PEAK: Final[float] = 2.0 * math.sqrt(math.log(2.0) / math.pi)
 
-#: ``2 / pi`` — the same for a Lorentzian.
 _LORENTZ_PEAK: Final[float] = 2.0 / math.pi
 
 
@@ -181,22 +153,11 @@ class LineProfileShape(StrEnum):
     wings. Doppler and Lorentz differ by ``ln tau`` versus ``sqrt(tau)`` there.
     """
 
-    #: Gaussian in frequency — thermal motion of the emitters. The right choice for every
-    #: line in doc 02 §6.3 at the doc 01 §2.1 operating point.
     DOPPLER = "doppler"
 
-    #: Lorentzian — natural and collisional broadening. Carried because it is the other
-    #: analytic limit and because its published ``tau^(-1/2)`` asymptote is a verification
-    #: anchor.
     LORENTZ = "lorentz"
 
-    #: A delta function: every photon at line centre, no wings, no redistribution. Not
-    #: physical — no line is monochromatic — but it is the lower bound on escape at a
-    #: given line-centre opacity, and :func:`slab_escape_probability` is exactly it.
     MONOCHROMATIC = "monochromatic"
-
-
-# ── the single-flight escape probability ────────────────────────────────────────
 
 
 def slab_escape_probability(optical_depth: ArrayLike) -> FloatArray:
@@ -223,18 +184,12 @@ def slab_escape_probability(optical_depth: ArrayLike) -> FloatArray:
         )
 
     small = tau < SMALL_OPTICAL_DEPTH
-    # np.where evaluates both branches, so the arguments are made safe first rather than
-    # left to produce a division by zero that is then discarded — under
-    # `filterwarnings = ["error"]` (root pyproject) that discarded warning is a failure.
     safe_tau = np.where(small, 1.0, tau)
     safe_log = np.where(tau > 0.0, np.where(small, tau, 1.0), 1.0)
 
     closed_form = (1.0 - 2.0 * special.expn(3, safe_tau)) / (2.0 * safe_tau)
     series = 1.0 - 0.5 * tau * (_PSI_3 - np.log(safe_log)) - tau**2 / 6.0
     return np.asarray(np.where(small, series, closed_form))
-
-
-# ── the profile average ─────────────────────────────────────────────────────────
 
 
 def _panelled_rule(edges: Sequence[float]) -> tuple[FloatArray, FloatArray]:
@@ -273,8 +228,6 @@ def _decade_edges(
     top = math.floor(math.log10(tau_0))
     levels = (10.0**k for k in range(top, -PANEL_DECADES_BELOW_UNITY - 1, -1))
     edges = [0.0, *(coordinate(level) for level in levels if 0.0 < level < tau_0), stop]
-    # Two decades can map to the same coordinate once the profile has underflowed; a
-    # zero-width panel contributes nothing but does make the weights degenerate.
     return sorted({edge for edge in edges if 0.0 <= edge <= stop})
 
 
@@ -330,8 +283,6 @@ def escape_factor(optical_depth: float, *, shape: LineProfileShape) -> float:
     if tau_0 < 0.0:
         raise ValueError(f"a line-centre optical depth cannot be negative, got {tau_0}")
     if tau_0 == 0.0:
-        # doc 04 §8 V-26 exactly rather than to quadrature accuracy: with no absorbers
-        # there is no trapping, and a 1 - 1e-16 here would leak into every ratio.
         return 1.0
 
     if shape is LineProfileShape.MONOCHROMATIC:
@@ -339,9 +290,6 @@ def escape_factor(optical_depth: float, *, shape: LineProfileShape) -> float:
     if shape is LineProfileShape.DOPPLER:
         return _doppler_escape(tau_0)
     return _lorentz_escape(tau_0)
-
-
-# ── the opacity ─────────────────────────────────────────────────────────────────
 
 
 def line_centre_optical_depth(
@@ -401,7 +349,6 @@ def line_centre_optical_depth(
         raise ValueError(f"an absorber density cannot be negative, got {lower_density_per_m3}")
 
     wavelength_m = wavelength_nm * _METRES_PER_NM
-    # dnu = c dlambda / lambda^2, the differential of nu = c / lambda taken in magnitude.
     fwhm_hz = _C_M_PER_S * (profile_fwhm_nm * _METRES_PER_NM) / wavelength_m**2
     peak = _DOPPLER_PEAK if shape is LineProfileShape.DOPPLER else _LORENTZ_PEAK
 
@@ -437,8 +384,6 @@ class TrappedLine:
     profile_fwhm_nm: float
 
     def __post_init__(self) -> None:
-        # Validate by doing: the opacity function already rejects everything invalid, and
-        # a second copy of those checks here is a second copy to keep in step.
         self.optical_depth(lower_density_per_m3=0.0, path_length_m=1.0)
 
     def optical_depth(self, *, lower_density_per_m3: float, path_length_m: float) -> float:

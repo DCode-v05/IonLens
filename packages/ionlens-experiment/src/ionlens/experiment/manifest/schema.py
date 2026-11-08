@@ -114,19 +114,12 @@ class ArtifactRequest(StrEnum):
     nothing.
     """
 
-    #: Written by the forward stage. HDF5 (doc 08 §7).
     PLASMA_STATE = "plasma_state"
-    #: Written by the instrument stage. HDF5, one group per instrument.
     MEASUREMENTS = "measurements"
-    #: Scalars for the doc 07 §7 regression store. Parquet.
     METRICS = "metrics"
-    #: Written by the inverse stage. Zarr.
     POSTERIOR = "posterior"
-    #: Sampler diagnostics — doc 05 §5.
     DIAGNOSTICS = "diagnostics"
-    #: FIM, profile likelihood and Sobol indices — doc 05 §9.
     IDENTIFIABILITY = "identifiability"
-    #: The doc 06 §4 term-by-term budget.
     ERROR_BUDGET = "error_budget"
 
 
@@ -284,8 +277,6 @@ class InverseSpec:
         if self.draws < 1:
             raise ValueError(f"inverse.draws must be at least one, got {self.draws}")
         if self.chains < 1:
-            # doc 05 §5 diagnoses convergence with R-hat, which is defined across chains;
-            # a single chain cannot be checked against anything.
             raise ValueError(
                 f"inverse.chains must be at least one, got {self.chains}. doc 05 §5 gates "
                 "on R-hat, which needs more than one chain to mean anything."
@@ -314,13 +305,6 @@ class OutputSpec:
     report: bool = False
 
 
-# ── the manifest ────────────────────────────────────────────────────────────────
-
-#: doc 08 §6's manifest spelling for each :class:`PlasmaSpec` field.
-#:
-#: The document uses the symbols a plasma physicist writes (``n0``, ``Te``); the code uses
-#: the names :class:`~ionlens.core.state.PlasmaParams` uses. One table rather than two sets of
-#: field names keeps the two from drifting.
 _PLASMA_KEYS: Final[Mapping[str, str]] = {
     "n0": "n_0",
     "Te": "T_e",
@@ -407,9 +391,6 @@ class Manifest:
         )
 
 
-# ── parsing ─────────────────────────────────────────────────────────────────────
-
-
 def _experiment(data: Mapping[str, ManifestValue]) -> ExperimentSpec:
     where = "experiment"
     check_keys(
@@ -435,8 +416,6 @@ def _bias(data: Mapping[str, ManifestValue]) -> BiasSpec:
     raw_phase = data.get("phase")
     return BiasSpec(
         mode=member(required(data, "mode", where=where), BiasMode, where=f"{where}.mode"),
-        # The potential is written flat — `{mode: dc, value: -250.0, units: V}` — rather
-        # than as a nested quantity, because that is how doc 08 §6 writes it.
         value=quantity({"value": data["value"], "units": data["units"]}, where=where),
         frequency=(
             None if raw_frequency is None else quantity(raw_frequency, where=f"{where}.frequency")

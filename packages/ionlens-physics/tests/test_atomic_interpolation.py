@@ -61,9 +61,6 @@ def _cx_section(**overrides: object) -> CrossSection:
     return CrossSection(**{**defaults, **overrides})  # type: ignore[arg-type]
 
 
-# ── inside the table ────────────────────────────────────────────────────────────
-
-
 class TestInsideTheTabulatedRange:
     def test_a_tabulated_point_returns_its_tabulated_value(self) -> None:
         section = _threshold_section()
@@ -74,10 +71,6 @@ class TestInsideTheTabulatedRange:
 
     @pytest.mark.physics
     def test_interpolation_is_linear_in_energy_and_cross_section(self) -> None:
-        # Linear-linear rather than log-log, and the choice is not free. Cross-section
-        # tables carry exact zeros at and below threshold, which log-log cannot
-        # represent; and linear interpolation invents no structure between points, which
-        # is the conservative failure mode for a quantity that goes on to be integrated.
         section = _cx_section()
 
         midpoint = interpolate_cross_section(section, np.array([5.5]))
@@ -103,9 +96,6 @@ class TestInsideTheTabulatedRange:
         assert np.all(result >= 0.0)
 
 
-# ── below the table ─────────────────────────────────────────────────────────────
-
-
 class TestBelowTheThreshold:
     """Not a policy. An inelastic process cannot occur below its threshold."""
 
@@ -117,9 +107,6 @@ class TestBelowTheThreshold:
 
     @pytest.mark.physics
     def test_the_sub_threshold_zero_is_not_an_extrapolation_and_never_raises(self) -> None:
-        # The table starts at the threshold, so every sub-threshold point is also below
-        # the tabulated range. Applying the physics first is what keeps a caller asking
-        # for a grid from 0 eV from having to opt out of a policy that does not apply.
         result = interpolate_cross_section(
             _threshold_section(),
             np.array([0.0, 10.0]),
@@ -143,9 +130,6 @@ class TestBelowTheTabulatedRange:
     """Where there is no threshold to appeal to, the caller chooses."""
 
     def test_the_default_holds_the_first_tabulated_value(self) -> None:
-        # Charge exchange rises slowly and monotonically as E -> 0 and has no threshold.
-        # Holding the first value is the mildest defensible statement; the alternatives
-        # either invent a divergence or delete a channel that is real at low energy.
         assert DEFAULT_BELOW is ExtrapolationPolicy.CONSTANT
 
         result = interpolate_cross_section(_cx_section(), np.array([0.01, 0.5]))
@@ -161,8 +145,6 @@ class TestBelowTheTabulatedRange:
 
     @pytest.mark.physics
     def test_the_power_law_continues_the_first_two_points_in_log_log(self) -> None:
-        # sigma = 8e-19 at 1 eV and 4e-19 at 10 eV is a slope of -log10(2) per decade,
-        # so 0.1 eV must return 1.6e-18.
         result = interpolate_cross_section(
             _cx_section(), np.array([0.1]), below=ExtrapolationPolicy.POWER_LAW
         )
@@ -176,9 +158,6 @@ class TestBelowTheTabulatedRange:
             )
 
     def test_a_table_starting_at_zero_energy_has_nothing_below_it(self) -> None:
-        # LXCat elastic tables commonly start at exactly 0 eV. Energies are validated
-        # non-negative, so the below-range branch is unreachable for such a table and no
-        # logarithm of zero is ever taken.
         section = _cx_section(
             energy_ev=np.array([0.0, 10.0, 100.0]), sigma_m2=np.array([8e-19, 4e-19, 2e-19])
         )
@@ -196,15 +175,8 @@ class TestBelowTheTabulatedRange:
             interpolate_cross_section(section, np.array([0.5]), below=ExtrapolationPolicy.POWER_LAW)
 
 
-# ── above the table, which is the one that matters ──────────────────────────────
-
-
 class TestAboveTheTabulatedRange:
     def test_the_default_is_to_refuse(self) -> None:
-        # doc 03 §4.5 makes the energy dependence of the cross section the single most
-        # consequential atomic-data choice in the project. Every silent option above the
-        # table is wrong in a different direction, and none of them announce themselves
-        # in the answer, so the default announces itself instead.
         assert DEFAULT_ABOVE is ExtrapolationPolicy.RAISE
 
         with pytest.raises(OutsideTabulatedRangeError):
@@ -230,9 +202,6 @@ class TestAboveTheTabulatedRange:
 
     @pytest.mark.physics
     def test_the_power_law_continues_the_last_two_points_in_log_log(self) -> None:
-        # 3e-20 at 100 eV and 1.5e-20 at 200 eV is sigma ~ 1/E, which is the correct
-        # asymptotic form for electron-impact ionisation up to the Bethe log. 400 eV
-        # must therefore return 7.5e-21.
         result = interpolate_cross_section(
             _threshold_section(), np.array([400.0]), above=ExtrapolationPolicy.POWER_LAW
         )
@@ -258,9 +227,6 @@ class TestAboveTheTabulatedRange:
         np.testing.assert_allclose(result, [1e-21, 3e-20])
 
 
-# ── the grid itself ─────────────────────────────────────────────────────────────
-
-
 class TestTheRequestedGrid:
     def test_rejects_a_negative_energy(self) -> None:
         with pytest.raises(ValueError, match="negative"):
@@ -278,16 +244,11 @@ class TestTheRequestedGrid:
         assert interpolate_cross_section(_cx_section(), np.array([])).size == 0
 
     def test_the_result_is_not_the_tabulated_array(self) -> None:
-        # The section's arrays are write-locked; a result aliasing one of them would
-        # hand the caller a read-only array with no explanation.
         section = _cx_section()
 
         result = interpolate_cross_section(section, section.energy_ev)
 
         assert result.flags.writeable
-
-
-# ── whole sets, which is what the Boltzmann solver asks for ─────────────────────
 
 
 class TestInterpolatingAWholeSet:

@@ -68,25 +68,11 @@ _M_E = float(magnitude_in(ELECTRON_MASS, "kg"))
 _K_B = float(magnitude_in(BOLTZMANN, "J/K"))
 _M_AR = float(default_registry().value_in("species.Ar.mass", "kg"))
 
-#: Root seed for every sampler in this file. One value, so that a failure is reproducible
-#: by re-running the test rather than by re-running the test several times.
 _SEED = 20260805
 
-#: How many standard errors a Monte-Carlo assertion is allowed. 4 sigma is a two-sided
-#: false-alarm rate of 6e-5 per assertion; with ~40 statistical assertions here that is a
-#: 0.3 % chance of a spurious red build per full run, which is the right place to sit.
 _SIGMA = 4.0
 
-#: Kolmogorov-Smirnov critical value at the 0.1 % level: ``D_crit = 1.95 / sqrt(n)``.
 _KS_CRITICAL = 1.95
-
-
-# ── synthetic cross sections ────────────────────────────────────────────────────
-#
-# Analytic, not tabulated from LXCat. That is deliberate: doc 09 §5 forbids shipping the
-# real tables, and more importantly a test whose expected answer is an integral over real
-# data cannot state its own closed form. A constant sigma makes every quantity in this
-# file — rate, mean free path, IEDF — an exact expression.
 
 
 def _section(
@@ -185,8 +171,6 @@ class TestTheNullCollisionFrequencyCeiling:
     """
 
     def test_a_constant_cross_section_puts_the_maximum_at_the_energy_ceiling(self) -> None:
-        # sigma constant, v = sqrt(2E/m) increasing, so sigma v is maximised at the top of
-        # the range and nu_max = n sigma v(E_ceiling) exactly.
         sigma = 5e-19
         ceiling = 100.0
         gas = _gas()
@@ -210,11 +194,7 @@ class TestTheNullCollisionFrequencyCeiling:
 
     @pytest.mark.physics
     def test_a_falling_cross_section_has_its_maximum_inside_the_interval(self) -> None:
-        # sigma(E) = a + bE with b < 0. Then sigma(E) sqrt(E) is stationary where
-        # a / (2 sqrt(E)) + (3/2) b sqrt(E) = 0, i.e. at E* = -a / (3b). A scan over the
-        # tabulated nodes alone would miss it and return a nu_max that is too small.
         sigma_low, sigma_high, ceiling = 1e-18, 0.0, 90.0
-        # a = 1e-18, b = -1e-18/90 -> E* = 1e-18 / (3 * 1e-18/90) = 30 eV.
         gas = _gas()
         sampler = NullCollisionSampler(
             species=_argon_ions(),
@@ -235,14 +215,10 @@ class TestTheNullCollisionFrequencyCeiling:
         expected = gas.density_m3 * sigma_star * _speed_of(e_star, _M_AR)
 
         assert sampler.nu_max_per_s == pytest.approx(expected, rel=1e-10)
-        # And the bound really is a bound: no energy in range beats it.
         scan = np.linspace(0.0, ceiling, 10_001)
         assert float(sampler.total_frequency_per_s(scan).max()) <= sampler.nu_max_per_s
 
     def test_the_ceiling_may_not_exceed_the_tabulated_range(self) -> None:
-        # Silently extrapolating the table to reach the ceiling is the failure
-        # ionlens.physics.atomic.interpolation exists to refuse; the refusal must survive
-        # being wrapped by this module rather than being papered over here.
         with pytest.raises(ValueError, match="tabulated"):
             NullCollisionSampler(
                 species=_argon_ions(),
@@ -259,9 +235,6 @@ class TestTheNullCollisionFrequencyCeiling:
             )
 
     def test_a_particle_above_the_ceiling_is_a_runtime_error(self) -> None:
-        # Above the ceiling nu can exceed nu_max, and the scheme then under-collides
-        # silently. doc 03 §4.3's treatment of stability constraints applies for the same
-        # reason: the violating run still produces an IEDF.
         ceiling = 10.0
         sampler = NullCollisionSampler(
             species=_argon_ions(),
@@ -298,9 +271,6 @@ class TestTheSampledRateMatchesTheClosedForm:
 
     @staticmethod
     def _electron_sampler(ceiling: float) -> NullCollisionSampler:
-        # Three channels with the thresholds argon actually has, so that a beam below
-        # 11.5 eV exercises the case doc 03 §4.5 needs to be right: most of nu_max belongs
-        # to channels that are closed, and the real collision probability is low.
         return NullCollisionSampler(
             species=_electrons(),
             gas=_gas(),
@@ -348,8 +318,6 @@ class TestTheSampledRateMatchesTheClosedForm:
         sampler = self._electron_sampler(ceiling)
         rng = collision_generator(_SEED)
 
-        # nu_max dt = 1e-2 keeps the O(nu_max dt / 2) = 0.5 % discretisation bias below the
-        # Monte-Carlo error of every channel measured here.
         nu_max_dt = 1e-2
         dt = nu_max_dt / sampler.nu_max_per_s
         n_particles, n_repeats = 400_000, 20
@@ -393,11 +361,6 @@ class TestTheSampledRateMatchesTheClosedForm:
     def test_the_rate_is_right_when_the_real_probability_is_a_percent_of_the_ceiling(
         self,
     ) -> None:
-        # The case the null-collision method exists for and the one a naive implementation
-        # gets wrong. At 4 eV the excitation and ionisation channels are shut, and the
-        # elastic channel's sqrt(E) speed factor is a twentieth of its value at the 400 eV
-        # ceiling: 94 % of the candidates drawn are null collisions and must leave the
-        # particle exactly as it was.
         ceiling = 400.0
         sampler = self._electron_sampler(ceiling)
         beam_ev = 4.0
@@ -462,9 +425,6 @@ class TestTheCollisionFreePathIsExponential:
             energy_ceiling_ev=ceiling,
         )
 
-        # The beam sits at the ceiling so nu == nu_max and the per-step probability is
-        # exactly 1 - exp(-nu dt); nu dt = 5e-3 makes the geometric-vs-exponential
-        # discrepancy 0.25 %, an order below the Kolmogorov-Smirnov critical distance.
         beam_ev = ceiling
         speed = _speed_of(beam_ev, _M_E)
         nu = density * sigma * speed
@@ -476,11 +436,6 @@ class TestTheCollisionFreePathIsExponential:
         positions = np.zeros(n_particles)
         velocities = _beam(n_particles, energy_ev=beam_ev, mass_kg=_M_E)
 
-        # A particle that has collided is stopped rather than removed: at zero speed
-        # nu = n sigma v = 0, so it can never collide again and its slot is inert. Removing
-        # it would shrink the array every step, and JAX compiles per shape — the run would
-        # spend its time in the compiler rather than in the sampler. Survivors keep the beam
-        # energy exactly, so every step is a fresh Bernoulli trial at the same nu.
         for step in range(max_steps):
             outcome = sampler.collide(
                 rng, positions_m=positions, velocities_m_per_s=velocities, dt_s=dt
@@ -494,7 +449,6 @@ class TestTheCollisionFreePathIsExponential:
                 break
 
         collided = first_step > 0
-        # 3 000 steps is 15 mean free paths; exp(-15) = 3e-7 of 5 000 particles is zero.
         assert collided.all(), f"{int((~collided).sum())} particles never collided"
 
         path = first_step[collided] * speed * dt
@@ -544,9 +498,6 @@ class TestNullCollisionEqualsDirectRejection:
         ceiling, beam_ev = 100.0, 30.0
         sampler = TestTheSampledRateMatchesTheClosedForm._electron_sampler(ceiling)
 
-        # nu_max dt = 1e-2, so the two schemes differ systematically by
-        # (nu_max - nu_total) dt / 2 <= 0.5 % of each channel's rate — below the ~1 %
-        # Monte-Carlo error of the counts compared here.
         nu_max_dt = 1e-2
         dt = nu_max_dt / sampler.nu_max_per_s
         n_particles, n_repeats = 400_000, 20
@@ -638,16 +589,11 @@ class TestChargeExchange:
 
     @pytest.mark.physics
     def test_the_ion_and_the_neutral_swap_identities(self) -> None:
-        # The ion leaves with exactly the neutral's velocity. Not "a thermal velocity" —
-        # *that* neutral's velocity. A freshly drawn thermal velocity would look identical
-        # in every distribution moment and would violate momentum conservation every time.
         sampler = self._sampler()
         before, after, target = self._collide_everything(sampler, n=20_000, energy_ev=100.0)
 
         np.testing.assert_array_equal(after, target)
 
-        # Momentum and energy of the (ion, neutral) pair, with the neutral leaving as the
-        # ion arrived. Equal masses for symmetric argon CX, so the sums are over velocity.
         neutral_after = before
         momentum_before = _M_AR * (before + target)
         momentum_after = _M_AR * (after + neutral_after)
@@ -662,14 +608,11 @@ class TestChargeExchange:
         sampler = self._sampler()
         _, after, _ = self._collide_everything(sampler, n=50_000, energy_ev=250.0)
 
-        # <E> = (3/2) k T_g regardless of the 250 eV the ion arrived with.
         energies = _kinetic_energy_ev(after, _M_AR)
         expected = 1.5 * _K_B * sampler.gas.temperature_k / _E
-        # Var(E) = (3/2) (k T)^2 for a 3-D Maxwellian, so sem = sqrt(3/2) kT / sqrt(n).
         sem = math.sqrt(1.5) * (_K_B * sampler.gas.temperature_k / _E) / math.sqrt(after.shape[0])
         assert energies.mean() == pytest.approx(expected, abs=_SIGMA * sem)
 
-        # And the shape, not only the mean: each Cartesian component is N(0, kT/m).
         scale = sampler.gas.thermal_speed_m_per_s
         result = stats.kstest(after[:, 2], stats.norm(loc=0.0, scale=scale).cdf)
         assert result.statistic < _KS_CRITICAL / math.sqrt(after.shape[0])
@@ -707,14 +650,14 @@ class TestTheChargeExchangeIedf:
     def test_the_wall_iedf_is_exponential_with_mean_e_field_times_mean_free_path(
         self,
     ) -> None:
-        length = 0.02  # doc 03 §4.4's domain length
+        length = 0.02
         bias_v = 250.0
-        field_v_per_m = -bias_v / length  # accelerates the positive ions towards z = 0
+        field_v_per_m = -bias_v / length
         sigma, density = 5e-19, 1e21
         mean_free_path = 1.0 / (density * sigma)
         assert length / mean_free_path == pytest.approx(10.0)
 
-        ceiling = 300.0  # above the 250 eV a never-scattered ion would reach
+        ceiling = 300.0
         sampler = NullCollisionSampler(
             species=_argon_ions(),
             gas=_gas(density_m3=density),
@@ -730,8 +673,6 @@ class TestTheChargeExchangeIedf:
         )
         ions = _argon_ions()
 
-        # nu_max dt = 1e-2 -> the scheme's 0.5 % rate deficit lengthens the effective mean
-        # free path by 0.5 %, which is folded into the tolerance below rather than ignored.
         nu_max_dt = 1e-2
         dt = nu_max_dt / sampler.nu_max_per_s
         n_particles = 20_000
@@ -744,11 +685,6 @@ class TestTheChargeExchangeIedf:
         in_flight = np.ones(n_particles, dtype=np.bool_)
         parking = length / 2.0
 
-        # An absorbed ion is parked mid-domain at rest with no field rather than removed
-        # from the arrays. Removing it would change the array shape almost every step, and
-        # JAX compiles per shape: the push would recompile thousands of times and the test
-        # would take minutes instead of seconds. A parked ion has zero speed, so
-        # nu = n sigma v = 0 and it can never collide again — it is inert, not merely quiet.
         for _ in range(12_000):
             pushed_positions, pushed_velocities = push_leapfrog(
                 ions,
@@ -760,8 +696,6 @@ class TestTheChargeExchangeIedf:
             positions = np.array(pushed_positions)
             moved = np.array(pushed_velocities)
 
-            # Specular reflection at the bulk boundary. Thermal ions decelerate within
-            # 3 um of it, so this touches a handful of particles and biases nothing.
             escaped = in_flight & (positions > length)
             positions[escaped] = 2.0 * length - positions[escaped]
             moved[escaped, 2] *= -1.0
@@ -780,16 +714,12 @@ class TestTheChargeExchangeIedf:
                 rng, positions_m=positions, velocities_m_per_s=moved, dt_s=dt
             ).velocities_m_per_s
 
-        # exp(-10) of the ions never charge-exchange at all and arrive at the full 250 eV;
-        # 12 000 steps is enough for every one of the rest to reach the wall.
         assert not in_flight.any(), f"{int(in_flight.sum())} ions never reached the wall"
         energies = arrival_ev
 
         expected_mean = bias_v / length * mean_free_path
         assert expected_mean == pytest.approx(25.0)
 
-        # Exponential: sd == mean, so sem = mean / sqrt(n). Plus the 0.5 % scheme deficit
-        # and the (3/2) k T_g = 0.039 eV the reborn ion already carries.
         tolerance = _SIGMA / math.sqrt(energies.size) + nu_max_dt / 2.0 + 2e-3
         assert energies.mean() == pytest.approx(expected_mean, rel=tolerance), (
             f"mean IEDF energy {energies.mean():.3f} eV against e|E| lambda = "
@@ -834,9 +764,6 @@ class TestElectronKinematics:
 
     @pytest.mark.physics
     def test_elastic_loses_exactly_the_two_m_over_mass_fraction(self) -> None:
-        # Delta E / E = (2 m_e / M) (1 - cos chi), with chi the angle between the incoming
-        # and outgoing directions. Asserted per particle against the recovered cos chi, so
-        # a wrong mass ratio or a missing factor of two cannot hide in the average.
         ceiling = 20.0
         sampler = self._one_channel(
             CollisionKind.ELECTRON_ELASTIC,
@@ -860,9 +787,7 @@ class TestElectronKinematics:
         expected = _kinetic_energy_ev(incoming, _M_E) * (1.0 - 2.0 * ratio * (1.0 - cos_chi))
         np.testing.assert_allclose(_kinetic_energy_ev(after, _M_E), expected, rtol=1e-12)
 
-        # Isotropic scattering has <cos chi> = 0, so the mean loss is exactly 2 m/M.
         loss = 1.0 - _kinetic_energy_ev(after, _M_E) / _kinetic_energy_ev(incoming, _M_E)
-        # sd(1 - cos chi) = 1/sqrt(3) for cos chi uniform on [-1, 1].
         sem = 2.0 * ratio / math.sqrt(3.0 * after.shape[0])
         assert loss.mean() == pytest.approx(2.0 * ratio, abs=_SIGMA * sem)
 
@@ -921,13 +846,11 @@ class TestElectronKinematics:
         assert secondary_v.shape == (n_events, 3)
         assert new_ion_v.shape == (n_events, 3)
 
-        # One electron in, two electrons and one ion out, and the threshold paid once.
         scattered = _kinetic_energy_ev(np.asarray(outcome.velocities_m_per_s)[hit], _M_E)
         ejected = _kinetic_energy_ev(secondary_v, _M_E)
         incoming = _kinetic_energy_ev(before[hit], _M_E)
         np.testing.assert_allclose(scattered + ejected + threshold, incoming, rtol=1e-11)
 
-        # The new particles are born where the ionising electron was, not at the origin.
         np.testing.assert_allclose(
             np.asarray(outcome.new_electron_positions_m), positions[hit], rtol=0.0, atol=0.0
         )
@@ -935,8 +858,6 @@ class TestElectronKinematics:
             np.asarray(outcome.new_ion_positions_m), positions[hit], rtol=0.0, atol=0.0
         )
 
-        # The ion is born out of the *neutral*, so it carries the gas temperature and not
-        # some fraction of the ionising electron's energy.
         ion_energy = _kinetic_energy_ev(new_ion_v, _M_AR)
         expected = 1.5 * _K_B * sampler.gas.temperature_k / _E
         sem = math.sqrt(1.5) * (_K_B * sampler.gas.temperature_k / _E) / math.sqrt(n_events)
@@ -984,13 +905,9 @@ class TestIonElasticKinematics:
         v_cm = (_M_AR * incoming + sampler.gas.mass_kg * target) / total_mass
         relative_speed = np.linalg.norm(incoming - target, axis=1)
 
-        # |v_i' - v_cm| = (m_n / (m_i + m_n)) |g| is exactly conservation of both.
         expected = sampler.gas.mass_kg / total_mass * relative_speed
         np.testing.assert_allclose(np.linalg.norm(after - v_cm, axis=1), expected, rtol=1e-12)
 
-        # Isotropy: <cos chi> = 0 over the deflection angle in the centre-of-mass frame.
-        # v_i - v_cm = (m_n / M) (v_i - v_n) before the collision as well as after, which
-        # is why the same normalisation serves both directions.
         direction = (after - v_cm) / expected[:, None]
         incoming_direction = (incoming - v_cm) / expected[:, None]
         cos_chi = np.sum(direction * incoming_direction, axis=1)
@@ -1022,9 +939,6 @@ class TestReproducibility:
         np.testing.assert_array_equal(first, second)
 
     def test_the_generator_is_the_collisions_stream(self) -> None:
-        # Not merely "a" generator: doc 10 §5 requires the noise model and the plasma solve
-        # to be independently perturbable, which only holds if this module draws from its
-        # own stream.
         from_helper = self._run(collision_generator(_SEED))
         from_stream = self._run(generator(_SEED, Stream.COLLISIONS))
 
@@ -1041,8 +955,6 @@ class TestTheBackgroundGas:
     """The neutral reservoir, against the ideal gas law and doc 01 §2.1's RP-1."""
 
     def test_the_neutral_density_matches_the_ideal_gas_law_at_rp1(self) -> None:
-        # 5 mTorr at 300 K. 1 Torr = 133.322 Pa, so p = 0.66661 Pa and
-        # n = p / (k_B T) = 1.61e20 m^-3.
         pascals_per_mtorr = 133.322 / 1000.0
         density = neutral_density_m3(pressure_pa=5.0 * pascals_per_mtorr, temperature_k=300.0)
 
@@ -1054,8 +966,6 @@ class TestTheBackgroundGas:
         assert gas.thermal_speed_m_per_s == pytest.approx(
             math.sqrt(_K_B * 300.0 / _M_AR), rel=1e-12
         )
-        # sqrt(k T / m) for argon at 300 K is 251 m/s, well below the 2 691 m/s Bohm speed
-        # of doc 03 §2.3 — which is why a post-CX ion counts as "slow".
         assert gas.thermal_speed_m_per_s == pytest.approx(251.0, rel=1e-2)
 
 
@@ -1070,8 +980,6 @@ class TestTheGuards:
             )
 
     def test_mixing_electron_and_ion_processes_in_one_sampler_is_refused(self) -> None:
-        # One sampler serves one species. Mixing them would apply electron kinematics to
-        # ions, which is a wrong answer rather than a crash.
         with pytest.raises(ValueError, match="one species"):
             NullCollisionSampler(
                 species=_argon_ions(),
@@ -1126,8 +1034,6 @@ class TestTheGuards:
             )
 
     def test_no_particles_is_not_an_error(self) -> None:
-        # An emptied species is a legitimate transient state at the start of a run, and a
-        # crash here would be indistinguishable from a physics failure in the log.
         sampler = TestChargeExchange._sampler(ceiling=10.0)
         outcome = sampler.collide(
             collision_generator(_SEED),

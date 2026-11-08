@@ -109,9 +109,6 @@ def _fwhm_of(x: NDArray[np.float64], y: NDArray[np.float64]) -> float:
     return float(right - left)
 
 
-# ── the Doppler mapping (doc 04 §3.2) ───────────────────────────────────────────
-
-
 class TestTheDopplerMapping:
     def test_the_mapping_inverts_itself(self) -> None:
         transition = ProbeTransition.from_registry()
@@ -154,8 +151,6 @@ class TestTheDopplerMapping:
             projection_factor=1.0,
         )
 
-        # doc 01 §5.1: "A 250 eV Ar+ ion travels at 3.47e4 m/s, giving a Doppler shift of
-        # 51.9 GHz at 668.6 nm."
         assert float(detuning[0]) / 1.0e9 == pytest.approx(51.9, rel=1e-3)
 
 
@@ -204,9 +199,6 @@ class TestTheDopplerWidth:
         )
 
         assert magnitude_in(projected, "MHz") == pytest.approx(734.0 * 0.2588, rel=0.01)
-
-
-# ── the scan and the tuning-range limit ─────────────────────────────────────────
 
 
 class TestDetuningScan:
@@ -281,9 +273,6 @@ class TestTuningCoverage:
         )
 
         assert magnitude_in(coverage.energy_ceiling, "eV") == pytest.approx(138.0, rel=0.02)
-
-
-# ── the signal itself ───────────────────────────────────────────────────────────
 
 
 def _weak_pump_scan(
@@ -385,9 +374,6 @@ class TestTheWeakPumpLineshape:
         broadening inside the inverse model rather than deconvolving the data.
         """
         temperature_ev = 0.05
-        # Fine in velocity, so the shrinking homogeneous width stays resolved by the
-        # quadrature. Under-resolving it is a real failure mode and has its own guard and
-        # its own test below; conflating the two here would hide both.
         distribution = _maxwellian(temperature_ev=temperature_ev, n_v=12001)
         base = ProbeTransition.from_registry()
         input_sigma = _thermal_speed(temperature_ev=temperature_ev)

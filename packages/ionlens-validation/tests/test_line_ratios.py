@@ -64,8 +64,6 @@ from ionlens.validation.line_ratios import (
     transition_wavelength_nm,
 )
 
-# ── the real argon levels ────────────────────────────────────────────────────────
-
 
 class TestPublishedArgonLevels:
     def test_the_ground_state_sits_at_zero(self) -> None:
@@ -73,9 +71,6 @@ class TestPublishedArgonLevels:
         assert argon_level("ground").degeneracy == 1
 
     def test_the_four_1s_levels_are_present_in_ascending_energy(self) -> None:
-        # The textbook ordering: 1s5 (metastable) < 1s4 (resonant) < 1s3 (metastable)
-        # < 1s2 (resonant). Getting this order wrong is the kind of transcription error
-        # doc 09 §1 exists to catch before it reaches a CR model.
         energies = [argon_level(label).energy_ev for label in ("1s5", "1s4", "1s3", "1s2")]
 
         assert energies == sorted(energies)
@@ -85,10 +80,6 @@ class TestPublishedArgonLevels:
         assert argon_level("1s3").role == "metastable"
 
     def test_every_degeneracy_is_two_j_plus_one(self) -> None:
-        # g = 2J + 1 is a physics identity, not a transcribed number. Checking it against
-        # the independently-transcribed J and g columns is a check on the transcription
-        # itself, in the spirit of the h*nu = E_k - E_i check ionlens.physics.atomic.nist
-        # applies to NIST "Lines" rows.
         for level in published_argon_levels():
             assert level.degeneracy == pytest.approx(2 * level.j + 1)
 
@@ -135,9 +126,6 @@ class TestTransitionWavelengthsReproduceTheKnownLines:
             transition_wavelength_nm(argon_level("1s5"), argon_level("2p9"))
 
 
-# ── the accuracy benchmark ───────────────────────────────────────────────────────
-
-
 class TestPublishedAccuracyBenchmarks:
     def test_three_calibration_points_are_transcribed(self) -> None:
         assert len(published_accuracy_benchmarks()) == 3
@@ -149,9 +137,6 @@ class TestPublishedAccuracyBenchmarks:
             assert row.calibration
 
     def test_the_maximum_error_is_never_smaller_than_the_average(self) -> None:
-        # A sanity check on the transcription itself: Zheng et al report both a maximum
-        # and an average error over their power sweep, and the maximum cannot be less
-        # than the average of the same set.
         for row in published_accuracy_benchmarks():
             assert row.max_t_e_error >= row.avg_t_e_error
             assert row.max_n_e_error >= row.avg_n_e_error
@@ -160,9 +145,6 @@ class TestPublishedAccuracyBenchmarks:
         row: SpectroscopicAccuracyBenchmark = published_accuracy_benchmarks()[0]
         with pytest.raises(AttributeError):
             row.avg_t_e_error = 0.0  # type: ignore[misc]
-
-
-# ── V-24 itself ─────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture(scope="module")
@@ -237,12 +219,6 @@ def real_argon_partial_system(grid: EnergyGrid) -> LevelSystem:
         RadiativeChannel(
             upper="2p9",
             lower="1s5",
-            # 3.31e7 /s is the widely-published Ar I 2p9 -> 1s5 Einstein coefficient
-            # (already used for this same transition in
-            # ionlens-instruments/tests/oes_system.py). It is used here as an *inherited*
-            # textbook value, not one this session re-verified against a live NIST ASD
-            # "Lines" query — that query returned "Invalid Input" for every parameter
-            # combination tried. See the module docstring.
             a_ul_per_s=3.31e7,
             wavelength_nm=transition_wavelength_nm(upper, metastable),
         ),
@@ -271,14 +247,8 @@ class TestTheV24Comparison:
     def test_the_real_argon_system_solves_and_the_gap_that_remains(
         self, grid: EnergyGrid, real_argon_partial_system: LevelSystem
     ) -> None:
-        # T_e = 3.5 eV sits inside the 2.4-8.1 eV range Zheng et al (2020) report across
-        # their triple-frequency Ar CCP conditions (Figs 2(b), 3(b), 4(b), 5(b)).
         t_e_ev = 3.5
         f0 = grid.normalise(maxwellian_eedf(grid.centres_ev, electron_temperature_ev=t_e_ev))
-        # n_g = 1.6e20 m^-3 and n_e = 1e17 m^-3 match the reference argon density and a
-        # mid-envelope electron density already used throughout
-        # ionlens-instruments/tests/test_cr.py, so this run sits in the same regime the
-        # rest of the CR-model test suite exercises.
         model = CollisionalRadiativeModel(
             system=real_argon_partial_system, grid=grid, wall_loss_per_s={"1s5": 1.0e4}
         )
@@ -287,20 +257,12 @@ class TestTheV24Comparison:
             electron_density_per_m3=1.0e17, ground_density_per_m3=1.6e20, f0=f0
         )
 
-        # The real, independently-anchored half of this test: a CR run at genuine argon
-        # level energies produces a physically sensible (positive, finite) population for
-        # the real 811.53 nm upper level.
         assert populations["2p9"] > 0.0
         assert np.isfinite(populations["2p9"])
-        line_811_intensity = populations["2p9"] * 3.31e7  # proportional to eps_ul
+        line_811_intensity = populations["2p9"] * 3.31e7
 
-        # The classic diagnostic Zheng et al (and Boffard, and Zhu & Pu) actually report
-        # is a *ratio* of two lines — 750.39/811.53 or 763.51/811.53 nm — because a
-        # single line's absolute intensity depends on n_g and the optical calibration in
-        # a way a ratio does not. Forming it needs a second A_ul this session could not
-        # verify (module docstring). No fabricated value is substituted.
         missing_companion_lines = ("2p1 -> 1s2 (750.39 nm)", "2p6 -> 1s5 (763.51 nm)")
-        assert line_811_intensity > 0.0  # the half of the ratio that *can* be computed
+        assert line_811_intensity > 0.0
 
         pytest.xfail(
             "doc 04 §8 V-24 is not closed by this test. A CR run on real NIST argon "

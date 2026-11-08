@@ -132,77 +132,24 @@ __all__ = [
 
 type LogLikelihood = Callable[[NDArray[np.float64]], float]
 
-#: Returned in place of the objective where the prior has no support. Large and finite
-#: rather than ``inf``: L-BFGS-B's line search handles a big number gracefully and can be
-#: derailed by a non-finite one, and the gradient of ``inf`` is ``nan``.
 _OUT_OF_SUPPORT: Final[float] = 1e30
 
-#: Central-difference step in unconstrained space. The coordinates are O(1) there by
-#: construction — that is the point of the transform — so a single absolute step is
-#: appropriate and there is no scale to chase.
 _GRADIENT_STEP: Final[float] = 1e-6
 
-#: doc 05 §5 puts MAP at 10^2-10^3 evaluations. This bounds a pathological case rather than
-#: a normal one; hitting it is reported as non-convergence, never silently returned.
 _DEFAULT_MAX_ITERATIONS: Final[int] = 500
 
-#: Projected-gradient tolerance. SciPy's L-BFGS-B default is 1e-5, which stops while the
-#: estimate is still ~1e-6 from the true mode on a well-conditioned quadratic. That is
-#: comfortably good enough for a point estimate and *not* good enough for doc 05 §7.2's T0,
-#: which requires "recovery to numerical tolerance" and treats a shortfall as a bug rather
-#: than a result. Tightened deliberately: the cost is a few extra iterations, and the
-#: alternative was to loosen the verification test until the default passed.
 _GRADIENT_TOLERANCE: Final[float] = 1e-10
 
-#: Gradient infinity-norm below which a point is certified a stationary point regardless of
-#: what the optimiser reported. L-BFGS-B returns ``ABNORMAL_TERMINATION_IN_LNSRCH`` when its
-#: line search stops making progress, and at the tolerance above that happens routinely once
-#: the **finite-difference** gradient reaches its own noise floor — which for
-#: :data:`_GRADIENT_STEP` and an O(1) objective is around 1e-8. The point is then already the
-#: optimum to ~1e-9, and calling it a failure is a false negative.
-#:
-#: That false negative is expensive rather than cosmetic: measured on 60 linear-Gaussian
-#: problems it fired on 3 of them, i.e. 5 % of an ensemble, and
-#: :mod:`ionlens.validation.coverage` refuses to report coverage at all past a 10 % failure rate.
-#: So ``converged`` means "this is a mode", not "SciPy was happy". A saddle with a
-#: coincidentally small gradient is not admitted by this: the Hessian check in
-#: :func:`~ionlens.inverse.laplace.laplace_posterior` rejects non-positive curvature separately.
 _STATIONARITY_TOLERANCE: Final[float] = 1e-6
 
-#: Relative function tolerance, tightened for the same reason. ``ftol`` is expressed by
-#: L-BFGS-B as a multiple of machine epsilon; this asks it to stop on the gradient rather
-#: than on a function-value plateau, which is the more meaningful criterion at an optimum.
 _FUNCTION_TOLERANCE: Final[float] = 1e-15
 
-#: Standard deviation of the Gaussian perturbation added to the reference start for the
-#: extra points a multi-start search adds beyond the first — see the module docstring's
-#: "Multi-start" section for why a perturbation rather than a fresh prior draw. A few units
-#: in a space that is O(1) by construction is enough to reach a neighbouring basin without
-#: routinely leaving the region the objective evaluates sensibly in.
 _MULTI_START_PERTURBATION_SCALE: Final[float] = 3.0
 
-#: Two optimised points farther apart than this (Euclidean, unconstrained space) are counted
-#: as different modes for :attr:`MapResult.n_distinct_modes`. Set well above the optimiser's
-#: own convergence tolerance (:data:`_STATIONARITY_TOLERANCE` operates on the gradient, not
-#: on position, but a converged L-BFGS-B run is typically within 1e-6 to 1e-4 of its true
-#: local optimum) and well below :data:`_MULTI_START_PERTURBATION_SCALE`, so it separates
-#: "two starts converged to the same point" from "two starts converged to different points"
-#: without being sensitive to the exact perturbation size chosen above.
 _MODE_CLUSTER_TOLERANCE: Final[float] = 1e-2
 
-#: How many times :func:`_bounded_perturbation` will redraw a single extra start before
-#: giving up and falling back to the reference point — see its docstring for why a draw is
-#: ever rejected at all. Generous rather than tight: a rejection only costs a prior
-#: evaluation (cheap; no forward model runs), so there is no reason to economise on
-#: attempts, and doc 05 §2.1's tightest boxes (e.g. ``kappa``'s ``[1, 5]``) can need several
-#: redraws at :data:`_MULTI_START_PERTURBATION_SCALE` before landing inside.
 _MAX_PERTURBATION_ATTEMPTS: Final[int] = 20
 
-#: Factor the perturbation scale is multiplied by after each rejected draw within one
-#: start's attempt budget. A rejected draw means the *current* scale is too large for this
-#: particular coordinate's prior box; shrinking geometrically rather than retrying the same
-#: scale converges toward a valid point within the attempt budget instead of repeating the
-#: same failure, while still trying the full requested scale first.
 _PERTURBATION_SHRINK: Final[float] = 0.7
 
 
@@ -522,18 +469,11 @@ def _result_at(
 ) -> MapResult:
     value = objective(u)
     gradient = jacobian(u)
-    # Only the Level A vector maps back to named physical quantities. Anything else — a
-    # Level B/C vector, or one of the low-dimensional problems the engine is verified on —
-    # simply has no ControlParameters representation, and inventing one would be worse than
-    # reporting its absence.
     parameters = (
         ControlParameters.from_unconstrained(u)
         if u.size == len(ControlParameters.__dataclass_fields__)
         else None
     )
-    # A point the objective cannot evaluate is not an estimate, whatever the optimiser said.
-    # Conversely, a point whose gradient has vanished *is* a mode even when the optimiser
-    # reported an abnormal line-search termination — see _STATIONARITY_TOLERANCE.
     stationary = bool(np.max(np.abs(gradient)) <= _STATIONARITY_TOLERANCE)
     healthy = (converged or stationary) and np.isfinite(value) and value < _OUT_OF_SUPPORT
     return MapResult(

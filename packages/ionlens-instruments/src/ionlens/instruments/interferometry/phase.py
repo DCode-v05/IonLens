@@ -110,8 +110,6 @@ __all__ = [
 
 type FloatArray = NDArray[np.float64]
 
-# ── constants pulled from the shared registry once, as plain floats for hot loops ──
-# (doc 08 §5: cross a module boundary once, then work in SI magnitudes.)
 
 _CLASSICAL_ELECTRON_RADIUS_M: Final[float] = float(magnitude_in(CLASSICAL_ELECTRON_RADIUS, "m"))
 _VACUUM_PERMITTIVITY_F_PER_M: Final[float] = float(magnitude_in(VACUUM_PERMITTIVITY, "F/m"))
@@ -119,39 +117,20 @@ _ELECTRON_MASS_KG: Final[float] = float(magnitude_in(ELECTRON_MASS, "kg"))
 _ELEMENTARY_CHARGE_C: Final[float] = float(magnitude_in(ELEMENTARY_CHARGE, "C"))
 _SPEED_OF_LIGHT_M_PER_S: Final[float] = float(magnitude_in(SPEED_OF_LIGHT, "m/s"))
 
-# ── the doc 02 §8.2 hardware specification ──────────────────────────────────────
 
-#: IF-L1: CO2 laser line. Doc 01 §5.4 rejects 633 nm HeNe on sensitivity grounds — a HeNe
-#: interferometer is blind at RP-1 by a factor of about six.
 CO2_WAVELENGTH_M: Final[float] = 10.6e-6
 
-#: IF-P2 / doc 02 §3.1: the full 400 mm chamber diameter, used as the default chord
-#: length. Widening the chamber from the 100 mm assumed in doc 01 §5.4 is "a design
-#: decision made because of a requirements calculation" — see the module docstring.
 CHAMBER_DIAMETER_M: Final[float] = 0.400
 
-#: IF-P1: the heterodyne phase resolution, 0.1 mrad.
 PHASE_RESOLUTION_RAD: Final[float] = 1.0e-4
 
-#: IF-G1: eight parallel chords.
 N_CHORDS: Final[int] = 8
 
-#: IF-G1: 5 mm spacing between chords in z.
 CHORD_SPACING_M: Final[float] = 5.0e-3
 
-#: IF-L2: the AOM heterodyne offset. Not used numerically by this module — it is what
-#: makes the detection heterodyne (phase-sign recovery, drift rejection); see
-#: :mod:`ionlens.instruments.interferometry.instrument`'s module docstring for where that
-#: shows up in the model — but it is named here as part of the doc 02 §8.2 specification
-#: table this module implements.
 HETERODYNE_OFFSET_HZ: Final[float] = 40.0e6
 
-# ── the neutral-gas term ────────────────────────────────────────────────────────
 
-#: Static (zero-frequency) polarisability *volume* of argon: 11.080 in units of the Bohr
-#: radius cubed (Dalgarno & Kingston 1960, Table 2), converted with
-#: a0 = 5.29177210903e-11 m (CODATA), a0^3 = 1.481847e-31 m^3.
-#: 11.080 * 1.481847e-31 = 1.6419e-30 m^3.
 ARGON_STATIC_POLARIZABILITY_VOLUME_M3: Final[float] = 1.6419e-30
 
 

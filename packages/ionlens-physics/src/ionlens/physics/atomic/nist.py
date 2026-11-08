@@ -71,25 +71,12 @@ __all__ = [
 
 FloatArray: TypeAlias = NDArray[np.float64]
 
-#: ``h c`` in eV nm — 1239.84. From CODATA via :mod:`ionlens.core.constants`, never typed in:
-#: doc 09 §2.5 makes a hand-entered fundamental constant "a plausible, undetectable and
-#: catastrophic error", and this one converts every wavelength in the project.
 _HC_EV_NM: Final[float] = float(magnitude_in(PLANCK * SPEED_OF_LIGHT, "eV * nm"))
 
-#: How far a tabulated ``h nu`` may sit from ``E_k - E_i`` before the row is rejected.
-#: See the module docstring: 0.03 % is the air-vacuum offset of a real row, and anything
-#: that survives 1 % is not a unit confusion.
 WAVELENGTH_ENERGY_TOLERANCE: Final[float] = 0.01
 
-#: How far an ASD wavelength may sit from the one doc 02 §6.3 tabulates and still be the
-#: same line. Doc 02 §6.3 quotes two decimals and ASD carries four, so the tolerance has
-#: to absorb 0.014 nm of rounding on the worst line in the set (Ar II 488.00). The
-#: closest pair in the set is 1.08 nm apart, so there is two orders of magnitude of
-#: headroom before this could match the wrong line.
 LINE_MATCH_TOLERANCE_NM: Final[float] = 0.05
 
-#: Spectrum number to spectroscopic numeral. Ar I is the neutral, Ar II the singly
-#: charged ion — the two doc 02 §6.3 uses, with room for the rest.
 _ROMAN_NUMERALS: Final[tuple[str, ...]] = ("I", "II", "III", "IV", "V", "VI", "VII", "VIII")
 
 
@@ -113,7 +100,6 @@ class AccuracyGrade(StrEnum):
     C = "C"
     D_PLUS = "D+"
     D = "D"
-    #: "> 50 %". An open-ended bound, not a value — see :attr:`is_bounded`.
     E = "E"
 
     @property
@@ -146,7 +132,6 @@ class AccuracyGrade(StrEnum):
         return Uncertainty(kind="relative", value=self.relative_uncertainty)
 
 
-#: doc 09 §2.2's grade table, verbatim. Each value is the NIST bound for that grade.
 _GRADE_UNCERTAINTY: Final[Mapping[AccuracyGrade, float]] = MappingProxyType(
     {
         AccuracyGrade.AAA: 0.003,
@@ -162,9 +147,6 @@ _GRADE_UNCERTAINTY: Final[Mapping[AccuracyGrade, float]] = MappingProxyType(
         AccuracyGrade.E: 0.50,
     }
 )
-
-
-# ── the data ────────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True, slots=True)
@@ -290,13 +272,6 @@ class LineSpec:
     role: str
 
 
-#: The over-determined line set of doc 02 §6.3, in the order that document tabulates it.
-#:
-#: doc 02 §6.3 chose these for strong emission, minimal blending at 0.026 nm resolution,
-#: and differing excitation-threshold sensitivity — "so that the ratios actually
-#: constrain ``T_e``". The 750.39/811.53 pair is the classical discriminator: the first
-#: is insensitive and the second highly sensitive to the metastable population, and using
-#: both separates ``T_e`` from ``n_metastable`` in a way one ratio cannot.
 DOC_02_LINE_SET: Final[tuple[LineSpec, ...]] = (
     LineSpec("Ar I", 750.39, "2p1", "direct excitation dominated"),
     LineSpec("Ar I", 751.47, "2p5", "direct excitation dominated"),
@@ -444,11 +419,6 @@ class LineList:
         return f"LineList({len(self)} transitions, {self.rows_without_a_ul} without A_ul)"
 
 
-# ── parsing ─────────────────────────────────────────────────────────────────────
-
-#: Which wavelength column to prefer, best first. Observed before Ritz because doc 02 §11
-#: calibrates the wavelength axis against a NIST line list and the observed value is what
-#: a spectrometer would see; air before vacuum for the same reason.
 _WAVELENGTH_COLUMNS: Final[tuple[str, ...]] = (
     "obs_wl_air",
     "obs_wl_vac",
@@ -456,7 +426,6 @@ _WAVELENGTH_COLUMNS: Final[tuple[str, ...]] = (
     "ritz_wl_vac",
 )
 
-#: ``(column, expected units)``. ``None`` means the column carries no units.
 _REQUIRED_COLUMNS: Final[tuple[tuple[str, str | None], ...]] = (
     ("element", None),
     ("sp_num", None),
@@ -468,19 +437,14 @@ _REQUIRED_COLUMNS: Final[tuple[tuple[str, str | None], ...]] = (
     ("g_k", None),
 )
 
-#: Assembled, in order, into :attr:`Transition.upper_level`.
 _UPPER_LEVEL_COLUMNS: Final[tuple[str, ...]] = ("conf_k", "term_k", "J_k")
 
 _WAVELENGTH_UNITS: Final[str] = "nm"
 
-#: Characters ASD uses to qualify a number: brackets for a predicted value, a question
-#: mark for a questionable one. Stripped so the value is readable; the qualification is
-#: not modelled, which is a known simplification rather than an oversight.
 _QUALIFIERS: Final[str] = "[]()?"
 
 _DELIMITERS: Final[tuple[str, ...]] = ("\t", "|")
 
-#: Characters that make up a rule between ASD's header and its rows.
 _RULE_CHARACTERS: Final[frozenset[str]] = frozenset("-+| ")
 
 
@@ -623,7 +587,6 @@ def parse_nist_asd(text: str) -> LineList:
             )
 
         if not _clean(cells[columns["Aki"]]):
-            # A level pair, not a line. Counted rather than silently forgotten.
             without_a_ul += 1
             continue
 
@@ -658,7 +621,6 @@ def _transition(cells: Sequence[str], *, columns: Mapping[str, int], line: int) 
             upper_level=label,
         )
     except NistParseError:
-        # Already names its row; re-wrapping would name it twice.
         raise
     except ValueError as exc:
         raise NistParseError(f"row {line}: {exc}") from exc

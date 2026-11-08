@@ -45,12 +45,6 @@ def _fine_grid() -> EnergyGrid:
 class TestTheMaxwellianLimit:
     @pytest.mark.physics
     def test_kappa_to_infinity_recovers_the_maxwellian(self) -> None:
-        # The single most valuable property of this family: it is not an independent
-        # shape bolted on beside the Maxwellian, it *contains* the Maxwellian as a limit.
-        # kappa = 1e8 keeps every gamma-function argument well inside float64 range
-        # (gamma overflows around x ~ 171) while still being deep in the asymptotic
-        # regime, so the residual is a clean measure of "is this the right limit" rather
-        # than of numerical breakdown.
         energy = np.linspace(0.0, 40.0, 400)
         electron_temperature_ev = 3.0
 
@@ -86,11 +80,6 @@ class TestTheMaxwellianLimit:
 
 
 class TestNormalisation:
-    # kappa near KAPPA_DISTRIBUTION_MINIMUM_KAPPA is deliberately excluded here: the
-    # mean-energy integrand there decays close to eps**-1, which converges but so slowly
-    # that no grid of any practical size resolves it to a tight tolerance. That is a
-    # property of the physics near the validity bound, not of the implementation — see
-    # TestRejections for the bound itself, which is where that regime belongs.
     @pytest.mark.physics
     @pytest.mark.parametrize("kappa", [3.0, 5.0, 10.0, 50.0])
     def test_every_member_of_the_family_integrates_to_one(self, kappa: float) -> None:
@@ -103,9 +92,6 @@ class TestNormalisation:
     @pytest.mark.physics
     @pytest.mark.parametrize("kappa", [3.0, 5.0, 10.0, 50.0])
     def test_the_mean_energy_is_three_halves_t_e_independent_of_kappa(self, kappa: float) -> None:
-        # The whole point of the (kappa - 3/2) normalisation convention: unlike
-        # generalised_eedf's family, a kappa distribution *does* have a well-defined
-        # temperature, and it is the same T_e that was asked for, for every kappa.
         grid = _fine_grid()
         electron_temperature_ev = 3.0
 
@@ -119,9 +105,6 @@ class TestNormalisation:
 class TestTheTail:
     @pytest.mark.physics
     def test_the_tail_is_enhanced_relative_to_a_maxwellian_at_the_same_T_e(self) -> None:
-        # The entire physical point of a kappa distribution: a power-law tail carries
-        # more high-energy electrons than an exponential one at the same T_e, which is
-        # what drives the excitation and ionisation rates doc 05 §7.1 cares about.
         energies = np.array([20.0, 25.0, 30.0, 40.0])
         electron_temperature_ev = 3.0
 
@@ -136,12 +119,6 @@ class TestTheTail:
 
     @pytest.mark.physics
     def test_a_smaller_kappa_enhances_the_tail_more(self) -> None:
-        # Smaller kappa is a heavier, more power-law-like tail; larger kappa approaches
-        # the Maxwellian from above. Far enough into the tail the enhancement shrinks
-        # monotonically as kappa grows — "far enough" matters: at a moderate energy the
-        # amplitude and the power-law exponent trade off and the ordering is not
-        # monotonic, which is why this is checked deep in the tail rather than near the
-        # mean energy.
         energy = np.array([1.0e3])
         electron_temperature_ev = 3.0
         maxwell = maxwellian_eedf(energy, electron_temperature_ev=electron_temperature_ev)[0]
@@ -160,9 +137,6 @@ class TestTheTail:
 class TestRejections:
     @pytest.mark.parametrize("kappa", [1.5, 1.0, 0.0, -1.0])
     def test_kappa_at_or_below_the_validity_bound_is_refused(self, kappa: float) -> None:
-        # kappa = 3/2 is not merely inconvenient, it is where <eps> stops existing: the
-        # tail integral integral eps**(3/2) f0 deps diverges. A ValueError here is the
-        # correct outcome, not an edge case to special-case away.
         with pytest.raises(ValueError, match="kappa"):
             kappa_eedf(np.array([1.0]), electron_temperature_ev=3.0, kappa=kappa)
 
@@ -179,9 +153,6 @@ class TestRejections:
 
     @pytest.mark.physics
     def test_a_large_kappa_does_not_warn_or_produce_nan(self) -> None:
-        # filterwarnings = ["error"] in pyproject.toml turns any RuntimeWarning (gamma
-        # overflow, log(0), etc.) into a failure, so this is a numerical-robustness
-        # regression test as much as a physics one.
         f0 = kappa_eedf(np.linspace(0.0, 400.0, 4000), electron_temperature_ev=3.0, kappa=1.0e8)
 
         assert np.all(np.isfinite(f0))

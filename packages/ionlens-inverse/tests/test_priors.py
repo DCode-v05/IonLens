@@ -43,13 +43,8 @@ from ionlens.inverse.priors import (
     smoothness_log_prior,
 )
 
-#: How closely a closed form must reproduce `scipy.stats`. The brief says ~1e-12; these
-#: are the same expression evaluated in a different order, so the agreement is at the
-#: level of the last couple of bits and 1e-13 is comfortably met.
 SCIPY_TOL = 1e-12
 
-#: How closely a density must integrate to one. `quad` on a smooth 1-D integrand does far
-#: better than this; the tolerance is set by the tails it truncates, not by the method.
 QUADRATURE_TOL = 1e-9
 
 INTERIOR = ControlParameters(
@@ -124,9 +119,6 @@ class TestClosedFormsAgainstScipy:
             )
 
     def test_log_normal(self) -> None:
-        # `lognorm` takes the log-scale sigma as its shape and the *median* as `scale`.
-        # Passing the mean of the log as `scale` instead is the classic error and would
-        # shift the T_e prior by a factor of e^3.
         prior = LogNormalPrior(median=3.0, log_sigma=0.4)
 
         for x in (0.5, 1.0, 3.0, 8.0, 30.0):
@@ -135,8 +127,6 @@ class TestClosedFormsAgainstScipy:
             )
 
     def test_truncated_normal(self) -> None:
-        # `truncnorm` bounds are standardised: a = (low - mean)/sigma. Passing the raw
-        # bounds is the classic error and silently renormalises the density.
         prior = TruncatedNormalPrior(mean=0.10, sigma=0.03, low=0.0, high=0.3)
         a, b = (0.0 - 0.10) / 0.03, (0.3 - 0.10) / 0.03
 
@@ -146,9 +136,6 @@ class TestClosedFormsAgainstScipy:
             )
 
     def test_truncated_normal_matches_when_the_truncation_is_severe(self) -> None:
-        # The stable branch of log(Phi(b) - Phi(a)) is only exercised when both bounds sit
-        # far into one tail, which is where the naive difference of two ~1.0 numbers loses
-        # every significant digit.
         prior = TruncatedNormalPrior(mean=0.0, sigma=1.0, low=4.0, high=9.0)
         expected = float(stats.truncnorm.logpdf(5.0, 4.0, 9.0, loc=0.0, scale=1.0))
 
@@ -203,24 +190,18 @@ class TestNormalisationByQuadrature:
             assert mass == pytest.approx(1.0, abs=QUADRATURE_TOL), spec.name
 
     def test_a_truncated_normal_is_renormalised_by_its_truncated_mass(self) -> None:
-        # The point of the truncation: a normal restricted to [0, 0.3] must integrate to
-        # one over [0, 0.3], not to the 0.99957 the untruncated density leaves there.
         prior = TruncatedNormalPrior(mean=0.10, sigma=0.03, low=0.0, high=0.3)
         mass, _ = integrate.quad(lambda x: math.exp(prior.log_prob(x)), 0.0, 0.3)
 
         assert mass == pytest.approx(1.0, abs=QUADRATURE_TOL)
 
     def test_the_truncation_correction_is_the_documented_size(self) -> None:
-        # A cross-check on the direction of the correction, computed independently: the
-        # normal N(0.10, 0.03) puts 4.2779e-4 of its mass below zero, so the truncated
-        # density is larger than the untruncated one by exactly 1/(1 - 4.2779e-4).
         untruncated = NormalPrior(mean=0.10, sigma=0.03)
         truncated = TruncatedNormalPrior(mean=0.10, sigma=0.03, low=0.0, high=0.3)
         retained = float(stats.norm.cdf(0.3, 0.10, 0.03) - stats.norm.cdf(0.0, 0.10, 0.03))
 
         difference = truncated.log_prob(0.12) - untruncated.log_prob(0.12)
 
-        # 1 - Phi(-10/3) - Phi(-20/3) = 1 - 4.29060e-4 - 1.3065e-11, from a normal table.
         assert retained == pytest.approx(1.0 - 4.29060e-4 - 1.3065e-11, abs=1e-9)
         assert difference == pytest.approx(-math.log(retained), rel=1e-13)
 
@@ -251,25 +232,18 @@ class TestTheJacobianInUnconstrainedSpace:
             assert mass == pytest.approx(1.0, abs=1e-8), spec.name
 
     def test_dropping_the_jacobian_would_not_integrate_to_one(self) -> None:
-        # The negative control. If this test ever passes for a parameter, the Jacobian for
-        # that parameter is a no-op and the corresponding assertion above proves nothing.
         prior = default_control_prior()
         lower, upper = unconstrained_bounds()
 
         for index, spec in enumerate(CONTROL_PARAMETERS):
             if spec.name == "V_w":
-                continue  # identity transform; the Jacobian is genuinely one
+                continue
             marginal = prior.marginal(spec.name)
             transform = spec.transform
 
             def wrong(u: float, m=marginal, t=transform) -> float:  # type: ignore[no-untyped-def]
                 return math.exp(m.log_prob(t.to_constrained(u)))
 
-            # A finite window that contains essentially all the mass of the *correct*
-            # density. Restricting it is not a weakening of the control: the correct
-            # integral over this same window is 1 to better than 1e-9, so any departure
-            # here is the missing Jacobian and nothing else. The unrestricted integral
-            # for several of these is genuinely divergent, which is the point.
             centre = transform.to_unconstrained(marginal.median)
             low = max(float(lower[index]), centre - 40.0)
             high = min(float(upper[index]), centre + 40.0)
@@ -296,8 +270,6 @@ class TestTheJacobianInUnconstrainedSpace:
         assert prior.log_prob(INTERIOR) == pytest.approx(expected, rel=1e-14)
 
     def test_a_point_outside_the_support_is_minus_infinity_not_an_exception(self) -> None:
-        # An optimiser stepping out of a log-uniform box must be told "no" by the
-        # objective, not by a traceback: L-BFGS-B backtracks on -inf and cannot on a raise.
         prior = default_control_prior()
         u = INTERIOR.to_unconstrained()
         u[0] = math.log(1.0e21)
@@ -308,10 +280,6 @@ class TestTheJacobianInUnconstrainedSpace:
         assert math.isfinite(default_control_prior().log_prob(ControlParameters.reference()))
 
     def test_the_reference_point_is_not_a_usable_unconstrained_start(self) -> None:
-        # Surfaced by this test suite rather than by a debugging session downstream.
-        # `eedf.kappa`'s registered nominal of 1.0 is a Maxwellian EEDF and is exactly the
-        # lower edge of doc 05 §2.1's `uniform [1, 5]`; a logit sends an edge to -inf. The
-        # behaviour is correct, the trap is real, and `ControlPrior.median()` is the answer.
         prior = default_control_prior()
         u = ControlParameters.reference().to_unconstrained()
 
@@ -350,8 +318,6 @@ class TestTheDocumentedLevelAPriors:
         assert marginal.support == pytest.approx((0.02, 0.5), rel=1e-12)
 
     def test_the_pressure_prior_is_the_gauge_reading_to_two_percent(self) -> None:
-        # doc 05 §2.1: "informative — gauge-measured, sigma = 2 %". Relative, so it is
-        # applied on the log scale where 2 % is what it says.
         marginal = default_control_prior(gauge_pressure=8.0).marginal("p")
 
         assert isinstance(marginal, LogNormalPrior)
@@ -359,8 +325,6 @@ class TestTheDocumentedLevelAPriors:
         assert marginal.log_sigma == pytest.approx(0.02)
 
     def test_the_bias_prior_is_the_supply_reading_to_one_percent(self) -> None:
-        # doc 05 §2.1: "informative — supply-measured, sigma = 1 %", on a quantity that is
-        # negative, so the sigma is one percent of the *magnitude*.
         marginal = default_control_prior(supply_bias=-400.0).marginal("V_w")
 
         assert isinstance(marginal, NormalPrior)
@@ -387,8 +351,6 @@ class TestTheDocumentedLevelAPriors:
         assert marginal.support == pytest.approx((1.0, 5.0), rel=1e-14)
 
     def test_every_marginal_support_matches_the_parameter_support(self) -> None:
-        # If they disagree, the joint prior is not normalised over the space the parameter
-        # vector can represent, and no single-parameter test would show it.
         prior = default_control_prior()
 
         for spec in CONTROL_PARAMETERS:
@@ -409,8 +371,6 @@ class TestTheExplicitPhysicsPriors:
     """doc 05 §4.2 — the soft penalties, and what each is anchoring."""
 
     def test_the_bohm_penalty_is_silent_when_the_criterion_holds(self) -> None:
-        # doc 05 §4.2: "soft penalty on u_s/c_s < 1". A supersonic sheath edge satisfies
-        # the criterion and must not be penalised for exceeding it.
         u_s = np.array([2400.0, 3000.0, 2701.0])
         c_s = np.full(3, 2700.0)
 
@@ -419,7 +379,6 @@ class TestTheExplicitPhysicsPriors:
         assert bohm_penalty(u_s * 2.0, c_s, weight=10.0) == 0.0
 
     def test_the_bohm_penalty_is_a_quadratic_hinge(self) -> None:
-        # -w/2 * sum(max(0, 1 - u_s/c_s))^2, computed here by hand.
         u_s = np.array([1350.0, 2700.0])
         c_s = np.array([2700.0, 2700.0])
 
@@ -430,8 +389,6 @@ class TestTheExplicitPhysicsPriors:
             bohm_penalty(np.ones(2), np.zeros(2), weight=1.0)
 
     def test_the_quasineutrality_penalty_is_zero_in_a_neutral_bulk(self) -> None:
-        # doc 05 §4.2: "soft penalty on (n_i - n_e)/n_i for z > 5 z_s". The caller has
-        # already selected the bulk region; this scores the residual there.
         n_i = np.array([1.0e17, 9.0e16])
 
         assert quasineutrality_penalty(n_i, n_i, weight=100.0) == 0.0
@@ -445,9 +402,6 @@ class TestTheExplicitPhysicsPriors:
         assert quasineutrality_penalty(n_i, n_e, weight=100.0) == pytest.approx(expected, rel=1e-12)
 
     def test_the_smoothness_prior_is_a_zero_mean_gaussian_on_the_coefficients(self) -> None:
-        # doc 05 §2.3: alpha ~ N(0, tau^2), the hierarchical shrinkage prior; doc 05 §4.2
-        # lists the same object as "profile smoothness | Tikhonov on discrepancy
-        # coefficients". Checked against scipy.stats, summed over coefficients.
         alpha = np.array([0.12, -0.4, 0.03, 0.0])
         tau = 0.25
 
@@ -460,7 +414,6 @@ class TestTheExplicitPhysicsPriors:
             smoothness_log_prior(np.zeros(3), tau=0.0)
 
     def test_a_negative_penalty_weight_is_rejected(self) -> None:
-        # A negative weight turns a penalty into a reward for violating the physics.
         with pytest.raises(ValueError, match="negative"):
             bohm_penalty(np.ones(2), np.ones(2), weight=-1.0)
         with pytest.raises(ValueError, match="negative"):
